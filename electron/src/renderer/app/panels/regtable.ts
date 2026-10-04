@@ -13,7 +13,11 @@
    its alias, then Hex, Dec, Bin and the "Changed" tag.  A pinned register
    has a second row, a copy, in the pinned block: the same values, the
    same highlight, data-pin instead of data-reg (data-reg is the register's
-   one row in its group, which the tutorial and the tests look for). */
+   one row in its group, which the tutorial and the tests look for).
+
+   onMark hears every star and every alias the student sets (the tutorial
+   waits for them); marks() and setMarks() read and set them all at once
+   (the tutorial puts back what was there before it). */
 
 import { badgeStyle, fit, needed, styles, type Column, type Fit, type Style } from '../logic/columns.ts';
 import {
@@ -45,7 +49,11 @@ const DROPS = [['dec'], ['bin']];
 // the four columns are what they were, and so is the panel's width).
 const NORMAL = { pad: 28, gap: 8 };
 const TIGHT = { pad: 20, gap: 4 };
-const PIN_ROWS = 6;   // the pinned block shows this many rows, then scrolls itself
+const PIN_ROWS = 6;
+
+// A star pressed (on: pinned now) or an alias given ('' : removed).
+export type Mark = { kind: 'pin'; key: string; on: boolean } | { kind: 'alias'; key: string; alias: string };
+export interface Marks { pins: string[]; aliases: [string, string][] }   // the pinned block shows this many rows, then scrolls itself
 
 // Kept while the window lives (one ISA to a window).
 const kept: { choice: ColumnChoice; pins: string[]; aliases: Map<string, string> } =
@@ -83,6 +91,7 @@ export class RegisterTable {
   private editing: (() => void) | null = null;
   private boxesShown = '';
   private readonly opts: { columns: Column[]; pc: string };
+  onMark: (m: Mark) => void = () => {};
 
   // `columns`: the name column and Hex, Dec, Bin; `pc`: the register a step
   // always changes (never scrolled to).
@@ -308,6 +317,19 @@ export class RegisterTable {
     this.renderPins();
     this.fit();
     if (fromCopy) row.star.focus(); // the copy is gone: its star's focus to the row's own
+    this.onMark({ kind: 'pin', key, on: kept.pins.includes(key) });
+  }
+
+  // Every star and alias, as they are now; and all of them set at once.
+  marks(): Marks { return { pins: [...kept.pins], aliases: [...kept.aliases] }; }
+  setMarks(m: Marks): void {
+    this.editing?.();
+    for (const key of kept.pins) if (!m.pins.includes(key)) { const row = this.rows.get(key); if (row) row.copy = null; }
+    kept.pins = m.pins.filter((k) => this.rows.has(k));
+    kept.aliases = new Map(m.aliases);
+    for (const key of kept.pins) this.addCopy(key);
+    this.renderPins();
+    this.fit();
   }
 
   // The pinned block in the order of the stars, every star and alias as the state says.
@@ -371,6 +393,7 @@ export class RegisterTable {
       copy.el.classList.remove('editing');
       this.showAlias(row);
       this.fit();
+      if (keep) this.onMark({ kind: 'alias', key, alias: kept.aliases.get(key) ?? '' });
     };
     this.editing = () => end(true);
     input.addEventListener('keydown', (e) => {

@@ -37,7 +37,7 @@ import { FP_ABI_NAMES } from '../../core/registers.ts';
 import type { Column, Fit } from '../../../../renderer/app/logic/columns.ts';
 import { code, h } from '../../../../renderer/app/dom.ts';
 import { perf } from '../../../../renderer/app/perf.ts';
-import { RegisterTable } from '../../../../renderer/app/panels/regtable.ts';
+import { RegisterTable, type Mark, type Marks } from '../../../../renderer/app/panels/regtable.ts';
 
 const COLUMNS: Column[] = [{ key: 'rn', ch: 8.5 }, { key: 'hex', ch: 10.5 }, { key: 'dec', ch: 10.5 }, { key: 'bin', ch: 28.5 }];
 
@@ -120,5 +120,9 @@ export class RegisterPanel {
   // the width and the boxes, and let go again.
   revealRegister(key: string): void { this.table.revealRegister(key); }
   showColumn(key: 'dec' | 'bin'): 'already' | 'hidden' | 'shown' { return this.table.showColumn(key); }
+  // The stars and aliases (regtable.ts): heard, read and set.
+  set onMark(listener: (m: Mark) => void) { this.table.onMark = listener; }
+  marks(): Marks { return this.table.marks(); }
+  setMarks(m: Marks): void { this.table.setMarks(m); }
   releaseColumn(key: 'dec' | 'bin'): void { this.table.releaseColumn(key); }
 }
