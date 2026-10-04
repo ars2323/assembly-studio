@@ -60,7 +60,7 @@ export function tabsHead(titles: string[], onSelect: (index: number) => void): T
 // back on, to let go again ("Bin", pressed).  Compact: a narrow head holds
 // two or three of them.
 export function columnButton(name: string, on: boolean, onClick: () => void): HTMLButtonElement {
-  const b = headButton(on ? name : `+ ${name}`, on ? '폭에 맞춰 다시 숨깁니다' : '좁아서 숨긴 열입니다. 누르면 보입니다', onClick);
+  const b = headButton(on ? name : `+ ${name}`, on ? 'Hide again to fit the width' : 'Hidden for lack of room: click to show', onClick);
   b.classList.add('colbtn');
   b.classList.toggle('on', on);
   b.setAttribute('aria-pressed', String(on));

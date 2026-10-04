@@ -36,7 +36,7 @@ export class ConsolePanel {
     this.head.root.addEventListener('dblclick', () => this.setExpanded(!this.expanded));
     this.log = h('pre', { class: 'clog mono' });
     this.emptyNote = h('div', { class: 'notice-host' },
-      notice({ pose: 'talk', title: '아직 출력이 없습니다', body: '프로그램이 출력하거나 입력을 받으면 여기에 나옵니다.' }));
+      notice({ pose: 'talk', title: 'No output yet', body: 'What the program prints, and the input it asks for, shows up here.' }));
     this.input = h('input', { class: 'cinput mono', type: 'text', 'aria-label': 'Console input', spellcheck: 'false', autocomplete: 'off' });
     this.input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.isComposing) {

@@ -9,7 +9,7 @@
        once when it changes, and its own "Changed" tag wherever the panel's
        width has the room (logic/columns.ts badgeStyle; the panel is given
        no width for it, which would come out of Text or the Editor) -- the
-       panel's head carries no legend; the status bar says "방금 바뀜: …"
+       panel's head carries no legend; the status bar says "Changed: …"
        in the same yellow at every width.  It lifts at the next step.
        After a step the list scrolls to it, unless the student is
        scrolling it (dom.ts userScrolls);
@@ -93,7 +93,7 @@ export class RegisterPanel {
       const b = h('button', { class: 'linkbtn', type: 'button' }, show ? 'Hide' : 'Show');
       b.addEventListener('click', () => setFold(!show));
       const n = this.order.filter((k) => this.rows.get(k)!.el.classList.contains('cp0')).length;
-      fold.replaceChildren(h('span', { class: 'foldtext' }, '부동소수점', show ? ` 레지스터 ${n}개 보이는 중` : ` 레지스터 ${n}개 숨김`), b);
+      fold.replaceChildren(h('span', { class: 'foldtext' }, `${n} floating-point register${n === 1 ? '' : 's'} ${show ? 'shown' : 'hidden'}`), b);
     };
     setFold(false);
     this.head = panelHead('Registers');

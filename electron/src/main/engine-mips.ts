@@ -89,7 +89,7 @@ export function start(win: BrowserWindow): Engine {
       machine = await onChecker((c) => readImage((m, ...a) => c.call(m, ...a), job.source, job.options));
     } catch (e) {
       if (e instanceof ImageError) return { error: e.message };
-      if (e instanceof SimulatorCrashed) return { error: '실행 이미지를 만드는 중에 시뮬레이터가 멈췄습니다' };
+      if (e instanceof SimulatorCrashed) return { error: 'The simulator stopped while making the executable image' };
       throw e;
     }
     const encoded = encodeTextFile(job.source, job.format ?? NEW_FILE_FORMAT);

@@ -40,7 +40,7 @@ export async function readImage(call: Call, source: string, options: AssembleOpt
   handlerNames.delete('main'); // declared by the loader for every program, defined by the program
 
   const r = await call('assemble', source, options);
-  if (!r.ok) throw new ImageError('어셈블 오류가 있어 실행 이미지를 만들 수 없습니다');
+  if (!r.ok) throw new ImageError('No executable image: the code has assemble errors');
   const seg = await call('segments');
   const regs = await call('registers');
   const sp = regs.general[29];
@@ -52,7 +52,7 @@ export async function readImage(call: Call, source: string, options: AssembleOpt
   if (little === big) throw new Error(`the byte order cannot be told from ${inMemory}`);
 
   const userText = (await call('textSegment')).filter((w) => w.addr >= seg.textBot && w.addr < seg.textTop);
-  if (userText.length === 0) throw new ImageError('명령이 없어 실행 이미지를 만들 수 없습니다');
+  if (userText.length === 0) throw new ImageError('No executable image: the program has no instructions');
   const textAddr = userText[0].addr;
   const words = new Array<number>((userText[userText.length - 1].addr - textAddr) / 4 + 1).fill(0);
   for (const w of userText) words[(w.addr - textAddr) / 4] = w.word >>> 0;
@@ -75,7 +75,7 @@ export async function readImage(call: Call, source: string, options: AssembleOpt
     .sort((a, b) => a.addr - b.addr || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 
   const main = own.find((s) => s.name === 'main') ?? own.find((s) => s.name === '__start');
-  if (!main) throw new ImageError('main 레이블이 없어 실행 이미지를 만들 수 없습니다');
+  if (!main) throw new ImageError('No executable image: the program has no main label');
 
   return {
     endian: little ? 'little' : 'big',

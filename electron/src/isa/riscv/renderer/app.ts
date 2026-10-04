@@ -45,9 +45,9 @@
 
 import { hex32 } from '../../../core/format.ts';
 import { LabelMap } from '../../../core/symbols.ts';
-import { nearMiss } from '../core/near-miss.ts';
+import { rarsHint } from '../core/near-miss.ts';
 import { tokenizeLine } from '../core/riscv-syntax.ts';
-import { abiName, findRegister, FP_ABI_NAMES } from '../core/registers.ts';
+import { abiName, FP_ABI_NAMES } from '../core/registers.ts';
 import type { Settings } from '../../../main/main.ts';
 import type { TextFileFormat } from '../../../node/text-file.ts';
 import type { EngineState } from '../sim/host.ts';
@@ -60,7 +60,7 @@ import { WINDOW_COLOURS } from '../../../main/theme.ts';
 import { notice } from '../../../renderer/app/notice.ts';
 import { createEditor } from '../../../renderer/app/editor.ts';
 import { shortName } from '../../../renderer/app/logic/names.ts';
-import { changedKeys, stateAfter, stopMessage, stopReason, textRows, toValues, ZERO_REGS, type RegisterValues, type RunState, type StopReason, type TextRow } from './logic/machine.ts';
+import { changedKeys, stateAfter, stopKeys, stopMessage, stopReason, textRows, toValues, ZERO_REGS, type RegisterValues, type RunState, type StopReason, type TextRow } from './logic/machine.ts';
 import { aboutDialog } from '../../../renderer/app/panels/about.ts';
 import { ConsolePanel } from '../../../renderer/app/panels/console.ts';
 import { Inspector } from './panels/inspector.ts';
@@ -72,6 +72,8 @@ import { ask } from '../../../renderer/app/panels/ask.ts';
 import { Tutorial, type Example, type Signal } from './tutorial.ts';
 import type { DataSection } from '../../../renderer/app/panels/data.ts';
 import { panelHead } from '../../../renderer/app/ui.ts';
+import { cell, clock, count, keys, lead, lines as lineList, plural } from '../../../renderer/app/cells.ts';
+import { assembledState, busyState, errorList, freshState } from '../../../renderer/app/panels/assemble.ts';
 
 const UNTITLED = 'untitled.s';
 const APP_NAME = brand.name;
@@ -95,6 +97,8 @@ let assembledText: string | null = null; // the program the machine holds
 // The program on the machine, as it was assembled: Reset reloads it, Export writes its image.
 let lastGood: { source: string; name: string; path: string | null; format: TextFileFormat | null } | null = null;
 let lastAssembly: { at: Date; instructions: number } | null = null; // for the Assemble panel
+let failedAt: Date | null = null;      // the last assemble that had errors (the Assemble panel)
+let assembling = false;                // an assemble taking long enough to say so
 let lastDataEnd = 0x10010000;           // one past the highest data label: how much of .data to show
 let runState: RunState = 'ready';
 let busy = false;                      // a call is on its way; keys wait
@@ -164,7 +168,7 @@ speedFast.addEventListener('click', () => void setSpeed('fast'));
 speedSlow.addEventListener('click', () => void setSpeed('slow'));
 const speedSwitch = h('span', { class: 'seg speed', role: 'radiogroup', 'aria-label': 'Run speed' }, speedFast, speedSlow);
 // A narrow title bar: the same choice as one button that says what it is.
-const speedOne = h('button', { class: 'btn speedone', type: 'button', title: 'Run speed (Instant / 1 line/s): 누르면 바뀝니다' });
+const speedOne = h('button', { class: 'btn speedone', type: 'button', title: 'Run speed (Instant / 1 line/s): click to switch' });
 speedOne.addEventListener('click', () => void setSpeed(speed === 'fast' ? 'slow' : 'fast'));
 const speedBox = h('span', { class: 'speedbox' }, h('span', { class: 'speedlabel' }, 'Run speed'), speedSwitch, speedOne);
 const toolbar = h('span', { class: 'toolbar' }, bAssemble, bRun, speedBox, bStep, bRestart);
@@ -175,7 +179,7 @@ viewEditor.addEventListener('click', () => showView('editor'));
 viewRun.addEventListener('click', () => showView('run'));
 const viewSwitch = h('span', { class: 'seg viewswitch', role: 'tablist', hidden: true }, viewEditor, viewRun);
 const titlebar = h('header', { class: 'titlebar' },
-  h('span', { class: 'brand home', title: '처음 화면 (ISA 바꾸기)', role: 'button', tabindex: '0' },
+  h('span', { class: 'brand home', title: 'Home (choose the ISA)', role: 'button', tabindex: '0' },
     h('img', { class: 'logo', src: asset(brand.mark), alt: '' }),
     h('span', { class: 'appname' }, APP_NAME)),
   fileLabel,
@@ -234,7 +238,7 @@ const centre = h('div', { class: 'centre' }, text.root, inspector.root, congrats
 // Between Registers and the Console, a grip: drag to share the height,
 // double-click for the default (the Console as tall as its words while it
 // is empty, its share once there is output: app.css).
-const consoleGrip = h('div', { class: 'vgrip', role: 'separator', 'aria-orientation': 'horizontal', title: '끌어서 높이 조절 · 두 번 눌러 되돌리기' },
+const consoleGrip = h('div', { class: 'vgrip', role: 'separator', 'aria-orientation': 'horizontal', title: 'Drag to resize · double-click to reset' },
   h('span', { class: 'grip' }));
 const leftCol = h('div', { class: 'leftcol' }, regsHost, consoleGrip, consolePanel.root);
 const runGrid = h('div', { class: 'run-grid' }, leftCol, centre);
@@ -256,10 +260,10 @@ const foldEditor = h('button', { class: 'foldbtn', type: 'button', title: 'Colla
 const foldRun = h('button', { class: 'foldbtn', type: 'button', title: 'Collapse Run', 'aria-label': 'Collapse Run' }, '›');
 foldEditor.addEventListener('click', () => fold('editor'));
 foldRun.addEventListener('click', () => fold('run'));
-const splitter = h('div', { class: 'splitter', role: 'separator', 'aria-orientation': 'vertical', title: '끌어서 폭 조절 · 두 번 눌러 되돌리기' },
+const splitter = h('div', { class: 'splitter', role: 'separator', 'aria-orientation': 'vertical', title: 'Drag to resize · double-click to reset' },
   foldEditor, h('span', { class: 'grip' }), foldRun);
 // Between the Editor and the Assemble panel, a grip like the Console's.
-const asmGrip = h('div', { class: 'vgrip', role: 'separator', 'aria-orientation': 'horizontal', title: '끌어서 높이 조절 · 두 번 눌러 되돌리기' },
+const asmGrip = h('div', { class: 'vgrip', role: 'separator', 'aria-orientation': 'horizontal', title: 'Drag to resize · double-click to reset' },
   h('span', { class: 'grip' }));
 const paneEditor = h('div', { class: 'pane pane-editor' }, editorPanel, asmGrip, asmPanel, railEditor);
 const paneRun = h('div', { class: 'pane pane-run' }, runPanel, railRun);
@@ -430,11 +434,11 @@ function sizeRunSide(): void {
 // there at all (dead: it could not start), which no key can mend.
 function renderPlaceholder(): void {
   const kind = engineState === 'dead' ? 'dead' : crashNote ? 'crashed' : errors.length ? 'failed' : 'fresh';
-  const where = narrow ? 'Editor 탭 아래쪽의 Assemble 패널' : '편집기 아래 Assemble 패널';
-  const [title, body] = kind === 'dead' ? ['시뮬레이터 엔진을 쓸 수 없습니다', `${engineDetail} 프로그램을 다시 시작해 보고, 그래도 안 되면 조교에게 알려 주세요.`]
-    : kind === 'crashed' ? ['시뮬레이터 엔진이 멈췄습니다', '엔진을 다시 시작했습니다. 프로그램은 지워졌으니 Ctrl+S 키로 다시 어셈블하세요.']
-    : kind === 'failed' ? ['아직 어셈블된 프로그램이 없습니다', `${where}에 나온 오류를 고친 뒤 Ctrl+S 키를 다시 누르세요.`]
-    : ['아직 어셈블하지 않았습니다', '어셈블하면 여기에 레지스터와 명령, 콘솔 출력이 나옵니다.'];
+  const where = narrow ? 'the Assemble panel on the Editor tab' : 'the Assemble panel under the Editor';
+  const [title, body] = kind === 'dead' ? ['The simulator engine is unavailable', `${engineDetail} Restart the app; if that does not help, tell your TA.`]
+    : kind === 'crashed' ? ['The simulator engine stopped', 'It has been restarted and the program cleared: press Ctrl+S to assemble again.']
+    : kind === 'failed' ? ['No program assembled yet', `Fix the errors in ${where}, then press Ctrl+S again.`]
+    : ['Not assembled yet', 'Assemble to see the registers, the instructions and the console output here.'];
   const key = JSON.stringify([kind, title, body, assembleName(false), engineDetail]);
   if (placeholder.dataset.key === key) return;
   placeholder.dataset.key = key;
@@ -445,45 +449,41 @@ function renderPlaceholder(): void {
   placeholder.dataset.kind = kind;
 }
 
-// The time of an assemble, as the Assemble panel and the band say it.
-const clock = (d: Date) => d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-
 // Over the Run side while the Editor's code is not the machine's program.
 function renderBand(): void {
   const on = machineShown() && edited;
   runBand.hidden = !on;
   if (!on) return;
   const at = lastAssembly ? ` (${clock(lastAssembly.at)})` : '';
-  const text = `지금 보이는 것은 마지막으로 어셈블한 코드입니다${at} · 고친 코드를 어셈블하려면 Ctrl+S`;
+  const text = `Edited · showing the last assembled code${at} · Ctrl+S to assemble your edits`;
   if (runBand.textContent !== text) { runBand.textContent = text; runBand.title = text; }
 }
 
-// The Assemble panel: the last assemble's errors; or when it was and what it
-// made, with a line once the code has changed since; or, before any, what
-// Ctrl+S will do.  Drawn again only when what it says changes (a list the
-// student has scrolled stays where it is).
+// The Assemble panel (panels/assemble.ts): a row of cells -- the state, what
+// the assemble made, what Ctrl+S did with the file, when -- and under it what
+// to do next; with errors, the list.  Before any assemble, what Ctrl+S will
+// do.  Drawn again only when what it says changes (a list the student has
+// scrolled stays where it is).
 let asmKey = '';
 function renderAssemble(): void {
   const key = JSON.stringify([errors.map((e) => [e.line, e.col, e.message]), lastAssembly?.at.getTime() ?? null,
-    lastAssembly?.instructions ?? null, edited, machineShown(), saveNote, saves(), narrow]);
+    lastAssembly?.instructions ?? null, failedAt?.getTime() ?? null, assembling, edited, machineShown(), saveNote, saveWarn, saves(), narrow]);
   if (key === asmKey) return;
   asmKey = key;
-  asmPanel.dataset.state = errors.length ? 'errors' : lastAssembly ? (edited ? 'changed' : 'ok') : 'fresh';
-  if (errors.length) {
-    asmHead.setMeta(errors.length === 1 ? '1 error' : `${errors.length} errors`);
-    asmBody.replaceChildren(errorNotice());
-    return;
-  }
-  if (lastAssembly) {
-    asmHead.setMeta(clock(lastAssembly.at));
-    const said = [h('p', { class: 'ok' }, `어셈블했습니다 · 명령 ${lastAssembly.instructions}개${saveNote ? ` · ${saveNote}` : ''}`)];
-    if (edited) said.push(h('p', { class: 'warn' }, '코드가 바뀌었습니다. 실행은 마지막으로 어셈블한 코드로 합니다 — 고친 코드를 어셈블하려면 Ctrl+S 키를 누르세요.'));
-    asmBody.replaceChildren(h('div', { class: 'asm-state' }, ...said));
-    return;
-  }
+  asmPanel.dataset.state = assembling ? 'busy' : errors.length ? 'errors' : lastAssembly ? (edited ? 'changed' : 'ok') : 'fresh';
   asmHead.setMeta('');
-  asmBody.replaceChildren(h('div', { class: 'asm-state' },
-    h('p', {}, `Ctrl+S 키를 누르면 ${saves() ? '저장하고 ' : ''}어셈블합니다. 결과와 오류가 여기에 나옵니다.`)));
+  // RARS's own words (docs/engine-protocol.md 6.1): what students see in its docs and searches.
+  const sourceOf = (line: number) => (line > 0 && line <= editor.view.state.doc.lines ? editor.view.state.doc.line(line).text.trim() : '');
+  asmBody.replaceChildren(assembling ? busyState()
+    : errors.length ? errorList({
+      errors: errors.map((e) => {
+        const source = sourceOf(e.line);
+        return { line: e.line, message: e.message, source, hint: source ? rarsHint(e.message, source) : '' };
+      }),
+      at: failedAt, kept: machineShown(), narrow, goTo: (n) => goToErrorLine(n), toEditor: () => showView('editor'),
+    })
+    : lastAssembly ? assembledState({ instructions: lastAssembly.instructions, at: lastAssembly.at, saveNote, saveWarn, edited })
+    : freshState(saves(), saveNote, saveWarn));
 }
 
 // The Editor line of PC: the Text row's line (several words of one pseudo
@@ -584,7 +584,7 @@ const saves = (): boolean => !file.example;
 const assembleName = (short: boolean): string => (saves() && !short ? 'Save & Assemble' : 'Assemble');
 function nameAssemble(): void {
   (bAssemble.querySelector('.label') as HTMLElement).textContent = assembleName(titlebar.classList.contains('short'));
-  bAssemble.title = saves() ? 'Save & Assemble (Ctrl+S)' : 'Assemble (Ctrl+S): 예제라서 저장하지 않습니다';
+  bAssemble.title = saves() ? 'Save & Assemble (Ctrl+S)' : 'Assemble (Ctrl+S): examples are not saved';
 }
 
 // The title bar gives way one step at a time, as far as it has to: the key
@@ -640,54 +640,66 @@ window.addEventListener('resize', () => fitTitlebar());
 (navigator as unknown as { windowControlsOverlay?: EventTarget }).windowControlsOverlay
   ?.addEventListener('geometrychange', () => fitTitlebar());
 
+// The status bar: cells (src/renderer/app/cells.ts), the engine's state when
+// it is not ready, then the machine's -- what it did last and where PC is --
+// the steps, the registers it changed, the instruction chosen in Text, a
+// word about the file; at the far end the keys that go on from here.
 function renderStatus(): void {
-  const parts: (Node | string)[] = [];
-  const span = (cls: string, ...c: (Node | string)[]) => h('span', { class: cls }, ...c);
-  if (engineState !== 'ready') parts.push(span(engineState === 'dead' ? 'err' : 'run engine',
-    engineState === 'starting' ? '엔진 준비 중…' : engineState === 'restarting' ? '엔진을 다시 시작하는 중…' : '엔진을 쓸 수 없음'));
-  if (crashNote) parts.push(span('err', crashNote));
-  if (!open) parts.push(span('', '준비'));
+  const parts: HTMLElement[] = [];
+  let hints: [string, string][] = [];
+  if (engineState !== 'ready') {
+    const e = lead(engineState === 'dead' ? 'err' : 'run',
+      engineState === 'starting' ? 'Starting the engine…' : engineState === 'restarting' ? 'Restarting the engine…' : 'Engine unavailable');
+    e.classList.add('engine');
+    parts.push(e);
+  }
+  if (crashNote) parts.push(lead('err', crashNote));
+  if (!open) parts.push(lead('idle', 'Ready'));
   else if (assembledText === null) {
     if (errors.length) {
-      parts.push(span('err', `오류 ${errors.length}개`));
+      parts.push(lead('err', plural(errors.length, 'error')));
       const e = errors[0];
-      parts.push(span('', e.line ? `${e.line}행 · ` : '', withHex(e.message)));
-    } else parts.push(span('', !saves() ? '어셈블 (Ctrl+S)' : edited ? '고친 뒤 저장·어셈블 (Ctrl+S)' : '저장·어셈블 (Ctrl+S)'));
-    if (saveNote) parts.push(span(saveWarn ? 'warn' : '', saveNote));
+      parts.push(cell('', e.line ? `Line ${e.line} · ` : '', withHex(e.message)));
+    } else parts.push(lead('idle', edited ? 'Edited · not assembled' : 'Not assembled'));
+    if (saveNote) parts.push(cell(saveWarn ? 'warn' : '', saveNote));
+    hints = [['Ctrl+S', assembleName(false)]];
   } else {
     const pc = lastRegs ? hex32(lastRegs.pc) : '';
     if (runState === 'running' && slow) {
-      parts.push(span('run', '천천히 실행 중 (1 line/s)'));
-      if (steps > 0) parts.push(span('', `${steps}단계`));
-      if (pc) parts.push(span('', 'PC ', code(pc)));
+      parts.push(lead('run', 'Slow run · 1 line/s'));
+      if (steps > 0) parts.push(cell('', count(steps, 'step')));
+      if (pc) parts.push(cell('', 'PC ', code(pc)));
       if (changedNow.length) parts.push(changedPart());
-      parts.push(span('', '멈추려면 Esc · 빨리 가려면 Instant'));
+      hints = [['Esc', 'Stop'], ['', 'Instant for full speed']];
     } else if (runState === 'running') {
-      parts.push(span('run', '실행 중'));
-      parts.push(span('', '멈춤 (Esc)'));
+      parts.push(lead('run', 'Running…'));
+      hints = [['Esc', 'Stop']];
     } else if (runState === 'input') {
-      parts.push(span('run', codeText(stopMessage('input', pc))));
-      parts.push(span('', '멈춤 (Esc)'));
+      parts.push(lead('run', codeText(stopMessage('input', pc))));
+      hints = stopKeys('input');
     } else {
       const reason = lastReason;
-      if (runState === 'ready') parts.push(span('', code('F10'), ' Step · ', code('F5'), ' Run'));
-      if (runState === 'ready' && steps === 0 && saveNote) parts.push(span(saveWarn ? 'warn' : '', saveNote));
-      else if (runState === 'finished') parts.push(span(reason === 'error' ? 'err' : 'ok', stopMessageFor(reason, pc)));
-      else parts.push(span('run', codeText(stopMessage(reason, pc))));
-      if (steps > 0 && runState !== 'finished') parts.push(span('', `${steps}단계`));
-      if (runState !== 'finished' && reason !== 'limit' && pc) parts.push(span('', 'PC ', code(pc)));
+      if (runState === 'ready') {
+        parts.push(lead('run', 'Ready', pc ? ' · PC ' : '', pc ? code(pc) : null));
+        if (steps === 0 && saveNote) parts.push(cell(saveWarn ? 'warn' : '', saveNote));
+        hints = [['F10', 'Step'], ['F5', 'Run']];
+      } else {
+        const tone = runState !== 'finished' ? 'run' : reason === 'error' ? 'err' : 'ok';
+        parts.push(lead(tone, codeText(stopMessage(reason, pc))));
+        hints = stopKeys(reason);
+      }
+      if (steps > 0 && runState !== 'finished') parts.push(cell('', count(steps, 'step')));
       if (changedNow.length) parts.push(changedPart());
-      if (selected >= 0) parts.push(span('', '고른 명령 ', code(hex32(selected))));
+      if (selected >= 0) parts.push(cell('', 'Selected ', code(hex32(selected))));
     }
     // A later assemble that failed (the machine keeps the last program).
-    if (errors.length) parts.push(span('err', `고친 코드에 오류 ${errors.length}개 — Assemble 패널`));
+    if (errors.length) parts.push(cell('err', `${plural(errors.length, 'error')} in the edited code`));
   }
-  if (note) parts.push(span('warn', note));
-  else if (exportNote) parts.push(span('ok', exportNote));
+  if (note) parts.push(cell('warn', note));
+  else if (exportNote) parts.push(cell('ok', exportNote));
+  if (open && hints.length) parts.push(keys(...hints));
   status.replaceChildren(...parts);
 }
-const stopMessageFor = (reason: StopReason, pc: string) =>
-  reason === 'exit' ? '프로그램이 끝났습니다 — 다시 하려면 Reset' : reason === 'error' ? '실행 오류로 멈췄습니다 — 콘솔을 보세요' : stopMessage(reason, pc);
 
 // ---- files -------------------------------------------------------------------------
 
@@ -902,7 +914,7 @@ async function saveAndAssemble(): Promise<boolean> {
   saveNote = '';
   saveWarn = false;
   if (file.example) {
-    saveNote = '예제라서 저장하지 않습니다';
+    saveNote = 'Example · not saved';
     return assemble(source);
   }
   try {
@@ -911,8 +923,8 @@ async function saveAndAssemble(): Promise<boolean> {
       file.path = saved.path;
       file.name = saved.name;
       dirty = editor.text() !== source; // typed on while the dialog was up
-      saveNote = '저장됨';
-    } else [saveNote, saveWarn] = ['저장하지 않음 (어셈블은 했습니다)', true];
+      saveNote = 'Saved';
+    } else [saveNote, saveWarn] = ['Not saved', true];
   } catch (e) {
     [saveNote, saveWarn] = [(e as Error).message, true];
   }
@@ -938,7 +950,7 @@ function takeBreakpoints(list: { line: number; addr: number | null }[]): void {
   for (const r of rows) r.breakpoint = breakpoints.has(r.addr);
   text.setRows(rows);
   const idle = list.filter((b) => b.addr === null).map((b) => b.line);
-  if (idle.length && current()) note = `${idle.join(', ')}행에는 명령이 없어 브레이크포인트가 걸리지 않습니다`;
+  if (idle.length && current()) note = `${lineList(idle)}: no instruction, breakpoint has no effect`;
 }
 
 const errorsOf = (list: ErrorItem[] | undefined) =>
@@ -953,8 +965,11 @@ async function assemble(source: string): Promise<boolean> {
   note = '';
   exportNote = '';
   congrats.hidden = true;
+  // An assemble that takes a while says so in the Assemble panel.
+  const slowAssemble = setTimeout(() => { assembling = true; renderAssemble(); }, 150);
   const failed = (list: typeof errors): false => {
     errors = list;
+    failedAt = new Date();
     edited = editor.text() !== assembledText;
     editor.showErrors(errors.map((e) => e.line).filter((n) => n > 0));
     if (narrow) view = 'editor'; // the errors are under the Editor
@@ -1012,13 +1027,15 @@ async function assemble(source: string): Promise<boolean> {
     after = { kind: 'assembled', ok: true };
     return true;
   } finally {
+    clearTimeout(slowAssemble);
+    assembling = false;
     busy = false;
     renderChrome();
     if (after) emit(after);
   }
 }
 
-// "N행으로 가기": the Editor (a narrow window: its tab), the line.
+// "Go to line N": the Editor (a narrow window: its tab), the line.
 function goToErrorLine(n: number): void {
   if (narrow) showView('editor');
   editor.goToLine(n);
@@ -1031,50 +1048,6 @@ function renderErrors(): void {
   editor.showErrors(errors.map((e) => e.line).filter((n) => n > 0));
   asmKey = '';
   renderAssemble();
-}
-
-// The slip a line shows, when there is one to name (src/isa/riscv/core/near-miss.ts),
-// under RARS's words: a name a letter or two from one RARS knows, a register
-// that does not exist, a MIPS habit.  RARS names the word it could not take
-// ('"spp": operand is of incorrect type'); only that word is guessed at as a
-// misspelt register.  Nothing to name: no hint.
-function hintFor(message: string, source: string): string {
-  const flagged = /^"([^"]+)"/.exec(message)?.[1] ?? null;
-  const near = nearMiss(source, flagged);
-  if (near?.why === 'spelling') {
-    const noSuch = { directive: '지시어는 없습니다', instruction: '명령은 없습니다', register: '레지스터는 없습니다' }[near.kind];
-    return `\`${near.token}\` ${noSuch}. 혹시 \`${near.meant}\`?`;
-  }
-  if (near?.why === 'no-such-register') return `\`${near.token}\` 레지스터는 없습니다. \`${near.family}\` 레지스터는 \`${near.range}\` 입니다.`;
-  if (near?.why === 'mips' && near.token.startsWith('$')) {
-    return findRegister(near.meant)
-      ? `RISC-V 레지스터 이름에는 \`$\` 기호가 없습니다: \`${near.token}\` → \`${near.meant}\`.`
-      : `RISC-V 레지스터 이름에는 \`$\` 기호가 없고, \`${near.meant}\` 레지스터도 없습니다(MIPS 레지스터 이름). 시스템 호출 번호는 \`a7\` 레지스터에 넣습니다.`;
-  }
-  if (near?.why === 'mips') return `\`${near.token}\` 명령은 MIPS 명령입니다. RISC-V 에서는 \`${near.meant}\` 명령을 씁니다.`;
-  return '';
-}
-
-function errorNotice(): HTMLElement {
-  const toLine = (n: number) => goToErrorLine(n);
-  const first = errors.find((e) => e.line > 0) ?? errors[0];
-  const go = h('button', { class: 'btn primary', type: 'button' }, first.line ? `${first.line}행으로 가기` : '고치러 가기');
-  go.addEventListener('click', () => (first.line ? toLine(first.line) : showView('editor')));
-  // RARS's own words (docs/engine-protocol.md 6.1): what students see in its docs and searches.
-  const items = errors.map((e) => {
-    const where = h('button', { class: 'linkbtn line', type: 'button', disabled: !e.line }, e.line ? `${e.line}행` : '');
-    where.addEventListener('click', () => { if (e.line) toLine(e.line); });
-    const source = e.line > 0 && e.line <= editor.view.state.doc.lines ? editor.view.state.doc.line(e.line).text.trim() : '';
-    const hint = source ? hintFor(e.message, source) : '';
-    return h('div', { class: 'item' }, h('span', { class: 'mark', 'aria-hidden': 'true' }, '!'), where,
-      h('span', { class: 'msg' }, h('span', { class: 'what' }, withHex(e.message)), source ? code(source, 'src') : null,
-        hint ? h('span', { class: 'hint' }, codeText(hint)) : null));
-  });
-  const title = errors.length > 1 ? `코드에 오류가 ${errors.length}개 있습니다` : '코드에 오류가 있습니다';
-  const todo = (errors.length > 1 ? '위에서부터 하나씩 고친 뒤 Ctrl+S 키를 다시 누르세요.' : '아래 줄을 고친 뒤 Ctrl+S 키를 다시 누르세요.')
-    + (machineShown() ? ` ${narrow ? 'Run 탭' : '오른쪽'}에는 마지막으로 어셈블한 코드가 그대로 있습니다.` : '');
-  return h('div', { class: 'notice-host' },
-    notice({ pose: 'curious', title, body: todo, more: [h('div', { class: 'items' }, ...items), h('div', { class: 'row' }, go)] }));
 }
 
 // ---- running ----------------------------------------------------------------------------
@@ -1148,11 +1121,11 @@ async function go(call: () => Promise<RunReply>): Promise<RunReply | null> {
     lastRegs = now;
     text.setPc(now.pc);
     showInspector();
-    if (result.reason === 'EXCEPTION' && result.message) consolePanel.append(`${result.message}${result.line ? ` (${result.line}행)` : ''}\n`);
+    if (result.reason === 'EXCEPTION' && result.message) consolePanel.append(`${result.message}${result.line ? ` (line ${result.line})` : ''}\n`);
     // Stopped while it waited for input: the engine has undone that ecall
     // (protocol 2, 7.3); the next Run or Step asks again.
-    if (result.input_cancelled) note = result.undone ? '입력을 기다리다 멈췄습니다 — 다시 실행하면 입력을 다시 받습니다'
-      : '입력을 기다리다 멈췄는데 되돌리지 못했습니다 — 다시 어셈블하세요 (Ctrl+S)';
+    if (result.input_cancelled) note = result.undone ? 'Stopped while waiting for input · Run asks for it again'
+      : 'Stopped while waiting for input and could not undo it · assemble again (Ctrl+S)';
     consolePanel.waitForInput(false);
     if (text.tab === 'data') void refreshData();
     if (reason === 'exit' && !congratsShown && !tutorial.active) showCongrats();
@@ -1219,8 +1192,8 @@ function changedPart(): HTMLElement {
   // (Both here too, "x5 t0", did not fit the status bar at 1280 and under.)
   const both = (key: string) => (key.startsWith('x') ? abiName(Number(key.slice(1))) : FP_ABI_NAMES[Number(key.slice(1))]);
   const names = changedNow.slice(0, 3).flatMap((key, i) => (i ? [', ', code(both(key))] : [code(both(key))]));
-  const more = changedNow.length > 3 ? ` 외 ${changedNow.length - 3}개` : '';
-  return h('span', { class: 'changed' }, '방금 바뀜: ', ...names, more);
+  const more = changedNow.length > 3 ? ` +${changedNow.length - 3} more` : '';
+  return cell('changed', 'Changed: ', ...names, more);
 }
 
 async function stop(): Promise<void> {
@@ -1228,7 +1201,7 @@ async function stop(): Promise<void> {
   switchTo = null;
   if (slow && runState === 'running') { slow.cancel(); return; } // the wait ends now; runSlow() says 'stopped'
   const how = await api.stop(); // the run's own answer ('STOP') updates the window
-  if (how === 'killed') note = '엔진이 대답하지 않아 다시 시작했습니다';
+  if (how === 'killed') note = 'The engine did not answer and was restarted';
 }
 
 // Reset: the program in the machine back to its start -- the last one that
@@ -1295,7 +1268,7 @@ async function giveInput(line: string): Promise<void> {
 // gutter is where breakpoints live), then the engine.
 async function toggleBreakpoint(addr: number): Promise<void> {
   const line = current() ? lineOf(addr) : null;
-  if (line === null) { note = '고친 코드에서는 Text 탭의 브레이크포인트를 바꿀 수 없습니다 — 먼저 어셈블하세요 (Ctrl+S)'; renderStatus(); return; }
+  if (line === null) { note = 'Breakpoints in Text cannot change in edited code · assemble first (Ctrl+S)'; renderStatus(); return; }
   const lines = new Set(editor.breakpointLines());
   const on = !breakpoints.has(addr >>> 0);
   if (on) lines.add(line); else lines.delete(line);
@@ -1311,7 +1284,7 @@ async function editorBreakpoint(line: number, on: boolean): Promise<void> {
   note = '';
   if (!current()) {
     // Changed code: its lines are not the program's; they go to the engine with the next assemble.
-    if (machineShown()) note = '고친 코드의 브레이크포인트는 다시 어셈블하면(Ctrl+S) 적용됩니다';
+    if (machineShown()) note = 'Breakpoints in edited code apply at the next assemble (Ctrl+S)';
     renderStatus();
     return;
   }
@@ -1389,7 +1362,7 @@ function showCongrats(): void {
   const close = h('button', { class: 'btn small', type: 'button' }, 'Close');
   close.addEventListener('click', () => { congrats.hidden = true; });
   congrats.replaceChildren(character('congrats', 120),
-    h('div', { class: 'say' }, h('h3', {}, '첫 실행 성공!'), h('p', {}, '프로그램이 끝까지 실행되었습니다.'), close));
+    h('div', { class: 'say' }, h('h3', {}, 'First run complete!'), h('p', {}, 'The program ran to the end.'), close));
   congrats.hidden = false;
 }
 
@@ -1449,7 +1422,7 @@ api.onInput(() => {
   renderChrome();
 });
 api.onCrashed((message, cause, restarted) => {
-  crashNote = restarted ? `${message} (${cause}) — 엔진을 다시 시작했습니다. 다시 어셈블하세요 (Ctrl+S)` : `${message} (${cause})`;
+  crashNote = restarted ? `${message} (${cause}) · engine restarted, assemble again (Ctrl+S)` : `${message} (${cause})`;
   assembledText = null;
   runState = 'ready';
   busy = false;

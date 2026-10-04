@@ -122,14 +122,27 @@ export function stateAfter(reason: StopReason): RunState {
   return reason === 'exit' || reason === 'error' ? 'finished' : 'paused';
 }
 
-// The status bar's words for a stop.  `hex` marks code (set in the mono font).
+// The status bar's first cell after a stop: what happened, and where.
+// `code` in backticks (set in the mono font).
 export function stopMessage(reason: StopReason | 'input', pc: string): string {
   switch (reason) {
-    case 'exit': return '프로그램이 끝났습니다';
-    case 'error': return '실행 오류로 멈췄습니다';
-    case 'breakpoint': return `브레이크포인트에서 멈췄습니다 (PC \`${pc}\`) — 이어서 하려면 F5`;
-    case 'input': return '입력을 기다립니다 — 콘솔에 입력하고 Enter';
-    case 'stopped': return `멈췄습니다 (PC \`${pc}\`) — 이어서 하려면 F5`;
-    case 'limit': return `한 줄 실행했습니다 (PC \`${pc}\`)`;
+    case 'exit': return 'Exited';
+    case 'error': return 'Runtime error';
+    case 'breakpoint': return `Breakpoint at \`${pc}\``;
+    case 'input': return 'Waiting for input';
+    case 'stopped': return `Stopped at \`${pc}\``;
+    case 'limit': return `Stepped · PC \`${pc}\``;
+  }
+}
+
+// ...and the keys that go on from there, for the status bar's far end
+// (a key of '' is a hint without a key).
+export function stopKeys(reason: StopReason | 'input'): [string, string][] {
+  switch (reason) {
+    case 'exit': return [['', 'Reset to run again']];
+    case 'error': return [['', 'See the Console · Reset to run again']];
+    case 'input': return [['Enter', 'in the Console'], ['Esc', 'Stop']];
+    case 'breakpoint': case 'stopped': return [['F5', 'Continue'], ['F10', 'Step']];
+    case 'limit': return [['F10', 'Step'], ['F5', 'Run']];
   }
 }
