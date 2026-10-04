@@ -22,7 +22,7 @@
 
 import { brand } from '../../../brand.ts';
 import { h, icon, markImg } from '../dom.ts';
-import { themeSwitch } from '../theme.ts';
+import { currentTheme, onTheme, THEME_FADE_MS, themeSwitch } from '../theme.ts';
 import { CHIP_ATTR, startfield } from '../../startfield/index.ts';
 import { offsets, SEED, type SparkName, sparkAt } from './spark.ts';
 
@@ -125,7 +125,8 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
 
   // The seed is a constant: the same board every start, on every machine.
   // After an ISA was chosen the board is already grown (20 s is past it).
-  const start = startfield({ seed: SEED, from: picked || home ? 20_000 : 0 });
+  // Night or day (theme.ts), and the other one at once when it is switched.
+  const start = startfield({ seed: SEED, from: picked || home ? 20_000 : 0, theme: currentTheme(), fadeMs: THEME_FADE_MS });
 
   /* The mark, the product's name, and the two ways in, down the middle of
      the die frame.  The mark is the top bar's own file (brand.mark, a
@@ -142,6 +143,9 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
       title,
       h('div', { class: 'wbody' }, actions)),
     corner, isaTag, h('div', { class: 'wtheme' }, themeSwitch()), fx);
+  // A switch of theme: the board cross-fades to the other look (start.setTheme),
+  // over the same time the page's colours take (theme.ts).
+  onTheme((t) => start.setTheme(t));
   let revealed = picked || home || calm.matches;
   if (!revealed) card.classList.add('intro');
   const reveal = () => {
