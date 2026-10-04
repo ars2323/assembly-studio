@@ -981,6 +981,10 @@ html.theme-fade, html.theme-fade *:not(canvas), html.theme-fade *::before, html.
     fill .5s ease, stroke .5s ease, caret-color .5s ease, filter .5s ease, transform .2s ease, opacity .2s ease !important; }
 /* On the card: bottom centre of the die frame, at every step and during the opening. */
 .wtheme { position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%); z-index: 1; }
+/* The version: the die frame's bottom-right corner, on the switch's line, quieter than the ISA tag. */
+.wver { position: absolute; right: 32px; bottom: 30px; z-index: 1; height: 24px; display: flex; align-items: center;
+  font: 500 11.5px/1 var(--code); letter-spacing: .04em; color: rgba(255,255,255,.42); pointer-events: none; }
+:root[data-theme="light"] .wver { color: rgba(22,24,29,.45); }
 
 /* ---- dialogs ------------------------------------------------------------ */
 .modal { width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto; padding: 20px 22px; border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 16px 48px rgba(var(--shadow-rgb), .20); color: var(--text); }

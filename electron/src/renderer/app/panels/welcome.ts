@@ -75,6 +75,9 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
   // The way back: an arrow in the die frame's top-left corner, on the steps after the first.
   // In the opposite corner, the ISA chosen, quietly.
   const isaTag = h('span', { class: 'wisa' });
+  // The version, quietly, in the bottom-right corner: there from the first frame, no About needed.
+  const version = h('span', { class: 'wver' });
+  void window.app?.about().then((info) => { version.textContent = `v${info.version}`; }, () => {});
   const back = h('button', { class: 'wback', type: 'button', title: '뒤로', 'aria-label': '뒤로' }, icon('arrow-left'));
   const corner = h('div', { class: 'wcorner' }, back);
   let chosen: Isa = pageIsa;
@@ -159,7 +162,7 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
       markImg('wlogo'),
       title,
       h('div', { class: 'wbody' }, actions)),
-    corner, isaTag, h('div', { class: 'wtheme' }, themeSwitch()));
+    corner, isaTag, h('div', { class: 'wtheme' }, themeSwitch()), version);
   // A switch of theme: the board cross-fades to the other look (start.setTheme),
   // over the same time the page's colours take (theme.ts).
   onTheme((t) => start.setTheme(t));
