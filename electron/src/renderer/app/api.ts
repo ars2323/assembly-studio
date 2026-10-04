@@ -8,7 +8,7 @@ export interface AppApi {
   // The ISA this window is for (the page's ?isa=), and changing it: the main
   // process ends this engine, starts the other and loads that ISA's page.
   isa(): 'mips' | 'riscv';
-  selectIsa(isa: 'mips' | 'riscv'): Promise<'mips' | 'riscv'>;
+  selectIsa(isa: 'mips' | 'riscv', then?: 'tutorial' | 'new' | 'open'): Promise<'mips' | 'riscv'>;
   call<M extends CallName>(method: M, ...args: Calls[M][0]): Promise<Calls[M][1]>;
   stop(): Promise<'stopped' | 'idle' | 'killed'>;
   // Assembles in a second process, the machine on screen untouched: does it assemble?

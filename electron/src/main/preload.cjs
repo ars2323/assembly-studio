@@ -21,7 +21,7 @@ const unwrap = (r) => {
 
 contextBridge.exposeInMainWorld('app', {
   isa: () => (new URLSearchParams(location.search).get('isa') === 'riscv' ? 'riscv' : 'mips'),
-  selectIsa: (isa) => ipcRenderer.invoke('isa:select', isa).then(unwrap),
+  selectIsa: (isa, then) => ipcRenderer.invoke('isa:select', isa, then).then(unwrap),
   // MIPS: call(method, ...args); RISC-V: call(cmd, params).  Either way the arguments go as a list.
   call: (method, ...args) => ipcRenderer.invoke('sim:call', method, args).then(unwrap),
   stop: () => ipcRenderer.invoke('sim:stop').then(unwrap),

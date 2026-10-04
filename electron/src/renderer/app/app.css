@@ -630,10 +630,19 @@ img.icon { filter: var(--icon-filter); }
 .action img { width: 18px; height: 18px; opacity: .85; flex: none; filter: brightness(0) invert(1); }
 .wbody .back { display: none; }
 /* The way back: an arrow in the die frame's top-left corner, on the steps after the first. */
-.wback { position: absolute; top: 28px; left: 28px; z-index: 1; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
-  border: 1px solid rgba(255,255,255,.22); border-radius: 6px; background: transparent; visibility: hidden; opacity: 0; transition: opacity .3s ease; }
-.wback.on { visibility: visible; opacity: 1; }
-.wcard.intro .wback { visibility: hidden; opacity: 0; }
+.wcorner { position: absolute; top: 28px; left: 28px; z-index: 1; display: flex; align-items: center; gap: 10px;
+  visibility: hidden; opacity: 0; transition: opacity .3s ease; }
+.wcorner.on { visibility: visible; opacity: 1; }
+.wcard.intro .wcorner { visibility: hidden; opacity: 0; }
+.wback { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+  border: 1px solid rgba(255,255,255,.22); border-radius: 6px; background: transparent; }
+/* The ISA chosen, beside the way back. */
+.wisa { font: 600 11px/1 var(--ui); letter-spacing: .08em; color: rgba(255,255,255,.6); }
+/* Into the other ISA's page: the first screen fades to the window's dark,
+   that page fades in out of it (app.ts ?then). */
+body.leaving .stage-welcome { opacity: 0; transition: opacity .25s ease; }
+body.arriving .work { animation: arrive .45s ease-out both; }
+@keyframes arrive { from { opacity: 0; } to { opacity: 1; } }
 .wback img { width: 16px; height: 16px; filter: brightness(0) invert(1); opacity: .8; }
 .wback:hover { border-color: #fff; background: rgba(255,255,255,.09); }
 .wback:hover img { opacity: 1; }
@@ -658,7 +667,7 @@ img.icon { filter: var(--icon-filter); }
 .actions.enter .action:nth-child(2) { animation-delay: .08s; }
 @keyframes wenter { 0% { opacity: 0; transform: translateY(8px); box-shadow: 0 0 18px rgba(255,255,255,.55); }
   60% { opacity: 1; box-shadow: 0 0 14px rgba(255,255,255,.35); } 100% { opacity: 1; transform: none; box-shadow: 0 0 0 rgba(255,255,255,0); } }
-@media (prefers-reduced-motion: reduce) { .wlogo, .wtitle, .wbody, .wback { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .wlogo, .wtitle, .wbody, .wcorner { transition: none; } }
 /* The bars on the first screen (body.first-screen, app.ts): the board shows
    through them, white words and icons, no dividing lines.  Nothing is
    blurred -- the board behind is flat, so a backdrop-filter would cost a

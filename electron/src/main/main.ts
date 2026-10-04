@@ -138,18 +138,20 @@ async function main(): Promise<void> {
   const startEngine = (which: Isa): Engine => (which === 'mips' ? mips.start(win) : riscv.start(win, runDir));
   let engine = startEngine(isa);
   let switching: Promise<unknown> = Promise.resolve();
-  // ?picked: loaded again because the ISA was just chosen on the first
-  // screen, which goes on from there (panels/welcome.ts).
-  const loadPage = (picked = false) => win.loadFile(paths.page, { query: picked ? { isa, picked: '1' } : { isa } });
-  ipcMain.handle('isa:select', (_e, which: unknown) => answer(() => {
+  // ?then: the page of the other ISA, loaded because the first screen chose
+  // it and then a way in (tutorial, new, open), which that page goes on to
+  // do at once (panels/welcome.ts, app.ts).
+  const loadPage = (then?: string) => win.loadFile(paths.page, { query: then ? { isa, then } : { isa } });
+  ipcMain.handle('isa:select', (_e, which: unknown, then: unknown) => answer(() => {
     if (which !== 'mips' && which !== 'riscv') throw new Error(`no ISA ${String(which)}`);
+    const next = then === 'tutorial' || then === 'new' || then === 'open' ? then : undefined;
     const turn = switching.then(async () => {
       if (which === isa) return isa; // already in use: nothing ends, nothing reloads
       await engine.dispose();
       isa = which;
       engine = startEngine(isa);
       // After this answer has gone back: the page that asked is replaced.
-      setImmediate(() => { if (!win.isDestroyed()) void loadPage(true); });
+      setImmediate(() => { if (!win.isDestroyed()) void loadPage(next); });
       return isa;
     });
     switching = turn.catch(() => {});
