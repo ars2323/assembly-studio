@@ -1006,6 +1006,8 @@ body.first-screen .toolbar { display: none; }
 html.theme-fade, html.theme-fade *:not(canvas), html.theme-fade *::before, html.theme-fade *::after {
   transition: background-color .5s ease, color .5s ease, border-color .5s ease, outline-color .5s ease, box-shadow .5s ease,
     fill .5s ease, stroke .5s ease, caret-color .5s ease, filter .5s ease, transform .2s ease, opacity .2s ease !important; }
+/* The work screen's switch (theme.ts): the page before cross-fades to the page after, as one picture. */
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: .5s; animation-timing-function: ease; }
 /* On the card, one line along the die frame's bottom edge: the KO/EN switch
    in the left corner, the version in the middle, the light/dark switch in
    the right corner -- inset like the way back and the ISA tag above them. */

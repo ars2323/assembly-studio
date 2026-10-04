@@ -9,11 +9,15 @@
    the right end of the status line.  Every switch on the page follows the
    one that was pressed ('themechange' on window).
 
-   The change is not a cut: for THEME_FADE_MS <html> carries .theme-fade,
-   under which every colour on the page eases from the old theme's to the
-   new one's (app.css); what the page cannot transition by CSS follows the
-   same clock (the caption buttons' patch, app.ts; the mark, dom.ts; the
-   board, startfield). */
+   The change is not a cut, and takes THEME_FADE_MS.  On the first screen
+   (a card and the board) <html> carries .theme-fade for that long, under
+   which the colours ease from the old theme's to the new one's (app.css),
+   and the board cross-fades itself (startfield).  On the work screen --
+   thousands of rows and cells, which would each be animated -- the page is
+   changed at once under a view transition instead: a picture of it before
+   cross-fades to the page after, on the compositor, whatever the page
+   holds (app.css ::view-transition-*).  What the page draws outside itself
+   follows the same clock (the caption buttons' patch, app.ts). */
 
 import { h, icon } from './dom.ts';
 
@@ -27,16 +31,23 @@ let fading = 0;
 
 export function setTheme(theme: Theme): void {
   const root = document.documentElement;
-  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  const apply = (): void => {
+    root.dataset.theme = theme;
+    try { sessionStorage.setItem(KEY, theme); } catch { /* no storage: this page only */ }
+    void (window as unknown as { app?: { setTheme?(t: Theme): Promise<void> } }).app?.setTheme?.(theme);
+    window.dispatchEvent(new CustomEvent<Theme>('themechange', { detail: theme }));
+  };
+  const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const transition = (document as Document & { startViewTransition?(update: () => void): unknown }).startViewTransition;
+  if (calm) apply();
+  else if (!document.body.classList.contains('first-screen') && transition) transition.call(document, apply);
+  else {
     root.classList.add('theme-fade');
     void root.offsetWidth; // the transitions in place before the colours change
     clearTimeout(fading);
     fading = window.setTimeout(() => root.classList.remove('theme-fade'), THEME_FADE_MS + 50);
+    apply();
   }
-  root.dataset.theme = theme;
-  try { sessionStorage.setItem(KEY, theme); } catch { /* no storage: this page only */ }
-  void (window as unknown as { app?: { setTheme?(t: Theme): Promise<void> } }).app?.setTheme?.(theme);
-  window.dispatchEvent(new CustomEvent<Theme>('themechange', { detail: theme }));
 }
 
 export function onTheme(listener: (theme: Theme) => void): void {
