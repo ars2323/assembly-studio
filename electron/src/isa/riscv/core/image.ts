@@ -8,9 +8,9 @@
               assembler's next datum would go (a trailing .space included),
               widened to any byte that is not zero and to any data label
               (.extern puts them at 0x10000000).  None when that is empty.
-   - entry    the PC the engine starts at: RARS's text base, 0x00400000.  The
-              engine assembles with "start at main" off, so a `main` (global
-              or not) is a label like any other.
+   - entry    the first instruction of `main` (a text label, global or
+              not); without one, the PC the engine starts at, RARS's text
+              base 0x00400000.
    - regs     sp (x2) and gp (x3) as assembling left them.
    - endian   the order the engine wrote a known word to memory in.
    - symbols  every label in RARS's symbol table, local and global (RARS has
@@ -81,7 +81,8 @@ export interface RiscvReads {
 
 export function riscvImage(r: RiscvReads): MachineImage {
   if (r.text.length === 0) throw new ImageError('No executable image: the program has no instructions');
-  const entry = r.pc >>> 0;
+  const main = r.symbols.find((s) => s.name === 'main' && s.segment === 'text');
+  const entry = (main ? main.addr : r.pc) >>> 0;
   const addrs = r.text.map((t) => t.addr >>> 0);
   const textAddr = Math.min(entry, ...addrs);
   const words = new Array<number>((Math.max(...addrs) - textAddr) / 4 + 1).fill(0);

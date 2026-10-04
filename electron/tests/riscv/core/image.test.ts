@@ -111,6 +111,20 @@ test('text that does not start at the start address: the image starts at the ent
   assert.equal(img.text.words[0x40], 0x13);
 });
 
+test('main not first: the entry is main, the text still starts at the first instruction', () => {
+  const img = riscvImage(reads({
+    text: [word(0x00400000, 0x00000013), word(0x00400004, 0x00008067), word(0x00400008, 0x00000013)],
+    symbols: [sym('helper', 0x00400000, 'text'), sym('main', 0x00400008, 'text', true)],
+  }));
+  assert.equal(img.entry, 0x00400008);
+  assert.equal(img.text.addr, 0x00400000);
+  assert.equal(img.text.words.length, 3);
+});
+
+test('a data label named main is not the entry', () => {
+  assert.equal(riscvImage(reads({ symbols: [sym('main', 0x10010000, 'data')] })).entry, 0x00400000);
+});
+
 test('a program with no instructions has no image', () => {
   assert.throws(() => riscvImage(reads({ text: [] })), ImageError);
 });
