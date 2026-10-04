@@ -5,7 +5,7 @@ The colours follow the start screen (the circuit board). The screen layout (butt
 behaviour) changes only where a review asks for it.
 There is one edition, the generic one.
 
-Status: **1.0.0 is released.** Stages S0–S6 are done; later work follows §9.
+Status: **1.0.0 was released after stages S0–S6; the latest release is 1.6.1.** Later work follows §9.
 
 ## 1. Components
 
@@ -105,12 +105,16 @@ The engines (SPIM, RARS) are already proven and are used without changes, so ver
 **Not kept:** end-to-end suites, golden files, mutants, per-width measurements, installer/IME/upgrade checks, probe checks, and their tools.
 **Not added:** new end-to-end tests, contrast unit tests (contrast was computed once when the drafts were made), screenshot comparison tools.
 **Screen check:** one screenshot script; take one or two shots of the changed screen and look at them.
-**Windows check:** a person uses the trial installer at review ② (no automatic Windows checks).
+**Windows check:** `windows-check.yml`, run by hand on a release (or a trial): it installs the installer on a Windows
+runner, drives the installed program, captures the desktop, checks the `.asx` export and Step back, and with
+`update_from` first lets an older release update itself to this one. A person still looks at the captures.
 
 | Workflow | When | What it does |
 |---|---|---|
 | `engines.yml` | When an engine input changes (`CPU/`, `native/`, `probe/`, the RARS commit, the Temurin version), or by hand | Builds `spim.node`, the RARS jar, the `RarsProbe` classes and the jlink runtime, and uploads them as `engines-<input hash>.zip`, a Release asset. In practice, once |
-| `release.yml` | A `v*` tag, or by hand | Downloads the engine zip → UI bundle → installer → publish. No tests |
+| `release.yml` | A `v*` tag, or by hand (`release` ticked: the release, Latest; otherwise a trial pre-release) | Downloads the engine zip → UI bundle → installer → publish, with `latest.yml` and the `.blockmap` for updates. No tests |
+| `windows-check.yml` | By hand | The installed program on Windows (above); its captures go to the temporary branch `windows-check-captures` |
+| `branch-cleanup.yml` | By hand | Deletes temporary branches (never the default branch) |
 
 - There is no automatic CI.
 - The engine zip is kept as a Release asset, not in the Actions cache (the cache is deleted after 7 days without use).
