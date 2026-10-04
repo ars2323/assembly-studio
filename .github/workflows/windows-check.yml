@@ -4,7 +4,8 @@
 # against the screen in both ISAs (electron/tests/e2e/asx-export.ts).
 # What Windows itself draws -- the caption buttons over the title bar, the
 # taskbar icon, the installer -- can only be seen this way.  The captures
-# are the run's artifact.
+# are the run's artifact, and are also pushed (alone, one commit) to the
+# branch windows-check-captures, where git can fetch them.
 name: windows-check
 
 on:
@@ -16,7 +17,7 @@ on:
         default: '1.0.0'
 
 permissions:
-  contents: read
+  contents: write   # the captures go to the branch windows-check-captures as well
 
 defaults:
   run:
@@ -63,3 +64,14 @@ jobs:
         with:
           name: windows-check-${{ inputs.version }}
           path: windows-check
+
+      - name: The captures to the branch windows-check-captures
+        if: always()
+        working-directory: windows-check
+        run: |
+          git init -q -b windows-check-captures
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "windows-check ${{ inputs.version }} (run ${{ github.run_id }})"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" windows-check-captures
