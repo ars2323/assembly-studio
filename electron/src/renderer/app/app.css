@@ -911,7 +911,7 @@ body.arriving .work { animation: arrive .45s ease-out both; }
 .actions.enter .action > * { animation: wlabel .26s ease-out both; }
 .actions.enter .action:nth-child(2) > * { animation-delay: .06s; }
 @keyframes wlabel { from { opacity: 0; } to { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .wlogo, .wtitle, .wbody, .wcorner, .wisa, .wtheme, .wver { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .wlogo, .wtitle, .wbody, .wcorner, .wisa, .wtheme, .wlang, .wver { transition: none; } }
 
 /* ---- first screen by day (<html data-theme="light">) ----------------------
    The same package in daylight: a pale face in a near-black rim, the die
@@ -948,12 +948,13 @@ body.arriving .work { animation: arrive .45s ease-out both; }
 :root[data-theme="light"] .wback:hover { border-color: #16181d; background: rgba(30,34,42,.06); }
 :root[data-theme="light"] .wback:focus-visible { outline-color: #16181d; }
 :root[data-theme="light"] .wisa { color: rgba(22,24,29,.5); }
-/* The switch on the card, in the card's own colours. */
-:root[data-theme="light"] .wtheme .theme-switch { border-color: rgba(30,34,42,.24); background: #f1f2f4; }
-:root[data-theme="light"] .wtheme .theme-switch .ts-knob { background: #ffffff; border-color: rgba(30,34,42,.28);
+/* The switches on the card (light/dark and KO/EN), in the card's own colours. */
+:root[data-theme="light"] :is(.wtheme, .wlang) :is(.theme-switch, .lang-switch) { border-color: rgba(30,34,42,.24); background: #f1f2f4; }
+:root[data-theme="light"] :is(.wtheme, .wlang) :is(.theme-switch, .lang-switch) .ts-knob { background: #ffffff; border-color: rgba(30,34,42,.28);
   box-shadow: 0 1px 2px rgba(20,24,32,.12); }
 :root[data-theme="light"] .wtheme .theme-switch img.icon { filter: none; }
-:root[data-theme="light"] .wtheme .theme-switch:hover { border-color: #16181d; }
+:root[data-theme="light"] .wlang .lang-switch .ts-word { color: #16181d; }
+:root[data-theme="light"] :is(.wtheme, .wlang) :is(.theme-switch, .lang-switch):hover { border-color: #16181d; }
 /* The bars on the first screen (body.first-screen, app.ts): the board shows
    through them, white words and icons, no dividing lines.  Nothing is
    blurred -- the board behind is flat, so a backdrop-filter would cost a
@@ -976,24 +977,31 @@ body.first-screen .toolbar { display: none; }
 
 /* ---- the light/dark switch (theme.ts) ---------------------------------- */
 /* A small pill, the sun at one end and the moon at the other, the knob under
-   the theme in use.  On the first screen's card (bottom centre) and at the
+   the theme in use.  On the first screen's card (bottom right) and at the
    status line's right end. */
-.theme-switch { position: relative; display: inline-flex; align-items: center; justify-content: space-between; flex: none;
+:is(.theme-switch, .lang-switch) { position: relative; display: inline-flex; align-items: center; justify-content: space-between; flex: none;
   width: 52px; height: 24px; padding: 0 5px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg);
   -webkit-app-region: no-drag; }
-.theme-switch .ts-knob { position: absolute; top: 2px; left: 2px; width: 24px; height: 18px; border-radius: 9px;
+:is(.theme-switch, .lang-switch) .ts-knob { position: absolute; top: 2px; left: 2px; width: 24px; height: 18px; border-radius: 9px;
   background: var(--switch-knob); border: 1px solid var(--border); box-shadow: var(--switch-knob-shadow); transition: transform .2s ease; }
-.theme-switch[aria-checked="true"] .ts-knob { transform: translateX(22px); }
+:is(.theme-switch, .lang-switch)[aria-checked="true"] .ts-knob { transform: translateX(22px); }
 .theme-switch .ts-sun, .theme-switch .ts-moon { position: relative; z-index: 1; display: flex; width: 16px; justify-content: center; }
 .theme-switch img.icon { width: 13px; height: 13px; opacity: .45; transition: opacity .2s ease; }
 .theme-switch[aria-checked="false"] .ts-sun img, .theme-switch[aria-checked="true"] .ts-moon img { opacity: 1; }
-.theme-switch:hover { border-color: var(--strong); }
-.theme-switch:focus-visible { outline: 2px solid var(--strong); outline-offset: 2px; }
-.stheme { display: flex; align-items: center; margin-left: 10px; flex: none; }
-.status .theme-switch { width: 44px; height: 18px; padding: 0 4px; }
-.status .theme-switch .ts-knob { top: 1px; width: 20px; height: 14px; }
-.status .theme-switch[aria-checked="true"] .ts-knob { transform: translateX(18px); }
+:is(.theme-switch, .lang-switch):hover { border-color: var(--strong); }
+:is(.theme-switch, .lang-switch):focus-visible { outline: 2px solid var(--strong); outline-offset: 2px; }
+/* The KO/EN switch (i18n.ts) is the same pill: the words KO and EN where the
+   sun and the moon are, as dim and as bright as they are, the knob under the
+   language in use. */
+.lang-switch .ts-word { position: relative; z-index: 1; display: flex; width: 16px; justify-content: center;
+  font: 600 8.5px/1 var(--ui); letter-spacing: .03em; color: var(--strong); opacity: .45; transition: opacity .2s ease; }
+.lang-switch[aria-checked="false"] .ts-ko, .lang-switch[aria-checked="true"] .ts-en { opacity: 1; }
+.stheme { display: flex; align-items: center; gap: 6px; margin-left: 10px; flex: none; }
+.status :is(.theme-switch, .lang-switch) { width: 44px; height: 18px; padding: 0 4px; }
+.status :is(.theme-switch, .lang-switch) .ts-knob { top: 1px; width: 20px; height: 14px; }
+.status :is(.theme-switch, .lang-switch)[aria-checked="true"] .ts-knob { transform: translateX(18px); }
 .status .theme-switch img.icon { width: 11px; height: 11px; }
+.status .lang-switch .ts-word { font-size: 7.5px; }
 /* Switching: every colour eases from the old theme's to the new one's
    (theme.ts THEME_FADE_MS puts .theme-fade on <html> for as long), so the
    page turns light or dark instead of cutting.  The switch's own knob and
@@ -1001,13 +1009,16 @@ body.first-screen .toolbar { display: none; }
 html.theme-fade, html.theme-fade *:not(canvas), html.theme-fade *::before, html.theme-fade *::after {
   transition: background-color .5s ease, color .5s ease, border-color .5s ease, outline-color .5s ease, box-shadow .5s ease,
     fill .5s ease, stroke .5s ease, caret-color .5s ease, filter .5s ease, transform .2s ease, opacity .2s ease !important; }
-/* On the card: bottom centre of the die frame, at every step and during the opening. */
-.wtheme { position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%); z-index: 1; }
+/* On the card, one line along the die frame's bottom edge: the KO/EN switch
+   in the left corner, the version in the middle, the light/dark switch in
+   the right corner -- inset like the way back and the ISA tag above them. */
+.wlang { position: absolute; left: 30px; bottom: 30px; z-index: 1; display: flex; }
+.wtheme { position: absolute; right: 30px; bottom: 30px; z-index: 1; display: flex; }
 /* Not during the opening: the card holds the mark alone until the name and the ISA step come up; these come with them. */
-.wtheme, .wver { transition: opacity .3s ease; }
-.wcard.intro .wtheme, .wcard.intro .wver { visibility: hidden; opacity: 0; }
-/* The version: the die frame's bottom-right corner, on the switch's line, quieter than the ISA tag. */
-.wver { position: absolute; right: 32px; bottom: 30px; z-index: 1; height: 24px; display: flex; align-items: center;
+.wtheme, .wlang, .wver { transition: opacity .3s ease; }
+.wcard.intro .wtheme, .wcard.intro .wlang, .wcard.intro .wver { visibility: hidden; opacity: 0; }
+/* The version: in the middle of that line, quieter than the ISA tag. */
+.wver { position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%); z-index: 1; height: 24px; display: flex; align-items: center;
   font: 500 11.5px/1 var(--code); letter-spacing: .04em; color: rgba(255,255,255,.42); pointer-events: none; }
 :root[data-theme="light"] .wver { color: rgba(22,24,29,.45); }
 
