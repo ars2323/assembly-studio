@@ -182,9 +182,10 @@ async function main(): Promise<void> {
       writeFileSync(target, encoded.bytes);
       return { path: target, name: path.basename(target) };
     }));
-  ipcMain.handle('example:open', (_e, name: string) => answer(() => {
+  // The tutorial's examples; `lang` 'en': the same programs with English comments (examples/en/).
+  ipcMain.handle('example:open', (_e, name: string, lang?: unknown) => answer(() => {
     if (!/^[a-z0-9-]+\.s$/.test(name)) throw new Error(`no example ${name}`);
-    return openBytes(readFileSync(path.join(paths.examples(isa), name)), name, null);
+    return openBytes(readFileSync(path.join(paths.examples(isa), lang === 'en' ? 'en' : '', name)), name, null);
   }));
   ipcMain.handle('about:info', async () => ({
     version, electron: process.versions.electron, chrome: process.versions.chrome, node: process.versions.node,
