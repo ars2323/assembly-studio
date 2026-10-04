@@ -53,7 +53,7 @@ import { createEditor } from './editor.ts';
 import { tokenizeMipsLine } from '../../core/mips-syntax.ts';
 import { shortName } from './logic/names.ts';
 import { changedKeys, stateAfter, stopKeys, stopMessage, textRows, type RegisterValues, type RunState, type TextRow } from './logic/machine.ts';
-import { cell, clock, count, keys, lead, lines as lineList, plural } from './cells.ts';
+import { ago, cell, clock, count, keys, lead, lines as lineList, plural } from './cells.ts';
 import { assembledState, busyState, errorList, freshState } from './panels/assemble.ts';
 import { aboutDialog } from './panels/about.ts';
 import { ConsolePanel } from './panels/console.ts';
@@ -438,9 +438,12 @@ function renderBand(): void {
   const on = machineShown() && edited;
   runBand.hidden = !on;
   if (!on) return;
-  const at = lastAssembly ? ` (${clock(lastAssembly.at)})` : '';
-  const text = `Edited · showing the last assembled code${at} · Ctrl+S to assemble your edits`;
-  if (runBand.textContent !== text) { runBand.textContent = text; runBand.title = text; }
+  // "assembled 12s ago", kept current by ago(); built again only when the assemble changes.
+  const key = lastAssembly ? String(lastAssembly.at.getTime()) : '';
+  if (runBand.dataset.key === key && runBand.childNodes.length) return;
+  runBand.dataset.key = key;
+  runBand.replaceChildren('Edited · showing the code assembled ', lastAssembly ? ago(lastAssembly.at) : 'earlier', ' · Ctrl+S to assemble your edits');
+  runBand.title = lastAssembly ? `Assembled at ${clock(lastAssembly.at)}` : '';
 }
 
 // The Assemble panel: a row of cells -- the state, what the assemble made,

@@ -12,6 +12,7 @@
    the tutorial) are not made here. */
 
 import { code, h } from './dom.ts';
+import { agoText } from './logic/ago.ts';
 
 type Child = Node | string | null | undefined | false;
 
@@ -45,6 +46,23 @@ export function keys(...pairs: [string, string][]): HTMLElement {
 // "Line 3", "Lines 3, 7": the Editor's lines a word is about.
 export const lines = (ns: number[]): string => `${ns.length === 1 ? 'Line' : 'Lines'} ${ns.join(', ')}`;
 
-// The time of an assemble, as the Assemble panel and the band say it: 24 hours, seconds.
+// The time of an assemble, 24 hours with seconds: the tooltip of ago().
 export const clock = (d: Date): string =>
   d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+
+/* An element saying how long ago `at` was, kept current: one timer for the
+   page refreshes every such element still on it (data-ago), once a second.
+   The exact time is its tooltip. */
+export function ago(at: Date): HTMLElement {
+  const el = h('span', { class: 'ago', 'data-ago': String(at.getTime()), title: clock(at) }, agoText(at));
+  if (!agoTimer) agoTimer = window.setInterval(tickAgo, 1000);
+  return el;
+}
+let agoTimer = 0;
+function tickAgo(): void {
+  const els = document.querySelectorAll<HTMLElement>('[data-ago]');
+  for (const el of els) {
+    const text = agoText(new Date(Number(el.dataset.ago)));
+    if (el.textContent !== text) el.textContent = text;
+  }
+}
