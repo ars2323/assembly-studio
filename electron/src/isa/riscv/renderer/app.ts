@@ -14,8 +14,17 @@
    and the memory show: a band over the Run side says that what it shows is
    the last assembled code, and Run, Step and Reset go on with that program
    until the next assemble.  A program with errors is assembled first in a
-   second process (src/main/engine-mips.ts, sim:check), so its errors leave the machine on
-   screen as it was.  While the Editor holds the program in the machine, it
+   second engine (src/main/engine-riscv.ts, sim:check), so its errors leave the machine on
+   screen as it was.
+
+   The engine (RARS in a JVM, docs/engine-protocol.md) has a state: it is
+   starting, ready, restarting after a crash, or dead (it cannot start).
+   The status bar says which; a dead engine says why on the Run side
+   instead of the machine.
+
+   This is the RISC-V window (src/renderer/app/app.ts is the MIPS one).  No
+   .hmx export and no Advanced settings here: those are SPIM's.  While the
+   Editor holds the program in the machine, it
    marks the line being executed (the Text panel's line column: the core's
    own PC -> source mapping); once the code has changed it marks none (its
    lines are no longer the program's), and Text alone shows where PC is.
@@ -34,36 +43,35 @@
    Ctrl+/-, the splitter and the folds are this run's only (src/main/main.ts
    keeps nothing on disk). */
 
-import { parseAssemblerMessage, resolveMessageLine, simplified, type AssemblerMessage } from '../../core/asm-errors.ts';
-import { hex32 } from '../../core/format.ts';
-import { LabelMap, parseSymbolListing } from '../../core/symbols.ts';
-import { generalRegisterName } from '../../core/registers.ts';
-import type { Settings } from '../../main/main.ts';
-import type { TextFileFormat } from '../../node/text-file.ts';
-import type { RunResult } from '../../sim/protocol.ts';
-import { brand } from '../../brand.ts';
-import './api.ts';
-import { asset, character, code, codeText, h, icon, monoCh, withHex } from './dom.ts';
-import { captionPatch, WHITE_PATCH } from './logic/overlay.ts';
-import { notice } from './notice.ts';
-import { nearMiss } from '../../core/near-miss.ts';
-import { createEditor } from './editor.ts';
-import { tokenizeMipsLine } from '../../core/mips-syntax.ts';
-import { shortName } from './logic/names.ts';
-import { changedKeys, stateAfter, stopMessage, textRows, type RegisterValues, type RunState, type TextRow } from './logic/machine.ts';
-import { aboutDialog } from './panels/about.ts';
-import { ConsolePanel } from './panels/console.ts';
+import { hex32 } from '../../../core/format.ts';
+import { LabelMap } from '../../../core/symbols.ts';
+import { nearMiss } from '../core/near-miss.ts';
+import { tokenizeLine } from '../core/riscv-syntax.ts';
+import { abiName, findRegister, FP_ABI_NAMES } from '../core/registers.ts';
+import type { Settings } from '../../../main/main.ts';
+import type { TextFileFormat } from '../../../node/text-file.ts';
+import type { EngineState } from '../sim/host.ts';
+import type { ErrorItem, RunReply } from '../sim/protocol.ts';
+import { api, type AboutInfo } from './api.ts';
+import { brand } from '../../../brand.ts';
+import { asset, character, code, codeText, h, icon, monoCh, withHex } from '../../../renderer/app/dom.ts';
+import { captionPatch, WHITE_PATCH } from '../../../renderer/app/logic/overlay.ts';
+import { notice } from '../../../renderer/app/notice.ts';
+import { createEditor } from '../../../renderer/app/editor.ts';
+import { shortName } from '../../../renderer/app/logic/names.ts';
+import { changedKeys, stateAfter, stopMessage, stopReason, textRows, toValues, ZERO_REGS, type RegisterValues, type RunState, type StopReason, type TextRow } from './logic/machine.ts';
+import { aboutDialog } from '../../../renderer/app/panels/about.ts';
+import { ConsolePanel } from '../../../renderer/app/panels/console.ts';
 import { Inspector } from './panels/inspector.ts';
 import { RegisterPanel } from './panels/registers.ts';
-import { defaultAdvanced, sameAdvanced, settingsDialog, type Advanced } from './panels/settings.ts';
-import { TextPanel } from './panels/text.ts';
-import { welcome } from './panels/welcome.ts';
-import { ask } from './panels/ask.ts';
+import { settingsDialog } from './panels/settings.ts';
+import { TextPanel } from '../../../renderer/app/panels/text.ts';
+import { welcome } from '../../../renderer/app/panels/welcome.ts';
+import { ask } from '../../../renderer/app/panels/ask.ts';
 import { Tutorial, type Example, type Signal } from './tutorial.ts';
-import type { DataSection } from './panels/data.ts';
-import { panelHead } from './ui.ts';
+import type { DataSection } from '../../../renderer/app/panels/data.ts';
+import { panelHead } from '../../../renderer/app/ui.ts';
 
-const api = window.app;
 const UNTITLED = 'untitled.s';
 const APP_NAME = brand.name;
 // Below this width (CSS px) the Editor and Run sides take turns.  A lab PC
@@ -83,26 +91,33 @@ let zoom = 0;                          // Ctrl+/-: this session only
 let assembledText: string | null = null; // the program the machine holds
 // The last program that assembled and how (Reset loads it again, also after a crash).
 // The program on the machine, as it was assembled: Reset reloads it, Export writes its image.
-let lastGood: { source: string; options: ReturnType<typeof assembleOptions>; name: string; path: string | null; format: TextFileFormat | null } | null = null;
+let lastGood: { source: string; name: string; path: string | null; format: TextFileFormat | null } | null = null;
 let lastAssembly: { at: Date; instructions: number } | null = null; // for the Assemble panel
+let lastDataEnd = 0x10010000;           // one past the highest data label: how much of .data to show
 let runState: RunState = 'ready';
 let busy = false;                      // a call is on its way; keys wait
 let steps = 0;
 let lastRegs: RegisterValues | null = null;
 let rows: TextRow[] = [];
 let selected = -1;
+// Breakpoints live in the Editor, by line; the engine holds those lines and
+// sets them again at every assemble (docs/engine-protocol.md 5.6).  This is
+// the engine's answer: the addresses they are on in the program on screen.
 const breakpoints = new Set<number>();
+let sentLines = '';                     // the lines the engine last got (JSON)
 const labels = new LabelMap();          // the program's, for Data
 let resumeWith: 'run' | 'step' = 'run';
 let congratsShown = false;             // once a session
-let errors: { message: AssemblerMessage; line: number }[] = [];
+let errors: { message: string; line: number; col: number }[] = [];
 let saveNote = '';     // what Ctrl+S did with the file: shown until the first step
 let saveWarn = false;  // ...and whether it is a warning (not saved)
 let note = '';                          // a one-off word in the status bar (breakpoints)
 let exportNote = '';                    // the same, for an export that went well
 let crashNote = '';
 let progress: { pc: number; instructions: number } | null = null;
-let lastReason: RunResult['reason'] = 'limit';
+let lastReason: StopReason = 'limit';
+let engineState: EngineState = 'starting';
+let engineDetail = '';
 let changedNow: string[] = []; // the registers the last step or run changed: the yellow rows
 let narrow = false;
 let view: 'editor' | 'run' = 'editor'; // narrow windows: the side on show
@@ -136,6 +151,10 @@ bAssemble.dataset.tut = 'assemble';
 bRun.dataset.tut = 'run';
 bStep.dataset.tut = 'step';
 bRestart.dataset.tut = 'reset';
+bAssemble.dataset.tut = 'assemble';
+bRun.dataset.tut = 'run';
+bStep.dataset.tut = 'step';
+bRestart.dataset.tut = 'reset';
 // The speed of Run: Instant (the core runs on its own) or one line a second.
 const speedFast = h('button', { type: 'button', role: 'radio', title: 'Run at full speed' }, 'Instant');
 const speedSlow = h('button', { type: 'button', role: 'radio', title: 'Run one line a second' }, '1 line/s');
@@ -148,8 +167,6 @@ speedOne.addEventListener('click', () => void setSpeed(speed === 'fast' ? 'slow'
 const speedBox = h('span', { class: 'speedbox' }, h('span', { class: 'speedlabel' }, 'Run speed'), speedSwitch, speedOne);
 const toolbar = h('span', { class: 'toolbar' }, bAssemble, bRun, speedBox, bStep, bRestart);
 const bSettings = iconButton('Settings', 'settings', () => settingsBox.open());
-// The assembled program as an executable image (.hmx): only a brand with brand.hmx shows it.
-const bExport = iconButton('Export executable image (.hmx)', 'file-output', () => void exportImage());
 const viewEditor = h('button', { type: 'button', role: 'tab' }, 'Editor');
 const viewRun = h('button', { type: 'button', role: 'tab' }, 'Run');
 viewEditor.addEventListener('click', () => showView('editor'));
@@ -167,7 +184,6 @@ const titlebar = h('header', { class: 'titlebar' },
     iconButton('Tutorial', 'circle-question-mark', () => void startTutorial()),
     iconButton('New file', 'file-plus', () => void newFile()),
     iconButton('Open file (Ctrl+O)', 'folder-open', () => void openFile()),
-    bExport,
     bSettings));
 const status = h('footer', { class: 'status' });
 
@@ -186,7 +202,7 @@ const editorHost = h('div', { class: 'pbody edhost' });
 const asmHead = panelHead('Assemble');
 const asmBody = h('div', { class: 'pbody abody' });
 const asmPanel = h('section', { class: 'panel asm', 'aria-label': 'Assemble' }, asmHead.root, asmBody);
-const editor = createEditor(editorHost, tokenizeMipsLine, () => void saveAndAssemble(), () => {
+const editor = createEditor(editorHost, tokenizeLine, () => void saveAndAssemble(), () => {
   if (!dirty || !edited) { dirty = true; edited = true; renderChrome(); }
 }, (line, on) => void editorBreakpoint(line, on));
 const editorHead = panelHead('Editor');
@@ -400,20 +416,22 @@ function sizeRunSide(): void {
 }
 
 // The Run side before there is a program to show: not assembled yet, the
-// first assemble had errors, or the simulator stopped (a crash).
+// first assemble had errors, the engine stopped (a crash) -- or it is not
+// there at all (dead: it could not start), which no key can mend.
 function renderPlaceholder(): void {
-  const kind = crashNote ? 'crashed' : errors.length ? 'failed' : 'fresh';
+  const kind = engineState === 'dead' ? 'dead' : crashNote ? 'crashed' : errors.length ? 'failed' : 'fresh';
   const where = narrow ? 'Editor 탭 아래쪽의 Assemble 패널' : '편집기 아래 Assemble 패널';
-  const [title, body] = kind === 'crashed' ? ['시뮬레이터가 멈췄습니다', 'Reset 버튼이나 Ctrl+S 키로 다시 시작하세요.']
+  const [title, body] = kind === 'dead' ? ['시뮬레이터 엔진을 쓸 수 없습니다', `${engineDetail} 프로그램을 다시 시작해 보고, 그래도 안 되면 조교에게 알려 주세요.`]
+    : kind === 'crashed' ? ['시뮬레이터 엔진이 멈췄습니다', '엔진을 다시 시작했습니다. 프로그램은 지워졌으니 Ctrl+S 키로 다시 어셈블하세요.']
     : kind === 'failed' ? ['아직 어셈블된 프로그램이 없습니다', `${where}에 나온 오류를 고친 뒤 Ctrl+S 키를 다시 누르세요.`]
     : ['아직 어셈블하지 않았습니다', '어셈블하면 여기에 레지스터와 명령, 콘솔 출력이 나옵니다.'];
-  const key = JSON.stringify([kind, title, body, assembleName(false)]);
+  const key = JSON.stringify([kind, title, body, assembleName(false), engineDetail]);
   if (placeholder.dataset.key === key) return;
   placeholder.dataset.key = key;
   const go = h('button', { class: 'btn primary', type: 'button' }, icon('hammer'), h('span', {}, assembleName(false)), h('kbd', {}, 'Ctrl+S'));
   go.addEventListener('click', () => void saveAndAssemble());
   // The words first, then Haram at the far end from the Editor they are about.
-  placeholder.replaceChildren(notice({ pose: 'guide', title, body, more: [h('div', { class: 'row' }, go)] }));
+  placeholder.replaceChildren(notice({ pose: 'guide', title, body, more: kind === 'dead' ? [] : [h('div', { class: 'row' }, go)] }));
   placeholder.dataset.kind = kind;
 }
 
@@ -436,7 +454,7 @@ function renderBand(): void {
 // student has scrolled stays where it is).
 let asmKey = '';
 function renderAssemble(): void {
-  const key = JSON.stringify([errors.map((e) => [e.line, e.message.message, e.message.source]), lastAssembly?.at.getTime() ?? null,
+  const key = JSON.stringify([errors.map((e) => [e.line, e.col, e.message]), lastAssembly?.at.getTime() ?? null,
     lastAssembly?.instructions ?? null, edited, machineShown(), saveNote, saves(), narrow]);
   if (key === asmKey) return;
   asmKey = key;
@@ -458,33 +476,18 @@ function renderAssemble(): void {
     h('p', {}, `Ctrl+S 키를 누르면 ${saves() ? '저장하고 ' : ''}어셈블합니다. 결과와 오류가 여기에 나옵니다.`)));
 }
 
-// The Editor line of PC: the Text row's line, or that of the source line a
-// pseudo instruction's later words belong to.  Only the student's own lines:
-// the start-up code comes from the exception handler, whose line numbers
-// are not the Editor's (the row's source text must be on that line).
+// The Editor line of PC: the Text row's line (several words of one pseudo
+// instruction share it).  RARS's text holds the student's program only --
+// no start-up code from an exception handler -- so every row's line is one
+// of the Editor's.
 function pcSourceLine(): number | null {
   return lastRegs ? lineOf(lastRegs.pc) : null;
 }
 
 function lineOf(addr: number): number | null {
-  let i = rows.findIndex((r) => r.addr === addr);
-  if (i < 0 || rows[i].kernel) return null;
-  while (i > 0 && rows[i].line === 0) i -= 1;
-  return userLine(rows[i]) ? rows[i].line : null;
+  const row = rows.find((r) => r.addr === addr >>> 0);
+  return row && row.line > 0 && row.line <= editor.view.state.doc.lines ? row.line : null;
 }
-
-// The row's source line is one of the Editor's (not the start-up code's).
-function userLine(row: TextRow): boolean {
-  if (row.kernel || row.line === 0 || row.line > editor.view.state.doc.lines || !row.source) return false;
-  return simplified(editor.view.state.doc.line(row.line).text).includes(simplified(row.source));
-}
-
-// The first word of an Editor line, if the line made any.
-const addressOfLine = (line: number): number | null => rows.find((r) => r.line === line && userLine(r))?.addr ?? null;
-
-const ZERO_REGS: RegisterValues = {
-  pc: 0, hi: 0, lo: 0, epc: 0, cause: 0, badVAddr: 0, status: 0, general: new Array(32).fill(0), fp: new Array(32).fill(0),
-};
 
 // ---- font size ---------------------------------------------------------------------
 
@@ -503,12 +506,7 @@ function applyFont(): void {
 
 // ---- settings and about -----------------------------------------------------------
 
-// 고급: this session only, from QtSpim's defaults at every start.  `applied`
-// is what the machine on screen was assembled with.
-let advanced: Advanced = defaultAdvanced();
-let applied: Advanced = defaultAdvanced();
-
-const about = aboutDialog();
+const about = aboutDialog((info) => ['Simulator engine: RARS ', code((info as AboutInfo).rars || '?'), ' by Pete Sanderson, Kenneth Vollmar and Benjamin Landers (MIT)']);
 const settingsBox = settingsDialog({
   fontSize: () => settings.fontSize,
   setFontSize: async (px) => {
@@ -521,19 +519,9 @@ const settingsBox = settingsDialog({
     settings = await api.setSettings({ ...settings, dataBase: base });
     if (text.tab === 'data') void refreshData();
   },
-  advanced: () => advanced,
-  setAdvanced: (a) => { advanced = a; renderStatus(); },
-  pickHandler: () => api.openHandler(),
   about: () => void about.open(),
 });
 document.body.append(settingsBox.root, about.root);
-
-const assembleOptions = (a: Advanced) => ({
-  fileName: file.name,
-  machine: a.machine,
-  run: { argv: ['program.s', ...a.args.split(/\s+/).filter(Boolean)], env: [] },
-  handler: a.handler.kind === 'default' ? undefined : a.handler.kind === 'none' ? null : a.handler.text,
-});
 
 // ---- chrome: title bar and status bar ----------------------------------------------------
 
@@ -546,14 +534,14 @@ function renderChrome(): void {
     b.classList.toggle('primary', primary && on);
   };
   setBtn(bAssemble, open && !running, !current());
-  bRun.replaceChildren(icon(running ? 'square' : 'play'), h('span', { class: 'label' }, running ? 'Stop' : 'Run'),
-    h('kbd', {}, running ? 'Esc' : 'F5'));
-  bRun.title = running ? 'Stop (Esc)' : 'Run (F5)';
-  setBtn(bRun, open && (running || (runState !== 'finished' && runState !== 'input')), running);
-  setBtn(bStep, open && !running && runState !== 'finished', current() && !running);
+  // Waiting for input is a run that is still going: Stop ends it (the engine undoes the half-done ecall).
+  const stoppable = running || runState === 'input';
+  bRun.replaceChildren(icon(stoppable ? 'square' : 'play'), h('span', { class: 'label' }, stoppable ? 'Stop' : 'Run'),
+    h('kbd', {}, stoppable ? 'Esc' : 'F5'));
+  bRun.title = stoppable ? 'Stop (Esc)' : 'Run (F5)';
+  setBtn(bRun, open && (running || runState === 'input' || runState !== 'finished'), running || runState === 'input');
+  setBtn(bStep, open && !stoppable && runState !== 'finished', current() && !stoppable);
   setBtn(bRestart, lastGood !== null && !busy, false);
-  bExport.hidden = !open || !brand.hmx;
-  bExport.disabled = lastGood === null || busy;
   speedFast.classList.toggle('on', speed === 'fast');
   speedSlow.classList.toggle('on', speed === 'slow');
   speedFast.setAttribute('aria-checked', String(speed === 'fast'));
@@ -645,13 +633,15 @@ window.addEventListener('resize', () => fitTitlebar());
 function renderStatus(): void {
   const parts: (Node | string)[] = [];
   const span = (cls: string, ...c: (Node | string)[]) => h('span', { class: cls }, ...c);
+  if (engineState !== 'ready') parts.push(span(engineState === 'dead' ? 'err' : 'run engine',
+    engineState === 'starting' ? '엔진 준비 중…' : engineState === 'restarting' ? '엔진을 다시 시작하는 중…' : '엔진을 쓸 수 없음'));
   if (crashNote) parts.push(span('err', crashNote));
   if (!open) parts.push(span('', '준비'));
   else if (assembledText === null) {
     if (errors.length) {
       parts.push(span('err', `오류 ${errors.length}개`));
       const e = errors[0];
-      parts.push(span('', e.line ? `${e.line}행 · ` : '', withHex(e.message.message)));
+      parts.push(span('', e.line ? `${e.line}행 · ` : '', withHex(e.message)));
     } else parts.push(span('', !saves() ? '어셈블 (Ctrl+S)' : edited ? '고친 뒤 저장·어셈블 (Ctrl+S)' : '저장·어셈블 (Ctrl+S)'));
     if (saveNote) parts.push(span(saveWarn ? 'warn' : '', saveNote));
   } else {
@@ -664,7 +654,9 @@ function renderStatus(): void {
       parts.push(span('', '멈추려면 Esc · 빨리 가려면 Instant'));
     } else if (runState === 'running') {
       parts.push(span('run', '실행 중'));
-      if (progress) parts.push(span('', 'PC ', code(hex32(progress.pc))), span('', `${progress.instructions.toLocaleString()}개 명령`));
+      parts.push(span('', '멈춤 (Esc)'));
+    } else if (runState === 'input') {
+      parts.push(span('run', codeText(stopMessage('input', pc))));
       parts.push(span('', '멈춤 (Esc)'));
     } else {
       const reason = lastReason;
@@ -679,31 +671,15 @@ function renderStatus(): void {
     }
     // A later assemble that failed (the machine keeps the last program).
     if (errors.length) parts.push(span('err', `고친 코드에 오류 ${errors.length}개 — Assemble 패널`));
-    else if (!sameAdvanced(advanced, applied)) parts.push(span('warn', '설정이 바뀌었습니다 — 다시 어셈블하면(Ctrl+S) 적용됩니다'));
   }
   if (note) parts.push(span('warn', note));
   else if (exportNote) parts.push(span('ok', exportNote));
   status.replaceChildren(...parts);
 }
-const stopMessageFor = (reason: RunResult['reason'], pc: string) =>
+const stopMessageFor = (reason: StopReason, pc: string) =>
   reason === 'exit' ? '프로그램이 끝났습니다 — 다시 하려면 Reset' : reason === 'error' ? '실행 오류로 멈췄습니다 — 콘솔을 보세요' : stopMessage(reason, pc);
 
 // ---- files -------------------------------------------------------------------------
-
-// The program on the machine -- the last assembled, which Run and Step go
-// on with -- as an executable image, even when the Editor has changed since
-// (then the note says so).  Its source-sha256 is of that program's source.
-async function exportImage(): Promise<void> {
-  if (lastGood === null || busy) return;
-  const good = lastGood;
-  const changed = editor.text() !== good.source;
-  const r = await api.exportImage({ source: good.source, options: good.options, name: good.name, path: good.path, format: good.format,
-                                    assembled: (lastAssembly?.at ?? new Date()).getTime() }).catch((e: Error) => ({ error: e.message }));
-  if (r === null) return;
-  if ('error' in r) note = r.error;
-  else { note = ''; exportNote = `${changed ? '마지막으로 어셈블한 코드를 ' : ''}실행 이미지로 저장했습니다 — ${r.name}`; }
-  renderStatus();
-}
 
 // Before another file takes the Editor's place.  Unsaved changes are always
 // asked about; a new file is asked about even when everything is saved --
@@ -748,13 +724,22 @@ async function load(opened: { name: string; path: string | null; text: string; f
   requestAnimationFrame(() => editor.view.focus());
 }
 
+// A call on its way to the engine (an assemble, a step) finishes first: one
+// that came back after another file was opened would put the old file's
+// machine on screen (the engine answers in a few ms, but not at once).
+async function idle(): Promise<void> {
+  for (let i = 0; i < 500 && busy; i += 1) await new Promise((r) => setTimeout(r, 20));
+}
+
 async function newFile(): Promise<void> {
+  await idle();
   if (!(await mayReplace('new'))) return;
   await load({ name: UNTITLED, path: null, text: '', format: { encoding: 'UTF-8', byteOrderMark: false, lineEnd: 'LF' } });
   file.format = null;
   renderChrome();
 }
 async function openFile(): Promise<void> {
+  await idle();
   if (!(await mayReplace('open'))) return;
   await load(await api.openFile().catch((e: Error) => { [saveNote, saveWarn] = [e.message, true]; renderChrome(); return null; }));
 }
@@ -779,6 +764,11 @@ async function startTutorial(): Promise<void> {
   await tutorial.start();
 }
 
+// The first address of a source line in the program on screen (Text's rows), or null.
+function addressOfLine(line: number): number | null {
+  return rows.find((r) => r.line === line)?.addr ?? null;
+}
+
 const listeners: ((s: Signal) => void)[] = [];
 function emit(s: Signal): void { for (const l of listeners) l(s); }
 
@@ -800,7 +790,7 @@ const tutorial = new Tutorial({
     if (!current() && !(await saveAndAssemble())) return;
     for (let i = 0; i < 500 && lastRegs && lastRegs.pc !== addr && runState !== 'finished' && runState !== 'input'; i += 1) {
       resumeWith = 'step';
-      await go(() => api.call('step', 1));
+      await go(() => api.call('step', {}));
     }
   },
   run: async () => { await run(); await waitWhileRunning(); },
@@ -866,7 +856,7 @@ const tutorial = new Tutorial({
 
 // The machine no longer matches what is on screen: a new file.
 async function forgetMachine(): Promise<void> {
-  if (runState === 'running') await api.stop();
+  if (runState === 'running' || runState === 'input') await api.stop().catch(() => {});
   assembledText = null;
   lastGood = null;
   lastAssembly = null;
@@ -905,8 +895,33 @@ async function saveAndAssemble(): Promise<boolean> {
   return assemble(source);
 }
 
+// The Editor's breakpoint lines to the engine, when they are not what it
+// holds (set, cleared, or moved with the text by an edit).  The engine sets
+// them again at every assemble by itself (docs/engine-protocol.md 5.6).
+async function sendBreakpointLines(): Promise<void> {
+  const lines = editor.breakpointLines();
+  const key = JSON.stringify(lines);
+  if (key === sentLines) return;
+  const r = await api.call('bp', { lines });
+  if (r.ok) { sentLines = key; takeBreakpoints(r.breakpoints); }
+}
+
+// The engine's answer -> the addresses on screen, and a word about lines
+// that hold no instruction (their dot stays: it takes effect once the line has code).
+function takeBreakpoints(list: { line: number; addr: number | null }[]): void {
+  breakpoints.clear();
+  for (const b of list) if (b.addr !== null) breakpoints.add(b.addr >>> 0);
+  for (const r of rows) r.breakpoint = breakpoints.has(r.addr);
+  text.setRows(rows);
+  const idle = list.filter((b) => b.addr === null).map((b) => b.line);
+  if (idle.length && current()) note = `${idle.join(', ')}행에는 명령이 없어 브레이크포인트가 걸리지 않습니다`;
+}
+
+const errorsOf = (list: ErrorItem[] | undefined) =>
+  (list ?? []).filter((e) => !e.warning).map((e) => ({ message: e.message, line: e.line, col: e.col }));
+
 // Assembles `source` into a fresh machine -- after assembling it in a second
-// process first (src/main/engine-mips.ts, sim:check): a program with errors leaves the
+// engine first (src/main/engine-riscv.ts, sim:check): a program with errors leaves the
 // machine on screen as it was, the program in it and where it had run to.
 async function assemble(source: string): Promise<boolean> {
   busy = true;
@@ -914,15 +929,6 @@ async function assemble(source: string): Promise<boolean> {
   note = '';
   exportNote = '';
   congrats.hidden = true;
-  const options = assembleOptions(advanced);
-  const lines = source.split('\n');
-  const parsed = (raw: string[]) => raw.map((line) => {
-    const message = parseAssemblerMessage(line);
-    return { message, line: resolveMessageLine(message, lines) };
-  });
-  // Errors: in the Assemble panel and the Editor's margin; the machine as it was.
-  // (The panel says what happened once it is over: renderChrome() below,
-  // when keys work again.)
   const failed = (list: typeof errors): false => {
     errors = list;
     edited = editor.text() !== assembledText;
@@ -932,61 +938,49 @@ async function assemble(source: string): Promise<boolean> {
     return false;
   };
   try {
-    if (runState === 'running') { slow?.cancel(); await api.stop(); await waitWhileRunning(); }
-    // The core ended while assembling it (a .err directive): the second
-    // process did, the machine on screen is untouched.  No second process at
-    // all (it did not start): assemble on the machine itself, as before.
-    const check = await api.check(source, options).catch(() => null);
-    if (check?.crashed) return failed([{ message: parseAssemblerMessage(check.crashed), line: 0 }]);
-    if (check && !check.ok) return failed(parsed(check.errors));
-    const same = source === assembledText;
-    let r: Awaited<ReturnType<typeof api.call<'assemble'>>>;
+    if (runState === 'running' || runState === 'input') { slow?.cancel(); await api.stop().catch(() => {}); await waitWhileRunning(); }
+    const check = await api.check(source).catch(() => null);
+    if (check && !check.ok) return failed(errorsOf(check.errors).length ? errorsOf(check.errors) : [{ message: check.error, line: 0, col: 0 }]);
+    await sendBreakpointLines();
+    let r;
     try {
-      r = await api.call('assemble', source, options);
-    } catch {
-      return false; // the process died: onCrashed says so
+      r = await api.call('assemble', { source });
+    } catch (e) {
+      crashNote = (e as Error).message; // a crash (onCrashed says more) or a dead engine
+      return false;
     }
     crashNote = '';
-    if (!r.ok) { // (checked above; only without a second process)
+    if (!r.ok) { // (checked above; only without a second engine)
       assembledText = null;
       runState = 'ready';
-      return failed(parsed(r.errors));
+      return failed(errorsOf(r.errors).length ? errorsOf(r.errors) : [{ message: r.error, line: 0, col: 0 }]);
     }
     consolePanel.clear();
+    consolePanel.waitForInput(false);
     steps = 0;
     progress = null;
     changedNow = [];
     lastReason = 'limit';
     errors = [];
-    rows = textRows(await api.call('textSegment'));
-    // Breakpoints: the Editor's lines, mapped to this program's words, and
-    // (for the same program) those set in Text on words with no line of the
-    // Editor's, such as the start-up code.
-    const kept = same ? [...breakpoints].filter((a) => lineOf(a) === null && rows.some((x) => x.addr === a)) : [];
-    const mapped = editor.breakpointLines().map((n) => [n, addressOfLine(n)] as const);
-    const dropped = mapped.filter(([, a]) => a === null).map(([n]) => n);
-    if (dropped.length) {
-      editor.setBreakpointLines(mapped.filter(([, a]) => a !== null).map(([n]) => n));
-      note = `${dropped.join(', ')}행에는 명령이 없어 브레이크포인트를 뺐습니다`;
-    }
-    breakpoints.clear();
-    for (const a of [...kept, ...mapped.map(([, a]) => a).filter((a): a is number => a !== null)]) breakpoints.add(a);
-    for (const a of breakpoints) await api.call('setBreakpoint', a);
-    for (const x of rows) x.breakpoint = breakpoints.has(x.addr);
+    rows = textRows(r.text);
     assembledText = source;
     edited = editor.text() !== source; // typed on while it assembled
-    lastGood = { source, options, name: file.name, path: file.path, format: file.format };
-    lastAssembly = { at: new Date(), instructions: rows.filter((x) => !x.kernel).length };
+    takeBreakpoints(r.breakpoints);
+    lastGood = { source, name: file.name, path: file.path, format: file.format };
+    lastAssembly = { at: new Date(), instructions: rows.length };
     editor.showErrors([]);
     labels.clear();
-    for (const sym of parseSymbolListing(r.symbols)) labels.add(sym.name, sym.address);
-    applied = structuredClone(advanced);
+    for (const sym of r.symbols) labels.add(sym.name, sym.addr >>> 0);
+    lastDataEnd = Math.max(DATA_BASE, ...r.symbols.filter((x) => x.segment === 'data').map((x) => (x.addr >>> 0) + 4));
     runState = 'ready';
     text.setRows(rows);
-    const regs = await api.call('registers');
-    registers?.update(regs, null);
-    lastRegs = regs;
-    text.setPc(regs.pc);
+    const regs = await api.call('regs');
+    if (regs.ok) {
+      const now = toValues(regs);
+      registers?.update(now, null);
+      lastRegs = now;
+      text.setPc(now.pc);
+    }
     if (selected >= 0 && !rows.some((x) => x.addr === selected)) clearSelection();
     else showInspector();
     text.setTab('text');
@@ -998,28 +992,6 @@ async function assemble(source: string): Promise<boolean> {
     renderChrome();
     if (after) emit(after);
   }
-}
-
-// What to do about an assembler message, before what went wrong.  For a
-// syntax error, first the slip the line shows when there is one to name
-// (src/core/near-miss.ts): a name a letter or two from one the assembler
-// knows, a register that does not exist, a register without its $.
-function hintFor(message: string, source: string): string {
-  if (/syntax error/i.test(message)) {
-    const near = nearMiss(source);
-    if (near?.why === 'spelling') {
-      const noSuch = { directive: '지시어는 없습니다', instruction: '명령은 없습니다', register: '레지스터는 없습니다' }[near.kind];
-      return `\`${near.token}\` ${noSuch}. 혹시 \`${near.meant}\`?`;
-    }
-    if (near?.why === 'no-such-register') return `\`${near.token}\` 레지스터는 없습니다. \`${near.family}\` 레지스터는 \`${near.range}\` 입니다.`;
-    if (near?.why === 'missing-dollar') return `레지스터 이름 앞에는 \`$\` 기호가 있어야 합니다: \`${near.token}\` → \`${near.meant}\`.`;
-    return '명령 이름, 레지스터 이름(예: `$t0`), 쉼표를 확인해 보세요.';
-  }
-  if (/defined for the second time|already defined/i.test(message)) return '같은 이름의 라벨이 두 번 있습니다. 한쪽 이름을 바꾸세요.';
-  if (/shift distance/i.test(message)) return '옮길 비트 수는 0 부터 31 까지만 쓸 수 있습니다.';
-  if (/too large|out of range|immediate/i.test(message)) return '값이 이 명령이 담을 수 있는 크기를 넘었습니다. 먼저 `li` 명령으로 레지스터에 넣어 보세요.';
-  if (/undefined|unknown/i.test(message)) return '쓰기 전에 정의하지 않은 이름입니다. 철자와 `.globl` 선언을 확인해 보세요.';
-  return ''; // nothing to add to "고친 뒤 Ctrl+S 키를 다시 누르세요" above: no hint
 }
 
 // "N행으로 가기": the Editor (a narrow window: its tab), the line.
@@ -1037,25 +1009,43 @@ function renderErrors(): void {
   renderAssemble();
 }
 
+// The slip a line shows, when there is one to name (src/isa/riscv/core/near-miss.ts),
+// under RARS's words: a name a letter or two from one RARS knows, a register
+// that does not exist, a MIPS habit.  RARS names the word it could not take
+// ('"spp": operand is of incorrect type'); only that word is guessed at as a
+// misspelt register.  Nothing to name: no hint.
+function hintFor(message: string, source: string): string {
+  const flagged = /^"([^"]+)"/.exec(message)?.[1] ?? null;
+  const near = nearMiss(source, flagged);
+  if (near?.why === 'spelling') {
+    const noSuch = { directive: '지시어는 없습니다', instruction: '명령은 없습니다', register: '레지스터는 없습니다' }[near.kind];
+    return `\`${near.token}\` ${noSuch}. 혹시 \`${near.meant}\`?`;
+  }
+  if (near?.why === 'no-such-register') return `\`${near.token}\` 레지스터는 없습니다. \`${near.family}\` 레지스터는 \`${near.range}\` 입니다.`;
+  if (near?.why === 'mips' && near.token.startsWith('$')) {
+    return findRegister(near.meant)
+      ? `RISC-V 레지스터 이름에는 \`$\` 기호가 없습니다: \`${near.token}\` → \`${near.meant}\`.`
+      : `RISC-V 레지스터 이름에는 \`$\` 기호가 없고, \`${near.meant}\` 레지스터도 없습니다(MIPS 레지스터 이름). 시스템 호출 번호는 \`a7\` 레지스터에 넣습니다.`;
+  }
+  if (near?.why === 'mips') return `\`${near.token}\` 명령은 MIPS 명령입니다. RISC-V 에서는 \`${near.meant}\` 명령을 씁니다.`;
+  return '';
+}
+
 function errorNotice(): HTMLElement {
   const toLine = (n: number) => goToErrorLine(n);
   const first = errors.find((e) => e.line > 0) ?? errors[0];
   const go = h('button', { class: 'btn primary', type: 'button' }, first.line ? `${first.line}행으로 가기` : '고치러 가기');
   go.addEventListener('click', () => (first.line ? toLine(first.line) : showView('editor')));
+  // RARS's own words (docs/engine-protocol.md 6.1): what students see in its docs and searches.
   const items = errors.map((e) => {
     const where = h('button', { class: 'linkbtn line', type: 'button', disabled: !e.line }, e.line ? `${e.line}행` : '');
     where.addEventListener('click', () => { if (e.line) toLine(e.line); });
+    const source = e.line > 0 && e.line <= editor.view.state.doc.lines ? editor.view.state.doc.line(e.line).text.trim() : '';
+    const hint = source ? hintFor(e.message, source) : '';
     return h('div', { class: 'item' }, h('span', { class: 'mark', 'aria-hidden': 'true' }, '!'), where,
-      h('span', { class: 'msg' },
-        h('span', { class: 'what' }, withHex(e.message.message)),
-        e.message.source ? code(e.message.source, 'src') : null,
-        ((hint) => (hint ? h('span', { class: 'hint' }, codeText(hint)) : null))(hintFor(e.message.message, e.message.source))));
+      h('span', { class: 'msg' }, h('span', { class: 'what' }, withHex(e.message)), source ? code(source, 'src') : null,
+        hint ? h('span', { class: 'hint' }, codeText(hint)) : null));
   });
-  // What is wrong (the title), what to do (the line under it), then the
-  // errors, each with its line; the button goes to the first.  The line's
-  // number is said twice at most: in the error and on the button.  Right
-  // under the Editor: no character (the panel is as tall as its words).
-  // With a program in the machine, it is still there: the Run side says so.
   const title = errors.length > 1 ? `코드에 오류가 ${errors.length}개 있습니다` : '코드에 오류가 있습니다';
   const todo = (errors.length > 1 ? '위에서부터 하나씩 고친 뒤 Ctrl+S 키를 다시 누르세요.' : '아래 줄을 고친 뒤 Ctrl+S 키를 다시 누르세요.')
     + (machineShown() ? ` ${narrow ? 'Run 탭' : '오른쪽'}에는 마지막으로 어셈블한 코드가 그대로 있습니다.` : '');
@@ -1077,74 +1067,84 @@ async function ready(): Promise<boolean> {
 }
 
 async function runOrStop(): Promise<void> {
-  if (runState === 'running') return stop();
+  if (runState === 'running' || runState === 'input') return stop();
   return run();
 }
 
 async function run(): Promise<void> {
   if (!(await ready())) return;
   if (runState === 'finished') { renderStatus(); return; }
-  if (runState === 'input') { consolePanel.waitForInput(true); return; }
   if (speed === 'slow') return runSlow();
+  // The Editor's lines are the machine's program's only while its code is (current()):
+  // breakpoints set in changed code wait for the next assemble.
+  if (current()) await sendBreakpointLines().catch(() => {});
   resumeWith = 'run';
   runState = 'running';
   steps = 0;
   progress = null;
   renderChrome();
-  if (applied.machine.mappedIo) consolePanel.waitForInput(true); // the program polls the receiver as it runs
-  await go(() => api.call('run'));
+  await go(() => api.call('run', { backstep: false }));
   if (switchTo === 'slow' && (runState as RunState) === 'paused') { switchTo = null; await runSlow(); }
 }
 
 async function step(): Promise<void> {
   if (!(await ready())) return;
-  if (runState === 'finished' || runState === 'running') return;
+  if (runState === 'finished' || runState === 'running' || runState === 'input') return;
+  if (current()) await sendBreakpointLines().catch(() => {});
   resumeWith = 'step';
-  await go(() => api.call('step', 1));
+  await go(() => api.call('step', {}));
 }
 
-async function go(call: () => Promise<RunResult>): Promise<RunResult | null> {
+async function go(call: () => Promise<RunReply>): Promise<RunReply | null> {
   busy = true;
   note = '';
   exportNote = '';
   congrats.hidden = true;
   const before = lastRegs;
-  let result: RunResult;
+  let result: RunReply;
   try {
     result = await call();
-  } catch {
+  } catch (e) {
     busy = false; // the crash report (onCrashed) says what happened
+    crashNote ||= (e as Error).message;
+    renderChrome();
     return null;
   }
+  let reason: StopReason = 'limit';
   try {
-    const now = await api.call('registers');
-    if (result.reason !== 'input' && resumeWith === 'step') steps += 1;
-    lastReason = result.reason;
+    if (!result.ok) { note = result.error; runState = 'paused'; return result; }
+    reason = stopReason(result.reason);
+    const now = toValues(result);
+    if (resumeWith === 'step') steps += 1;
+    lastReason = reason;
     // A slow run between two of its steps is still running.
-    runState = slow && result.reason === 'limit' ? 'running' : stateAfter(result.reason);
+    runState = slow && reason === 'limit' ? 'running' : stateAfter(reason);
     registers?.update(now, before);
     changedNow = [...changedKeys(before, now)];
     lastRegs = now;
     text.setPc(now.pc);
     showInspector();
-    for (const e of result.errors) consolePanel.append(e.endsWith('\n') ? e : e + '\n');
-    consolePanel.waitForInput(result.reason === 'input');
+    if (result.reason === 'EXCEPTION' && result.message) consolePanel.append(`${result.message}${result.line ? ` (${result.line}행)` : ''}\n`);
+    // Stopped while it waited for input: the engine has undone that ecall
+    // (protocol 2, 7.3); the next Run or Step asks again.
+    if (result.input_cancelled) note = result.undone ? '입력을 기다리다 멈췄습니다 — 다시 실행하면 입력을 다시 받습니다'
+      : '입력을 기다리다 멈췄는데 되돌리지 못했습니다 — 다시 어셈블하세요 (Ctrl+S)';
+    consolePanel.waitForInput(false);
     if (text.tab === 'data') void refreshData();
-    if (result.reason === 'exit' && result.errors.length === 0 && !congratsShown && !tutorial.active) showCongrats();
+    if (reason === 'exit' && !congratsShown && !tutorial.active) showCongrats();
     return result;
   } finally {
     busy = false;
     renderChrome();
-    emit({ kind: 'stopped', reason: result.reason });
+    emit({ kind: 'stopped', reason });
   }
 }
 
-/* 실행 at one line a second.  The window steps the core itself, one
-   instruction per call, and waits a second in between; stopping (Esc, 멈춤)
-   cancels the wait at once, so a slow run of a billion-step loop is never
-   more than a click away from ending.  Every step updates what a step
-   updates: registers, the Inspector, the Editor's line.  A breakpoint stops
-   it before its instruction; switching to 즉시 hands the rest to the core. */
+/* Run at one line a second.  The window steps the engine itself, one
+   instruction per call, and waits a second in between; stopping (Esc)
+   cancels the wait at once.  Every step updates what a step updates:
+   registers, the Inspector, the Editor's line.  A breakpoint stops it
+   before its instruction; switching to Instant hands the rest to the engine. */
 async function runSlow(): Promise<void> {
   resumeWith = 'run';
   runState = 'running';
@@ -1155,21 +1155,21 @@ async function runSlow(): Promise<void> {
   renderChrome();
   try {
     for (let first = true; !cancelled; first = false) {
-      if (!first && lastRegs && breakpoints.has(lastRegs.pc)) { // stop before it, as the core does
+      if (!first && lastRegs && breakpoints.has(lastRegs.pc >>> 0)) { // stop before it, as the engine does
         runState = 'paused';
         lastReason = 'breakpoint';
         return;
       }
       resumeWith = 'step';
-      const result = await go(() => api.call('step', 1));
+      const result = await go(() => api.call('step', {}));
       resumeWith = 'run';
-      if (!result || result.reason !== 'limit') return; // the end, an error, input, a crash
-      if (cancelled) break;   // stopped while that step was on its way
+      if (!result || !result.ok || stopReason(result.reason) !== 'limit') return; // the end, an error, a stop, a crash
+      if (cancelled) break;
       runState = 'running';
       renderChrome();
       await new Promise<void>((done) => { wake = done; setTimeout(done, 1000); });
     }
-    runState = 'paused';        // stopped, or switched to Instant
+    runState = 'paused';
     lastReason = 'stopped';
   } finally {
     slow = null;
@@ -1189,25 +1189,27 @@ async function setSpeed(next: 'fast' | 'slow'): Promise<void> {
   else await api.stop();                // run() then goes on with runSlow()
 }
 
-// The status bar's name for the yellow rows, in their yellow: where the
-// Registers panel has no room for its "Changed" tag, this is what says what
-// a yellow row is.  Three names at most, then how many more.
+// The status bar's name for the yellow rows, in their yellow.
 function changedPart(): HTMLElement {
-  const names = changedNow.slice(0, 3).flatMap((key, i) => (i ? [', ', code(key)] : [code(key)]));
+  // The name the student writes (t0, fa0); the Registers panel beside it says both.
+  // (Both here too, "x5 t0", did not fit the status bar at 1280 and under.)
+  const both = (key: string) => (key.startsWith('x') ? abiName(Number(key.slice(1))) : FP_ABI_NAMES[Number(key.slice(1))]);
+  const names = changedNow.slice(0, 3).flatMap((key, i) => (i ? [', ', code(both(key))] : [code(both(key))]));
   const more = changedNow.length > 3 ? ` 외 ${changedNow.length - 3}개` : '';
   return h('span', { class: 'changed' }, '방금 바뀜: ', ...names, more);
 }
 
 async function stop(): Promise<void> {
-  if (runState !== 'running') return;
+  if (runState !== 'running' && runState !== 'input') return;
   switchTo = null;
-  if (slow) { slow.cancel(); return; } // the wait ends now; runSlow() says 'stopped'
-  await api.stop(); // the run's own answer ('stopped') updates the window
+  if (slow && runState === 'running') { slow.cancel(); return; } // the wait ends now; runSlow() says 'stopped'
+  const how = await api.stop(); // the run's own answer ('STOP') updates the window
+  if (how === 'killed') note = '엔진이 대답하지 않아 다시 시작했습니다';
 }
 
 // Reset: the program in the machine back to its start -- the last one that
-// assembled, as it was assembled (its options, its breakpoints), whatever the
-// Editor holds now: assembling is Save & Assemble's.  Also after a crash.
+// assembled, as it was assembled, whatever the Editor holds now.  Also after
+// a crash.  The engine keeps the breakpoint lines.
 async function restart(): Promise<void> {
   if (busy || lastGood === null) return;
   const good = lastGood;
@@ -1217,14 +1219,15 @@ async function restart(): Promise<void> {
   congrats.hidden = true;
   [saveNote, saveWarn] = ['', false]; // Reset saves nothing
   try {
-    if (runState === 'running') { slow?.cancel(); await api.stop(); await waitWhileRunning(); }
-    let r: Awaited<ReturnType<typeof api.call<'assemble'>>>;
+    if (runState === 'running' || runState === 'input') { slow?.cancel(); await api.stop().catch(() => {}); await waitWhileRunning(); }
+    let r;
     try {
-      r = await api.call('assemble', good.source, good.options);
-    } catch {
-      return; // the process died: onCrashed says so
+      r = await api.call('assemble', { source: good.source });
+    } catch (e) {
+      crashNote = (e as Error).message;
+      return;
     }
-    if (!r.ok) return; // it assembled before, with the same options
+    if (!r.ok) return; // it assembled before
     crashNote = '';
     assembledText = good.source;
     edited = editor.text() !== good.source;
@@ -1233,15 +1236,17 @@ async function restart(): Promise<void> {
     progress = null;
     changedNow = [];
     lastReason = 'limit';
-    rows = textRows(await api.call('textSegment'));
-    for (const a of breakpoints) await api.call('setBreakpoint', a);
-    for (const x of rows) x.breakpoint = breakpoints.has(x.addr);
+    rows = textRows(r.text);
+    takeBreakpoints(r.breakpoints);
     runState = 'ready';
     text.setRows(rows);
-    const regs = await api.call('registers');
-    registers?.update(regs, null);
-    lastRegs = regs;
-    text.setPc(regs.pc);
+    const regs = await api.call('regs');
+    if (regs.ok) {
+      const now = toValues(regs);
+      registers?.update(now, null);
+      lastRegs = now;
+      text.setPc(now.pc);
+    }
     if (selected >= 0 && !rows.some((x) => x.addr === selected)) clearSelection();
     else showInspector();
     if (text.tab === 'data') void refreshData();
@@ -1252,52 +1257,43 @@ async function restart(): Promise<void> {
   }
 }
 
+// A line typed in the Console while the program waits for it.  The run or
+// step that waits is still on its way; it goes on by itself.
 async function giveInput(line: string): Promise<void> {
-  await api.call('provideInput', line + '\n');
-  if (runState === 'running') return; // mapped I/O: the program reads it as it runs
+  if (runState !== 'input') return;
+  runState = 'running';
   consolePanel.waitForInput(false);
-  runState = 'paused';
-  if (resumeWith === 'run') await run();
-  else await step();
+  renderChrome();
+  await api.call('input', { text: line + '\n' });
 }
 
-// A breakpoint set or cleared in Text: the machine (Text shows its program),
-// and the Editor's gutter while the Editor's code is that program.
+// A breakpoint set or cleared in Text: the Editor's line of that word (the
+// gutter is where breakpoints live), then the engine.
 async function toggleBreakpoint(addr: number): Promise<void> {
-  const on = !breakpoints.has(addr);
-  await setBreakpoint(addr, on);
   const line = current() ? lineOf(addr) : null;
-  if (line !== null) {
-    const lines = new Set(editor.breakpointLines());
-    if (on) lines.add(line); else if (![...breakpoints].some((a) => lineOf(a) === line)) lines.delete(line);
-    editor.setBreakpointLines([...lines]);
-  }
+  if (line === null) { note = '고친 코드에서는 Text 탭의 브레이크포인트를 바꿀 수 없습니다 — 먼저 어셈블하세요 (Ctrl+S)'; renderStatus(); return; }
+  const lines = new Set(editor.breakpointLines());
+  const on = !breakpoints.has(addr >>> 0);
+  if (on) lines.add(line); else lines.delete(line);
+  editor.setBreakpointLines([...lines]);
+  await sendBreakpointLines();
+  renderStatus();
 }
 
-async function setBreakpoint(addr: number, on: boolean): Promise<void> {
-  if (on) breakpoints.add(addr); else breakpoints.delete(addr);
-  await api.call(on ? 'setBreakpoint' : 'clearBreakpoint', addr);
-  text.setBreakpoint(addr, on);
-}
-
-// A breakpoint set or cleared in the Editor's gutter.  Before an assemble,
-// or with changed code, it is only kept by line (the dot moves with the
-// text): it takes effect at the next assemble.
+// A breakpoint set or cleared in the Editor's gutter.  The engine gets the
+// lines at once; with changed code they apply from the next assemble.
 async function editorBreakpoint(line: number, on: boolean): Promise<void> {
   emit({ kind: 'breakpoint', line, on });
+  note = '';
   if (!current()) {
-    if (machineShown()) { note = '고친 코드의 브레이크포인트는 다시 어셈블하면(Ctrl+S) 적용됩니다'; renderStatus(); }
-    return;
-  }
-  const addr = addressOfLine(line);
-  if (addr === null) {
-    editor.setBreakpointLines(editor.breakpointLines().filter((n) => n !== line));
-    note = `${line}행에는 명령이 없습니다 — 브레이크포인트는 명령이 있는 줄에만`;
+    // Changed code: its lines are not the program's; they go to the engine with the next assemble.
+    if (machineShown()) note = '고친 코드의 브레이크포인트는 다시 어셈블하면(Ctrl+S) 적용됩니다';
     renderStatus();
     return;
   }
-  if (on) await setBreakpoint(addr, true);
-  else for (const a of [...breakpoints].filter((a) => lineOf(a) === line)) await setBreakpoint(a, false);
+  if (busy || runState === 'running' || runState === 'input') { renderStatus(); return; } // sent before the next run or assemble
+  await sendBreakpointLines().catch(() => {});
+  renderStatus();
 }
 
 // ---- the Inspector ----------------------------------------------------------------------
@@ -1317,33 +1313,48 @@ function clearSelection(): void {
 }
 
 function showInspector(): void {
-  const convention = applied.machine.delayedBranches ? 'MipsDelaySlot' : 'SpimNoDelaySlot';
-  const regs = (lastRegs ?? ZERO_REGS).general;
+  const x = (lastRegs ?? ZERO_REGS).x;
   const pinned = selected >= 0 ? text.rowFor(selected) : undefined;
-  if (pinned) { inspector.show(pinned, regs, true, convention); return; }
+  if (pinned) { inspector.show(pinned, x, true); return; }
   const started = runState !== 'ready' || steps > 0;
-  const atPc = lastRegs && started ? text.rowFor(lastRegs.pc) : undefined;
-  if (atPc) inspector.show(atPc, regs, false, convention);
+  const atPc = lastRegs && started ? text.rowFor(lastRegs.pc >>> 0) : undefined;
+  if (atPc) inspector.show(atPc, x, false);
   else inspector.guide();
 }
 inspector.onFollow = () => { clearSelection(); renderStatus(); };
 
 // ---- Data ------------------------------------------------------------------------------
 
+// RARS's default memory map: .data from 0x10010000, the stack below 0x7fffeffc.  The data section is
+// as long as the program's data labels reach (at least 256 bytes, at most
+// 4 KB); the stack from sp to its top when sp points into it.
+const DATA_BASE = 0x10010000;
+const STACK_TOP = 0x7ffffffc; // RARS's stack base: the bytes above it are out of range
+
+async function readSection(kind: DataSection['kind'], from: number, to: number): Promise<DataSection | null> {
+  const m = await api.call('mem', { addr: from | 0, len: to - from });
+  if (!m.ok) return null;
+  const bytes = new Uint8Array((to - from));
+  for (let i = 0; i < bytes.length; i += 1) bytes[i] = parseInt(m.hex.slice(2 * i, 2 * i + 2), 16);
+  const view = new DataView(bytes.buffer);
+  const words = Array.from({ length: bytes.length / 4 }, (_, i) => view.getUint32(4 * i, true));
+  return { kind, from, to, words, bytes };
+}
+
 async function refreshData(): Promise<void> {
-  if (assembledText === null) { text.data.clear(); return; }
-  const s = await api.call('segments');
-  const regs = lastRegs ?? await api.call('registers');
-  const sp = regs.general[29] >>> 0;
-  const part = async (kind: DataSection['kind'], from: number, to: number): Promise<DataSection> => ({
-    kind, from, to, words: await api.call('readWords', from, (to - from) / 4),
-    bytes: await api.call('readBytes', from, to - from),
-  });
-  const stackTop = 0x80000000;
-  const sections = [await part('data', s.dataBot, s.dataTop)];
-  if (sp < stackTop && stackTop - sp <= 0x10000) sections.push(await part('stack', sp & ~15, stackTop));
-  sections.push(await part('kernel', s.kDataBot, s.kDataTop));
-  const pointers = [29, 30, 28].map((n) => ({ name: generalRegisterName(n), value: regs.general[n] >>> 0 }));
+  if (assembledText === null || runState === 'running' || runState === 'input') { if (assembledText === null) text.data.clear(); return; }
+  const dataLabels = lastDataEnd;
+  const end = Math.min(DATA_BASE + 4096, Math.max(DATA_BASE + 256, (dataLabels + 64 + 15) & ~15));
+  const sections: DataSection[] = [];
+  const data = await readSection('data', DATA_BASE, end);
+  if (data) sections.push(data);
+  const regs = lastRegs ?? ZERO_REGS;
+  const sp = regs.x[2] >>> 0;
+  if (sp < STACK_TOP && STACK_TOP - (sp & ~3) <= 0x10000) {
+    const stack = await readSection('stack', sp & ~3, STACK_TOP);
+    if (stack) sections.push(stack);
+  }
+  const pointers = [2, 8, 3].map((n) => ({ name: ['', '', 'sp', 'gp', '', '', '', '', 'fp'][n], value: regs.x[n] >>> 0 }));
   text.data.show(sections, settings.dataBase, labels, pointers);
 }
 
@@ -1387,7 +1398,7 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'F5') { e.preventDefault(); void runOrStop(); return; }
   if (e.key === 'F10') { e.preventDefault(); void step(); return; }
   if (e.key === 'Escape') {
-    if (runState === 'running') { e.preventDefault(); void stop(); }
+    if (runState === 'running' || runState === 'input') { e.preventDefault(); void stop(); }
     else if (selected >= 0) { clearSelection(); renderStatus(); }
     return;
   }
@@ -1403,14 +1414,28 @@ window.addEventListener('keydown', (e) => {
 // ---- events from the simulator ------------------------------------------------------------------
 
 api.onConsole((t) => consolePanel.append(t));
-api.onProgress((p) => { progress = p; if (runState === 'running') renderStatus(); });
-api.onCrashed((message, detail) => {
-  // detail: "시뮬레이터가 중단되었습니다 (fatal error in the simulator core: File contains an .err directive)"
-  crashNote = `${detail || message} — 다시 어셈블하세요`;
+// The program waits for a line: the run (or step) is still on its way, and
+// goes on by itself once giveInput() hands the engine the line.
+api.onInput(() => {
+  if (runState !== 'running' && !busy) return;
+  slow?.cancel(); // a slow run does not step on while it waits
+  runState = 'input';
+  consolePanel.waitForInput(true);
+  renderChrome();
+});
+api.onCrashed((message, cause, restarted) => {
+  crashNote = restarted ? `${message} (${cause}) — 엔진을 다시 시작했습니다. 다시 어셈블하세요 (Ctrl+S)` : `${message} (${cause})`;
   assembledText = null;
   runState = 'ready';
   busy = false;
+  slow?.cancel();
   consolePanel.waitForInput(false);
+  sentLines = ''; // a fresh engine holds no breakpoints yet
+  renderChrome();
+});
+api.onEngineState((state, detail) => {
+  engineState = state;
+  engineDetail = detail;
   renderChrome();
 });
 
@@ -1418,6 +1443,9 @@ api.onCrashed((message, detail) => {
 
 async function start(): Promise<void> {
   settings = await api.getSettings();
+  const e = await api.engineState();
+  engineState = e.state;
+  engineDetail = e.detail;
   applyFont();
   measure();
   new ResizeObserver(() => measure()).observe(document.body);

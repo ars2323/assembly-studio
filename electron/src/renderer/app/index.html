@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
-<!-- tools/build-ui.ts bundles app.ts and what it imports -->
-<script src="../../../build/renderer/app.js"></script>
+<!-- isa.js loads the ISA's window: build/renderer/app-<isa>.js (tools/build-ui.ts bundles it) -->
+<script src="isa.js" data-bundles="../../../build/renderer/" data-riscv-css="../../isa/riscv/renderer/riscv.css"></script>
 </body>
 </html>
