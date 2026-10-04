@@ -44,7 +44,8 @@ import type { RunResult } from '../../sim/protocol.ts';
 import { brand } from '../../brand.ts';
 import './api.ts';
 import { asset, character, code, codeText, h, icon, monoCh, withHex } from './dom.ts';
-import { captionPatch, WHITE_PATCH } from './logic/overlay.ts';
+import { captionPatch, palette } from './logic/overlay.ts';
+import { WINDOW_COLOURS } from '../../main/theme.ts';
 import { notice } from './notice.ts';
 import { nearMiss } from '../../core/near-miss.ts';
 import { createEditor } from './editor.ts';
@@ -1360,15 +1361,16 @@ function showCongrats(): void {
 // ---- the caption buttons' patch -----------------------------------------------------------
 // Windows draws the minimise / maximise / close buttons on a patch the page
 // cannot paint (titleBarOverlay).  On the first screen, whose title bar is
-// dark glass over the photo, the patch is transparent and the symbols white.
+// dark glass over the board, the patch is transparent and the symbols white.
 // Elsewhere, while the tutorial dims the window, or a dialog's backdrop
-// covers it, the patch takes the colour white has under the same layers
-// (logic/overlay.ts), or it would stay a bright square at the top right;
-// white again after.  The buttons keep working throughout.
-let overlayNow = `${WHITE_PATCH.color} ${WHITE_PATCH.symbolColor}`; // the window's own at its start (src/main/main.ts)
+// covers it, the patch takes the colour the title bar has under the same
+// layers (logic/overlay.ts), or it would stand out at the top right; the
+// title bar's own again after.  The buttons keep working throughout.
+const colours = palette(getComputedStyle(document.documentElement));
+let overlayNow = `${WINDOW_COLOURS.titlebar} ${WINDOW_COLOURS.symbol}`; // the window's own at its start (src/main/main.ts)
 function updateOverlay(): void {
   const b = document.body.classList;
-  const p = captionPatch(b.contains('first-screen'), b.contains('tutorial-on'), document.querySelector('dialog[open]') !== null);
+  const p = captionPatch(colours, b.contains('first-screen'), b.contains('tutorial-on'), document.querySelector('dialog[open]') !== null);
   if (`${p.color} ${p.symbolColor}` === overlayNow) return;
   overlayNow = `${p.color} ${p.symbolColor}`;
   void api.setOverlay(p);
