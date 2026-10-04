@@ -185,7 +185,7 @@ export const run = (print: RegExp): Step => ({
   result: {
     title: (t) => (t.host.finished() ? '끝까지 실행되었습니다' : '빨간 점에서 멈췄습니다'),
     body: (t) => (t.host.finished() ? '빨간 점이 없어서 프로그램이 끝까지 실행되었습니다.'
-      : '빨간 점을 찍은 줄 앞에서 멈췄습니다. 이 줄은 아직 실행되지 않았습니다. 상태 표시줄에도 멈춘 까닭과 PC 가 나옵니다.'),
+      : '빨간 점을 찍은 줄 앞에서 멈췄습니다. 이 줄은 아직 실행되지 않았습니다. 상태 표시줄에도 멈춘 이유와 PC 가 나옵니다.'),
     targets: (t) => [statusLead(), ...(t.host.finished() ? [] : pcLine(t))],
     reveal: (t) => { if (!t.host.narrow() && !t.host.finished()) t.host.revealLine(t.line(print)); } },
   skip: async (t) => { await t.host.run(); },
