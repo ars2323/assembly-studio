@@ -6,13 +6,20 @@
 # Run by hand (workflow_dispatch) it publishes a trial instead: a pre-release
 # v<version>-trial.<run number> on the commit it ran on, not Latest -- for
 # trying an installer before a release (the tag is made by the release, no
-# tag push needed).
+# tag push needed).  With `release` ticked, the run by hand publishes the
+# release itself: v<version>, Latest, the tag made on the commit it ran on
+# (for when a tag cannot be pushed).
 name: release
 
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      release:
+        description: 'Publish the release v<version> (Latest) instead of a trial'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -46,7 +53,9 @@ jobs:
       - name: The tag (a release - electron/package.json's version; a trial - made here)
         run: |
           version=$(node -p "require('./package.json').version")
-          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && [ "${{ inputs.release }}" = true ]; then
+            echo "TAG=v$version" >> "$GITHUB_ENV"; echo "KIND=release-here" >> "$GITHUB_ENV"
+          elif [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
             echo "TAG=v$version-trial.$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
           else
             [ "v$version" = "$GITHUB_REF_NAME" ] || { echo "::error::the tag is $GITHUB_REF_NAME but electron/package.json says $version"; exit 1; }
@@ -79,7 +88,10 @@ jobs:
             echo '```'
           } > ../release-notes.md
           cat ../release-notes.md
-          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+          if [ "${KIND:-}" = release-here ]; then
+            gh release create "$TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title "Assembly Studio $VERSION" --notes-file ../release-notes.md --latest
+          elif [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
             gh release create "$TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
               --title "Assembly Studio $VERSION (trial $GITHUB_RUN_NUMBER)" --notes-file ../release-notes.md --latest=false
           else

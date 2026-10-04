@@ -38,4 +38,4 @@ RISC-V 엔진 (저장소 루트): `bash probe/setup.sh` (RARS 를 `~/.cache/asse
 - 문서(README, 릴리스 노트 등)는 이 프로젝트에 대해서만 쓴다. 다른 저장소나 이전 제품을 언급하지 않는다.
 - 자동 CI 는 없다. 검증은 최소로: core 단위 테스트, 캡처, 검토 시점의 사람 확인.
 - 커밋은 작게, 한 목적씩. 단계마다 push 한다.
-- 1.0.0 이후의 변경은 버전을 올려 낸다(고침 1.0.x, 기능 1.x.0): `electron/package.json`, `docs/releases/<버전>.md`, 태그 `v<버전>`.
+- 1.0.0 이후의 변경은 버전을 올려 낸다(고침 1.0.x, 기능 1.x.0): `electron/package.json`, `docs/releases/<버전>.md`, 그리고 release.yml 을 손으로 실행(`release` 체크)해 `v<버전>` 을 발행.
