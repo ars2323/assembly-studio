@@ -1,7 +1,8 @@
 /* Updates, from GitHub Releases: electron-updater's GitHub provider (the
    publish entry in tools/package.ts, which the package carries as
    resources/app-update.yml).  It reads the release marked Latest -- its
-   latest.yml, then its installer; pre-releases (the trials, the engines-…
+   latest.yml, then its installer (only the changed blocks when it can);
+   pre-releases (the trials, the engines-…
    zips) are never looked at.
 
    The first screen asks, once per run, while its opening plays
@@ -23,8 +24,13 @@
    Nothing here stops the program: a failure is logged and answered as "no
    update" (the check) or update:error (the rest), and the first screen goes on. */
 
+import { appendFileSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+
 import { app, ipcMain, type BrowserWindow } from 'electron';
 import electronUpdater from 'electron-updater';
+
+import { brand } from '../brand.ts';
 
 export interface UpdateCheck { available: boolean; version?: string }
 export interface UpdateProgress { percent: number; transferred: number; total: number }
@@ -81,12 +87,43 @@ export function updates(win: BrowserWindow): void {
   });
 }
 
+/* What electron-updater says (what it checked, how much of the installer it
+   downloaded -- "Full: …, To download: …"), kept in update.log as well as on
+   the console: an installed program's console is nowhere to be seen.  The
+   file is in the updater's own folder, %LOCALAPPDATA%\<name>-updater (the
+   program's profile is this run's alone and goes when it exits; this folder
+   holds the installer's copy for updates and goes with an uninstall,
+   packaging/installer.nsh).  Started afresh once it passes LOG_LIMIT. */
+const LOG_LIMIT = 256 * 1024;
+export const updateLogFile = (): string =>
+  path.join(process.env.LOCALAPPDATA ?? app.getPath('appData'), `${brand.exe.toLowerCase()}-updater`, 'update.log');
+function fileLogger(): { info(m: unknown): void; warn(m: unknown): void; error(m: unknown): void } {
+  const file = updateLogFile();
+  try {
+    mkdirSync(path.dirname(file), { recursive: true });
+    if ((statSync(file, { throwIfNoEntry: false })?.size ?? 0) > LOG_LIMIT) writeFileSync(file, '');
+  } catch { /* no log file: the console only */ }
+  const write = (level: string, m: unknown) => {
+    try { appendFileSync(file, `${new Date().toISOString()} ${level} v${app.getVersion()} ${String(m)}\n`); } catch { /* the console has it */ }
+  };
+  return {
+    info: (m) => { console.log('update:', m); write('info', m); },
+    warn: (m) => { console.warn('update:', m); write('warn', m); },
+    error: (m) => { console.error('update:', m); write('error', m); },
+  };
+}
+
 function realSource(): Source {
   const u = electronUpdater.autoUpdater;
+  u.logger = fileLogger();
   u.autoDownload = false;            // only when the window asks
   u.autoInstallOnAppQuit = false;    // only through update:install
   u.allowPrerelease = false;         // the trials are pre-releases
-  u.disableDifferentialDownload = true;  // the whole installer, every time
+  // Only the blocks that changed: the installer of the version installed,
+  // kept by itself in %LOCALAPPDATA%\<name>-updater (packaging/installer.nsh),
+  // against the two releases' .blockmap files.  Without that copy, or on any
+  // failure, electron-updater downloads the whole installer instead.
+  u.disableDifferentialDownload = false;
   // Every failure is also an 'error' event, and an EventEmitter with no
   // listener for it throws: this one only logs (the calls report their own).
   let onInstallError: ((m: string) => void) | null = null;

@@ -71,15 +71,15 @@
   !define MUI_FINISHPAGE_TEXT "@NAME@ has been removed.$\r$\n$\r$\nThe .s files you saved are left as they are."
 !macroend
 
-; electron-builder's installer keeps a copy of itself (the whole
-; installer, over 100 MB) in %LOCALAPPDATA%\<name>-updater, the old side of
-; electron-updater's differential downloads.  The program downloads every
-; update whole (src/main/updater.ts: disableDifferentialDownload), so the copy
-; is never read: remove it.  This runs after the files are in place and before
-; a silent update's installer starts the new version.  An update's installer
-; runs from pending\ in that folder: RMDir (not /r) leaves the folder while
-; pending\ is there, and electron-updater clears pending\ itself.
-!macro customInstall
-  Delete "$LOCALAPPDATA\${APP_INSTALLER_STORE_FILE}"
-  RMDir "$LOCALAPPDATA\@NPMNAME@-updater"
+; electron-builder's installer keeps a copy of itself (the whole installer,
+; over 100 MB) in %LOCALAPPDATA%\<name>-updater: the old side of an update's
+; differential download (src/main/updater.ts), which then fetches only the
+; blocks that changed.  It is kept while the program is installed, and removed
+; with the program -- but not when the uninstaller runs for an update: the
+; update's installer runs from pending\ in that same folder, and puts its own
+; copy there afterwards.
+!macro customUnInstall
+  ${ifNot} ${isUpdated}
+    RMDir /r "$LOCALAPPDATA\@NPMNAME@-updater"
+  ${endIf}
 !macroend
