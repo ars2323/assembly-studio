@@ -167,6 +167,7 @@ bAssemble.dataset.tut = 'assemble';
 bRun.dataset.tut = 'run';
 bStep.dataset.tut = 'step';
 bRestart.dataset.tut = 'reset';
+bBack.dataset.tut = 'stepback';
 // The speed of Run: Instant (the core runs on its own) or one line a second.
 const speedFast = h('button', { type: 'button', role: 'radio', title: 'Run at full speed' }, 'Instant');
 const speedSlow = h('button', { type: 'button', role: 'radio', title: 'Run one line a second' }, '1 line/s');
@@ -239,7 +240,7 @@ const editorPanel = h('section', { class: 'panel editor-panel', 'aria-label': 'E
 // ---- the Run side ----------------------------------------------------------------------
 
 const text = new TextPanel({
-  select: (addr) => select(addr),
+  select: (addr) => { select(addr); emit({ kind: 'select', addr }); },
   toggleBreakpoint: (addr) => void toggleBreakpoint(addr),
 });
 text.onTab = (tab) => { if (tab === 'data') void refreshData(); emit({ kind: 'tab', tab }); };
@@ -889,6 +890,7 @@ const tutorial = new Tutorial({
   assembled: () => current(),
   assemble: () => saveAndAssemble(),
   step: () => step(),
+  stepBack: () => stepBack(),
   runUntil: async (addr) => {
     if (!current() && !(await saveAndAssemble())) return;
     for (let i = 0; i < 500 && lastRegs && lastRegs.pc !== addr && runState !== 'finished' && runState !== 'input'; i += 1) {
@@ -903,6 +905,14 @@ const tutorial = new Tutorial({
   pc: () => lastRegs?.pc ?? null,
   running: () => runState === 'running',
   finished: () => runState === 'finished',
+  waiting: () => consolePanel.waiting,
+  // As typed in the Console: then until the run that went on with it has stopped.
+  input: async (line) => {
+    if (!consolePanel.waiting) return;
+    consolePanel.type(line);
+    for (let i = 0; i < 100 && (runState === 'input' || busy); i += 1) await new Promise((r) => setTimeout(r, 20));
+    await waitWhileRunning();
+  },
   addressOfLine: (line) => addressOfLine(line),
   labelAddress: (name) => labels.find(name) ?? null,
   quietPc: (on) => text.root.classList.toggle('quiet-pc', on),
@@ -1176,6 +1186,7 @@ async function stepBack(): Promise<void> {
   note = '';
   exportNote = '';
   const before = lastRegs;
+  let after: Signal | null = null;
   try {
     const r = await api.call('backstep');
     undo = r.undo;
@@ -1183,6 +1194,7 @@ async function stepBack(): Promise<void> {
     const now = await api.call('registers');
     steps = Math.max(0, steps - 1);
     back = { io: r.io };
+    after = { kind: 'back', io: r.io };
     runState = 'paused';
     lastReason = 'limit';
     registers?.update(now, before);
@@ -1197,6 +1209,7 @@ async function stepBack(): Promise<void> {
   } finally {
     busy = false;
     renderChrome();
+    if (after) emit(after);
   }
 }
 
@@ -1492,7 +1505,7 @@ window.addEventListener('keydown', (e) => {
   const mod = e.ctrlKey || e.metaKey;
   const inEditor = editorHost.contains(e.target as Node);
   if (e.key === 'F5') { e.preventDefault(); void runOrStop(); return; }
-  if (isStepBackKey(e)) { e.preventDefault(); if (!tutorial.active) void stepBack(); return; } // the tutorial teaches F10 alone
+  if (isStepBackKey(e)) { e.preventDefault(); void stepBack(); return; } // (the tutorial lets it through only where it teaches it)
   if (e.key === 'F10') { e.preventDefault(); void step(); return; }
   if (e.key === 'Escape') {
     if ((e.target as HTMLElement).closest?.('input, textarea')) return; // a box's own Esc (the Registers alias)

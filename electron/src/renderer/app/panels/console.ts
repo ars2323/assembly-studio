@@ -73,6 +73,14 @@ export class ConsolePanel {
     this.log.scrollTop = this.log.scrollHeight;
   }
 
+  // A line given as if typed in the field and entered (the tutorial's Skip).
+  type(line: string): void {
+    if (!this.waiting) return;
+    this.input.value = '';
+    this.echo(line);
+    this.onInput(line);
+  }
+
   private echo(line: string): void {
     this.text += line + '\n';
     this.log.append(h('span', { class: 'typed' }, line + '\n'));

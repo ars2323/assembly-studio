@@ -34,8 +34,9 @@
 
    Keys: → next, ← back, Esc stop (asks first); while a program runs Esc
    stops the program instead, and in a box (an alias) it is the box's.
-   Keys a step does not ask for (F5 while it teaches F10) do nothing, so the
-   machine stays where the next steps expect it. */
+   Keys a step does not ask for (F5 while it teaches F10; Shift+F10, Step
+   back, is a key of its own) do nothing, so the machine stays where the
+   next steps expect it. */
 
 import { codeText, h, icon } from '../dom.ts';
 import { onLang, tr, type Msg } from '../i18n.ts';
@@ -54,7 +55,9 @@ export type Signal =
   | { kind: 'reset' }
   | { kind: 'goto'; line: number }
   | { kind: 'pin'; key: string; on: boolean }        // a star in Registers (on: pinned now)
-  | { kind: 'alias'; key: string; alias: string };   // an alias given to a pinned register ('' : none)
+  | { kind: 'alias'; key: string; alias: string }    // an alias given to a pinned register ('' : none)
+  | { kind: 'back'; io: boolean }                    // a step back (io: it undid a call that printed or read)
+  | { kind: 'select'; addr: number };                // a row of Text clicked (the Inspector on it)
 
 export type Example = 'tutorial.s' | 'tutorial-error.s';
 
@@ -72,6 +75,7 @@ export interface TutorialHost {
   assembled(): boolean;                     // the machine holds the Editor's program
   assemble(): Promise<boolean>;
   step(): Promise<void>;
+  stepBack(): Promise<void>;
   runUntil(addr: number): Promise<void>;    // steps (quietly) until PC is `addr`
   run(): Promise<void>;
   stop(): Promise<void>;
@@ -80,6 +84,8 @@ export interface TutorialHost {
   pc(): number | null;
   running(): boolean;
   finished(): boolean;
+  waiting(): boolean;                       // the program waits for a line in the Console
+  input(line: string): Promise<void>;       // a line typed in the Console (and Enter), the run gone on with it
   addressOfLine(line: number): number | null;
   labelAddress(name: string): number | null;
   pin(addr: number | null): void;           // the Inspector on that instruction (Text's row chosen); null: Follow PC
@@ -107,7 +113,7 @@ export interface TutorialHost {
 // An element, or a box inside one (an Editor line, a gutter cell): the
 // element is what the box is cut to and what a click there must reach.
 export type Target = Element | { rect: DOMRect | null; within: Element | null } | null | undefined;
-export type Key = 'F5' | 'F10' | 'Ctrl+S';
+export type Key = 'F5' | 'F10' | 'Shift+F10' | 'Ctrl+S';
 
 // What a card says and points at.
 export interface Beat {
@@ -197,8 +203,7 @@ export class Tutorial {
   // PC has passed every instruction before `re`'s line (and the program has
   // not ended): if not, start over if need be and step there quietly.
   async atLeast(re: RegExp): Promise<void> {
-    if (!this.host.assembled()) await this.host.assemble();
-    if (this.host.finished()) await this.host.restart();
+    await this.notFinished();
     const pc = this.host.pc() ?? 0;
     if (pc < this.addr(re) || pc >= 0x80000000) await this.host.runUntil(this.addr(re));
   }
@@ -219,9 +224,15 @@ export class Tutorial {
     if (pc >= this.addr(until) && pc < 0x80000000) await this.host.restart();
     await this.atLeast(re);
   }
+  // A program in the machine that can go on: not ended, not halfway through
+  // reading a line (that run is the Console step's).
   async notFinished(): Promise<void> {
     if (!this.host.assembled()) await this.host.assemble();
-    if (this.host.finished()) await this.host.restart();
+    if (this.host.finished() || this.host.waiting()) await this.host.restart();
+  }
+  // Until `done` is true (or `ms` have gone by).
+  async until(done: () => boolean, ms = 5000): Promise<void> {
+    for (const end = Date.now() + ms; !done() && Date.now() < end;) await new Promise((r) => setTimeout(r, 30));
   }
   column(panel: 'regs' | 'text', key: string): void {
     const was = this.host.showColumn(panel, key);
@@ -390,8 +401,7 @@ export class Tutorial {
     if (!this.active || document.querySelector('dialog[open]')) return false;
     const step = this.step;
     const inBox = !!(e.target as HTMLElement).closest?.('input, textarea');
-    const key: Key | null = e.key === 'F5' ? 'F5' : e.key === 'F10' ? 'F10'
-      : (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' ? 'Ctrl+S' : null;
+    const key = keyOf(e);
     const take = () => { e.preventDefault(); e.stopPropagation(); return true; };
     if (e.key === 'Escape') {
       if (this.host.running() || inBox) return false; // Esc stops the program; a box's Esc is its own
@@ -609,6 +619,13 @@ export class Tutorial {
 }
 
 const SVG = 'http://www.w3.org/2000/svg';
+
+// The key of a key press, as steps let keys through (Shift+F10 is not F10).
+export function keyOf(e: { key: string; shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }): Key | null {
+  if (e.key === 'F5') return 'F5';
+  if (e.key === 'F10') return e.shiftKey ? 'Shift+F10' : 'F10';
+  return (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' ? 'Ctrl+S' : null;
+}
 
 // A small line icon (lucide's drawings), in the text's colour.
 const GLYPHS: Record<string, string> = {
