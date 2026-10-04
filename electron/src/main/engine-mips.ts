@@ -55,12 +55,13 @@ export function start(win: BrowserWindow): Engine {
   }));
   ipc.handle('sim:stop', () => answer(async () => (await sim).stop()));
   // A crash is an answer here, not an error (an error's name does not
-  // cross into the page): { ok: false, crashed: what the core said }.
+  // cross into the page): { ok: false, crashed: what the core said,
+  // crashLine: the line it was reading, if it knew }.
   ipc.handle('sim:check', (_e, source: string, options: AssembleOptions) => answer(async () => {
     try {
       return await onChecker((c) => c.assemble(source, options));
     } catch (e) {
-      if (e instanceof SimulatorCrashed) return { ok: false, errors: [], symbols: '', format: null, data: { start: 0, end: 0 }, crashed: e.message };
+      if (e instanceof SimulatorCrashed) return { ok: false, errors: [], symbols: '', format: null, data: { start: 0, end: 0 }, crashed: e.message, crashLine: e.line };
       throw e;
     }
   }));
