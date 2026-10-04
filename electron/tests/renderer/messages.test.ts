@@ -7,13 +7,14 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { DIALOGS } from '../../src/renderer/app/messages/dialogs.ts';
+import { STEPBACK } from '../../src/renderer/app/messages/stepback.ts';
 import { INSPECTOR } from '../../src/renderer/app/messages/inspector.ts';
 import { SETTINGS } from '../../src/renderer/app/messages/settings.ts';
 import { CARD, CHAPTERS, MIPS, RISCV, STEPS } from '../../src/renderer/app/messages/tutorial.ts';
 import { WELCOME } from '../../src/renderer/app/messages/welcome.ts';
 import { brand } from '../../brands/generic/brand.ts';
 
-const TABLES = { WELCOME, DIALOGS, SETTINGS, INSPECTOR, CARD, CHAPTERS, STEPS, MIPS, RISCV, brandAbout: { about: brand.about } };
+const TABLES = { WELCOME, DIALOGS, SETTINGS, INSPECTOR, STEPBACK, CARD, CHAPTERS, STEPS, MIPS, RISCV, brandAbout: { about: brand.about } };
 
 type Said = string | (string | { key: string } | { click: string })[];
 // Every message in a table, by its path ("STEPS.pin.doing").

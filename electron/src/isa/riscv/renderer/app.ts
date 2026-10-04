@@ -62,6 +62,8 @@ import { asset, code, codeText, h, icon, markImg, monoCh, withHex } from '../../
 import { onTheme, THEME_FADE_MS, themeSwitch } from '../../../renderer/app/theme.ts';
 import { currentLang, langSwitch, onLang, tr } from '../../../renderer/app/i18n.ts';
 import { DIALOGS } from '../../../renderer/app/messages/dialogs.ts';
+import { STEPBACK } from '../../../renderer/app/messages/stepback.ts';
+import { BACK_IO_NOTE, backKeys, backMessage, isStepBackKey, STEP_BACK_KEY } from '../../../renderer/app/logic/stepback.ts';
 import { captionPatch, mixPalette, palette } from '../../../renderer/app/logic/overlay.ts';
 import { WINDOW_COLOURS } from '../../../main/theme.ts';
 import { notice } from '../../../renderer/app/notice.ts';
@@ -78,6 +80,7 @@ import { welcome } from '../../../renderer/app/panels/welcome.ts';
 import { ask } from '../../../renderer/app/panels/ask.ts';
 import { Tutorial, type Example, type Signal } from '../../../renderer/app/tutorial/engine.ts';
 import { CHAPTERS } from './tutorial-steps.ts';
+import { isIoEcall } from './logic/stepback.ts';
 import type { DataSection } from '../../../renderer/app/panels/data.ts';
 import { panelHead } from '../../../renderer/app/ui.ts';
 import { ago, cell, clock, count, keys, lead, lines as lineList, plural } from '../../../renderer/app/cells.ts';
@@ -131,6 +134,8 @@ let progress: { pc: number; instructions: number } | null = null;
 let lastReason: StopReason = 'limit';
 let engineState: EngineState = 'starting';
 let engineDetail = '';
+let undo = 0;                          // how many instructions Step back can undo (the engine says)
+let back: { io: boolean } | null = null; // the last thing done was a step back (the status bar)
 let changedNow: string[] = []; // the registers the last step or run changed: the yellow rows
 let narrow = false;
 let view: 'editor' | 'run' = 'editor'; // narrow windows: the side on show
@@ -161,6 +166,12 @@ const fileLabel = h('span', { class: 'file' });
 const bAssemble = button('Save & Assemble', 'hammer', 'Ctrl+S', () => void saveAndAssemble());
 const bRun = button('Run', 'play', 'F5', () => void runOrStop());
 const bStep = button('Step', 'step-forward', 'F10', () => void step());
+// Step back: undoes the last instruction executed.  Its tooltip says what
+// it cannot undo, in the language in use.
+const bBack = button('Step back', 'step-back', STEP_BACK_KEY, () => void stepBack());
+const backTitle = () => { bBack.title = tr(STEPBACK.tooltip); };
+backTitle();
+onLang(backTitle);
 const bRestart = button('Reset', 'rotate-ccw', '', () => void restart());
 bAssemble.dataset.tut = 'assemble';
 bRun.dataset.tut = 'run';
@@ -182,7 +193,7 @@ speedOne.addEventListener('click', () => void setSpeed(speed === 'fast' ? 'slow'
 const speedBox = h('span', { class: 'speedbox' }, h('span', { class: 'speedlabel' }, 'Run speed'), speedSwitch, speedOne);
 // A thin line between two groups of the toolbar.
 const divider = (cls = ''): HTMLElement => h('span', { class: `tsep${cls ? ` ${cls}` : ''}`, 'aria-hidden': 'true' });
-const runctl = h('span', { class: 'runctl' }, bAssemble, divider(), bRun, speedBox, bStep, divider(), bRestart);
+const runctl = h('span', { class: 'runctl' }, bAssemble, divider(), bRun, speedBox, bStep, bBack, divider(), bRestart);
 const bSettings = iconButton('Settings', 'settings', () => settingsBox.open());
 // The assembled program as an executable image (.asx, docs/asx-format.md).
 const bExport = iconButton('Export executable image (.asx)', 'file-output', () => void exportImage());
@@ -598,6 +609,7 @@ function renderChrome(): void {
   bRun.title = stoppable ? 'Stop (Esc)' : 'Run (F5)';
   setBtn(bRun, open && (running || runState === 'input' || runState !== 'finished'), running || runState === 'input');
   setBtn(bStep, open && !stoppable && runState !== 'finished', current() && !stoppable);
+  setBtn(bBack, open && !stoppable && assembledText !== null && undo > 0, false);
   setBtn(bRestart, lastGood !== null && !busy, false);
   bExport.hidden = !open;
   bExport.disabled = lastGood === null || busy;
@@ -722,7 +734,11 @@ function renderStatus(): void {
       hints = stopKeys('input');
     } else {
       const reason = lastReason;
-      if (runState === 'ready') {
+      if (back && runState === 'paused') {
+        parts.push(lead('run', codeText(backMessage(pc))));
+        if (back.io) parts.push(cell('', BACK_IO_NOTE));
+        hints = backKeys(undo > 0);
+      } else if (runState === 'ready') {
         parts.push(lead('run', 'Ready', pc ? ' · PC ' : '', pc ? code(pc) : null));
         if (steps === 0 && saveNote) parts.push(cell(saveWarn ? 'warn' : '', saveNote));
         hints = [['F10', 'Step'], ['F5', 'Run']];
@@ -949,6 +965,8 @@ async function forgetMachine(): Promise<void> {
   rows = [];
   text.setRows([]);
   lastRegs = null;
+  undo = 0;
+  back = null;
   clearSelection();
   consolePanel.clear();
 }
@@ -1045,6 +1063,8 @@ async function assemble(source: string): Promise<boolean> {
     steps = 0;
     progress = null;
     changedNow = [];
+    undo = 0;
+    back = null;
     lastReason = 'limit';
     errors = [];
     rows = textRows(r.text);
@@ -1126,7 +1146,8 @@ async function run(): Promise<void> {
   steps = 0;
   progress = null;
   renderChrome();
-  await go(() => api.call('run', { backstep: false }));
+  // RARS's back-stepper records the run too, for Step back (docs/engine-protocol.md 5.7).
+  await go(() => api.call('run', { backstep: true }));
   if (switchTo === 'slow' && (runState as RunState) === 'paused') { switchTo = null; await runSlow(); }
 }
 
@@ -1135,7 +1156,42 @@ async function step(): Promise<void> {
   if (runState === 'finished' || runState === 'running' || runState === 'input') return;
   if (current()) await sendBreakpointLines().catch(() => {});
   resumeWith = 'step';
-  await go(() => api.call('step', {}));
+  await go(() => api.call('step', { backstep: true }));
+}
+
+// Step back: the last instruction executed undone -- registers, memory and
+// PC as they were before it (RARS's back-stepper, the last 1000:
+// docs/engine-protocol.md 5.7).  Everything that follows a step follows it
+// too: the changed registers, the PC line, the Inspector, Data.  What the
+// program printed stays in the Console.
+async function stepBack(): Promise<void> {
+  if (busy || assembledText === null || runState === 'running' || runState === 'input' || undo <= 0) return;
+  busy = true;
+  note = '';
+  exportNote = '';
+  const before = lastRegs;
+  try {
+    const r = await api.call('backstep', {});
+    if (!r.ok) { undo = 0; return; }
+    undo = r.undo ?? 0;
+    const now = toValues(r);
+    steps = Math.max(0, steps - 1);
+    const row = text.rowFor(now.pc >>> 0);
+    back = { io: row !== undefined && isIoEcall(row.word, now.x[17]) };
+    runState = 'paused';
+    lastReason = 'limit';
+    registers?.update(now, before);
+    changedNow = [...changedKeys(before, now)];
+    lastRegs = now;
+    text.setPc(now.pc);
+    showInspector();
+    if (text.tab === 'data') void refreshData();
+  } catch (e) {
+    crashNote ||= (e as Error).message; // a crash (onCrashed says more) or a dead engine
+  } finally {
+    busy = false;
+    renderChrome();
+  }
 }
 
 async function go(call: () => Promise<RunReply>): Promise<RunReply | null> {
@@ -1158,6 +1214,8 @@ async function go(call: () => Promise<RunReply>): Promise<RunReply | null> {
     reason = stopReason(result.reason);
     const now = toValues(result);
     if (resumeWith === 'step') steps += 1;
+    undo = result.undo ?? 0;
+    back = null;
     lastReason = reason;
     // A slow run between two of its steps is still running.
     runState = slow && reason === 'limit' ? 'running' : stateAfter(reason);
@@ -1275,6 +1333,8 @@ async function restart(): Promise<void> {
     steps = 0;
     progress = null;
     changedNow = [];
+    undo = 0;
+    back = null;
     lastReason = 'limit';
     rows = textRows(r.text);
     takeBreakpoints(r.breakpoints);
@@ -1441,6 +1501,7 @@ window.addEventListener('keydown', (e) => {
   const mod = e.ctrlKey || e.metaKey;
   const inEditor = editorHost.contains(e.target as Node);
   if (e.key === 'F5') { e.preventDefault(); void runOrStop(); return; }
+  if (isStepBackKey(e)) { e.preventDefault(); if (!tutorial.active) void stepBack(); return; } // the tutorial teaches F10 alone
   if (e.key === 'F10') { e.preventDefault(); void step(); return; }
   if (e.key === 'Escape') {
     if ((e.target as HTMLElement).closest?.('input, textarea')) return; // a box's own Esc (the Registers alias)
@@ -1471,6 +1532,8 @@ api.onInput(() => {
 });
 api.onCrashed((message, cause, restarted) => {
   crashNote = restarted ? `${message} (${cause}) · engine restarted, assemble again (Ctrl+S)` : `${message} (${cause})`;
+  undo = 0;
+  back = null;
   assembledText = null;
   runState = 'ready';
   busy = false;
