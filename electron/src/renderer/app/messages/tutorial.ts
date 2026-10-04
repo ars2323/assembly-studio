@@ -87,7 +87,7 @@ export const STEPS = {
     result: {
       title: { ko: '어셈블되었습니다', en: 'Assembled' },
       body: {
-        ko: 'Editor 아래 Assemble 패널의 칸에 결과(Assembled), 만들어진 명령 수, 저장 여부, 어셈블한 때가 나옵니다. 예제는 저장하지 않습니다. '
+        ko: 'Editor 아래 Assemble 패널의 칸에 결과(어셈블 완료), 만들어진 명령 수, 저장 여부, 어셈블한 때가 나옵니다. 예제는 저장하지 않습니다. '
           + '맨 아래 상태 표시줄은 지금 상태와 PC 를, 오른쪽 끝에는 지금 쓸 수 있는 키를 보여 줍니다.',
         en: 'The cells of the Assemble panel under the Editor show the result (Assembled), how many instructions it made, whether the file was saved, and when. Examples are never saved. '
           + 'The status bar at the bottom shows the state and PC, and at its right end the keys you can use now.',
@@ -279,7 +279,7 @@ export const STEPS = {
     result: {
       title: { ko: '처음으로 돌아왔습니다', en: 'Back at the start' },
       body: {
-        ko: (reg: string) => `\`${reg}\` 가 다시 0 이 되었고, 상태 표시줄은 Ready 입니다. F10 키나 F5 키로 처음부터 다시 실행할 수 있습니다. 찍어 둔 빨간 점은 그대로 남아 있습니다.`,
+        ko: (reg: string) => `\`${reg}\` 가 다시 0 이 되었고, 상태 표시줄에는 준비 라고 나옵니다. F10 키나 F5 키로 처음부터 다시 실행할 수 있습니다. 찍어 둔 빨간 점은 그대로 남아 있습니다.`,
         en: (reg: string) => `\`${reg}\` is 0 again, and the status bar says Ready. F10 or F5 runs it again from the start. The red dot you placed is still there.`,
       },
     },
@@ -309,13 +309,13 @@ export const STEPS = {
     title: { ko: (phase: number) => (phase === 0 ? '오류가 나면' : 'Assemble 패널의 오류 목록'),
       en: (phase: number) => (phase === 0 ? 'When there is an error' : 'The list of errors in the Assemble panel') },
     doing: {
-      ko: (phase: number, line: string): Do => (phase === 0 ? [{ key: 'Ctrl+S' }, OR.ko, { click: 'Assemble' }] : [{ click: `Go to line ${line} →` }]),
+      ko: (phase: number, line: string): Do => (phase === 0 ? [{ key: 'Ctrl+S' }, OR.ko, { click: 'Assemble' }] : [{ click: `${line}행으로 이동 →` }]),
       en: (phase: number, line: string): Do => (phase === 0 ? [{ key: 'Ctrl+S' }, OR.en, { click: 'Assemble' }] : [{ click: `Go to line ${line} →` }]),
     },
     body: {
       ko: (phase: number, line: string) => (phase === 0
         ? '이번에는 일부러 한 줄을 틀리게 쓴 예제를 열었습니다. 어셈블해 보세요. 오류가 어디에 어떻게 나오는지 이어서 보여 드립니다.'
-        : `오류 수, 틀린 줄과 그 내용, 고치는 요령이 나옵니다. 아래의 Go to line ${line} 버튼을 누르면 Editor 의 그 줄로 가고, 튜토리얼도 다음으로 넘어갑니다.`),
+        : `오류 수, 틀린 줄과 그 내용, 고치는 요령이 나옵니다. 아래의 ${line}행으로 이동 버튼을 누르면 Editor 의 그 줄로 가고, 튜토리얼도 다음으로 넘어갑니다.`),
       en: (phase: number, line: string) => (phase === 0
         ? 'This time an example with one line written wrong on purpose is open. Assemble it, and we will show you where the error shows up and how.'
         : `It gives the number of errors, the wrong line and what is wrong, and how to fix it. The Go to line ${line} button below takes you to that line in the Editor, and the tutorial goes on.`),

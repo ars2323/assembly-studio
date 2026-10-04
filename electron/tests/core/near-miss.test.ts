@@ -1,9 +1,11 @@
-/* src/core/near-miss.ts: the slips it names, and the words it leaves alone. */
+/* src/core/near-miss.ts: what it says is wrong, in both languages, never
+   what the student may have meant; and the words it leaves alone. */
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { assemblerHint, editDistance, nearMiss, nearMissRule, nearest } from '../../src/core/near-miss.ts';
+import { spimMessage } from '../../src/core/asm-messages.ts';
+import { assemblerHint, editDistance, nearAny, nearMiss, nearMissRule } from '../../src/core/near-miss.ts';
 
 test('the distance counts an insertion, a deletion, a substitution and a swap as one each', () => {
   assert.equal(editDistance('srl', 'srll'), 1);
@@ -15,42 +17,33 @@ test('the distance counts an insertion, a deletion, a substitution and a swap as
 
 test('the rule: nothing for two characters, one letter to five, two from six on', () => {
   assert.deepEqual([1, 2, 3, 5, 6, 9].map(nearMissRule), [0, 0, 1, 1, 2, 2]);
+  assert.equal(nearAny('$spp', ['$sp', '$fp']), true);
+  assert.equal(nearAny('$sp', ['$sp']), false);
+  assert.equal(nearAny('$label', ['$sp', '$fp']), false);
 });
 
-test('the typical slips are named', () => {
-  assert.deepEqual(nearMiss('    .global main'), { why: 'spelling', kind: 'directive', token: '.global', meant: '.globl' });
-  assert.deepEqual(nearMiss('msg: .asciz "hi"'), { why: 'spelling', kind: 'directive', token: '.asciz', meant: '.asciiz' });
-  assert.deepEqual(nearMiss('x: .wrod 1'), { why: 'spelling', kind: 'directive', token: '.wrod', meant: '.word' });
-  assert.deepEqual(nearMiss('    srll $t1, $t0, 2'), { why: 'spelling', kind: 'instruction', token: 'srll', meant: 'srl' });
-  assert.deepEqual(nearMiss('    addd $t0, $t1, $t2'), { why: 'spelling', kind: 'instruction', token: 'addd', meant: 'add' });
-  assert.deepEqual(nearMiss('    sysclal'), { why: 'spelling', kind: 'instruction', token: 'sysclal', meant: 'syscall' });
+test('what is wrong: a word that is no instruction or directive, a register that does not exist, a missing $', () => {
+  assert.deepEqual(nearMiss('    .global main'), { why: 'unknown', kind: 'directive', token: '.global' });
+  assert.deepEqual(nearMiss('msg: .asciz "hi"'), { why: 'unknown', kind: 'directive', token: '.asciz' });
+  assert.deepEqual(nearMiss('    srll $t1, $t0, 2'), { why: 'unknown', kind: 'instruction', token: 'srll' });
+  assert.deepEqual(nearMiss('    lii $v0, 10'), { why: 'unknown', kind: 'instruction', token: 'lii' });
+  assert.deepEqual(nearMiss('    syscalll'), { why: 'unknown', kind: 'instruction', token: 'syscalll' });
+  assert.deepEqual(nearMiss('    foobar $t0'), { why: 'unknown', kind: 'instruction', token: 'foobar' }); // far from every name: still none
+  assert.deepEqual(nearMiss('    li $v0, 10; sycall'), { why: 'unknown', kind: 'instruction', token: 'sycall' });
   assert.deepEqual(nearMiss('    li $s10, 1'), { why: 'no-such-register', token: '$s10', family: '$s', range: '$s0–$s7' });
   assert.deepEqual(nearMiss('    add $t10, $t0, $t1'), { why: 'no-such-register', token: '$t10', family: '$t', range: '$t0–$t9' });
   assert.deepEqual(nearMiss('    move $a4, $t0'), { why: 'no-such-register', token: '$a4', family: '$a', range: '$a0–$a3' });
   assert.deepEqual(nearMiss('    add $32, $t0, $t1'), { why: 'no-such-register', token: '$32', family: '$0', range: '$0–$31' });
-  assert.deepEqual(nearMiss('    add t0, $t1, $t2'), { why: 'missing-dollar', token: 't0', meant: '$t0' });
-  assert.deepEqual(nearMiss('    li v0, 4'), { why: 'missing-dollar', token: 'v0', meant: '$v0' });
-  assert.deepEqual(nearMiss('    lw $t0, 0($spp)'), { why: 'spelling', kind: 'register', token: '$spp', meant: '$sp' });
+  assert.deepEqual(nearMiss('    add t0, $t1, $t2'), { why: 'missing-dollar', token: 't0' });
+  assert.deepEqual(nearMiss('    li v0, 4'), { why: 'missing-dollar', token: 'v0' });
+  assert.deepEqual(nearMiss('    lw $t0, 0($spp)'), { why: 'unknown-register', token: '$spp' });
 });
 
-test('a line the assembler would accept gets no guess', () => {
+test('a line the assembler would accept gets nothing', () => {
   for (const line of ['    .globl main', '    srl $t1, $t0, 2', 'main: li $v0, 10', '    lw $t0, 4($t1)', '    .asciiz "text"',
-    '    add $s7, $t9, $a3', 'loop:', '    beq $t0, $zero, done   # done', '    la $a0, msg']) {
+    '    add $s7, $t9, $a3', 'loop:', '    beq $t0, $zero, done   # done', '    la $a0, msg', 'x = 4', '    j $L1']) {
     assert.equal(nearMiss(line), null, line);
   }
-});
-
-test('a word far from every name, or as near to two, gets no guess', () => {
-  assert.equal(nearMiss('    foobar $t0'), null);       // nothing within two
-  assert.equal(nearMiss('    xyz $t0'), null);          // nothing within one
-  assert.equal(nearMiss('    ad $t0, $t1, $t2'), null); // two characters: never
-  assert.equal(nearest('sr', ['srl', 'sra', 'sll']), null);
-  // Ties: the one sharing the longest prefix, then the longest suffix, else none.
-  assert.equal(nearest('srll', ['srl', 'sll']), 'srl');        // prefix srl (3) over s (1)
-  assert.equal(nearest('sbb', ['sb', 'sub']), 'sb');           // prefix sb (2) over s (1)
-  assert.equal(nearest('.asciz', ['.ascii', '.asciiz']), '.asciiz'); // prefix tied at .asci; suffix z decides
-  assert.equal(nearest('sbb', ['sub', 'sll']), 'sub');         // prefix tied at s; suffix b decides
-  assert.equal(nearest('xll', ['sll', 'all']), null);          // prefix 0 and suffix ll for both: no guess
 });
 
 test('labels, strings, numbers and comments are not looked at', () => {
@@ -61,14 +54,38 @@ test('labels, strings, numbers and comments are not looked at', () => {
   assert.equal(nearMiss('    .word 0xsrl'), null);
 });
 
-test('the hint under an assembler message', () => {
-  assert.equal(assemblerHint('syntax error', '    srll $t1, $t0, 2'), 'No instruction `srll`. Did you mean `srl`?');
-  assert.equal(assemblerHint('syntax error', '    .global main'), 'No directive `.global`. Did you mean `.globl`?');
-  assert.equal(assemblerHint('syntax error', '    li $s10, 1'), 'No register `$s10`. The `$s` registers are `$s0–$s7`.');
-  assert.equal(assemblerHint('syntax error', '    add t0, $t1, $t2'), 'Register names start with `$`: `t0` → `$t0`.');
-  assert.equal(assemblerHint('syntax error', '    add $t0 $t1'), 'Check the instruction name, the register names (like `$t0`) and the commas.');
-  assert.equal(assemblerHint('Label is defined for the second time', 'main:'), 'Two labels have this name. Rename one of them.');
-  assert.equal(assemblerHint('Immediate value is too large for field', 'addi $t0, $t0, 0x12345'),
+test('the hint under an assembler message: what is wrong, no guess, in both languages', () => {
+  const both = (message: string, line: string) => [assemblerHint(message, line, 'ko'), assemblerHint(message, line, 'en')];
+  assert.deepEqual(both('syntax error', '    lii $v0, 10'), ['`lii` 라는 명령은 없습니다.', 'There is no instruction `lii`.']);
+  assert.deepEqual(both('syntax error', '    srll $t1, $t0, 2'), ['`srll` 라는 명령은 없습니다.', 'There is no instruction `srll`.']);
+  assert.deepEqual(both('syntax error', '    .global main'), ['`.global` 라는 지시어는 없습니다.', 'There is no directive `.global`.']);
+  assert.deepEqual(both('syntax error', '    li $s10, 1'),
+    ['`$s10` 라는 레지스터는 없습니다. `$s` 레지스터는 `$s0–$s7` 입니다.', 'There is no register `$s10`. The `$s` registers are `$s0–$s7`.']);
+  assert.deepEqual(both('syntax error', '    lw $t0, 0($spp)'), ['`$spp` 라는 레지스터는 없습니다.', 'There is no register `$spp`.']);
+  assert.deepEqual(both('syntax error', '    add t0, $t1, $t2'), ['레지스터 이름은 `$` 로 시작합니다.', 'Register names start with `$`.']);
+  assert.deepEqual(both('syntax error', '    add $t0 $t1'),
+    ['명령 이름, 레지스터 이름(`$t0` 처럼), 쉼표를 확인하세요.', 'Check the instruction name, the register names (like `$t0`) and the commas.']);
+  assert.equal(assemblerHint('Label is defined for the second time', 'main:', 'en'), 'Two labels have this name. Rename one of them.');
+  assert.equal(assemblerHint('Immediate value is too large for field', 'addi $t0, $t0, 0x12345', 'en'),
     'The value is too big for this instruction. Put it in a register with `li` first.');
-  assert.equal(assemblerHint('Cannot open file', ''), '');
+  assert.equal(assemblerHint('Unknown character', '.asciiz "abc', 'en'), '');
+  assert.equal(assemblerHint('Cannot open file', '', 'ko'), '');
+  // Never a guess, in either language.
+  for (const lang of ['ko', 'en'] as const) {
+    for (const line of ['srll $t1, $t0, 2', '.global main', 'lw $t0, 0($spp)', 'add t0, $t1, $t2', 'sysclal']) {
+      const hint = assemblerHint('syntax error', line, lang);
+      assert.doesNotMatch(hint, /mean|→|혹시|아닌가요|\?/, hint);
+      assert.doesNotMatch(hint, /`(srl|\.globl|\$sp|\$t0|syscall)`/, hint);
+    }
+  }
+});
+
+test("SPIM's messages in the window's words; others as they are", () => {
+  assert.equal(spimMessage('syntax error', 'ko'), '문법 오류');
+  assert.equal(spimMessage('syntax error', 'en'), 'Syntax error');
+  assert.equal(spimMessage('Label is defined for the second time', 'ko'), 'Label 이 두 번 정의됨');
+  assert.equal(spimMessage('immediate value (65432) out of range (-32768 .. 32767)', 'ko'), '값이 범위를 벗어남');
+  assert.equal(spimMessage('Shift distance can only be in the range 0..31', 'en'), 'Shift amount out of range');
+  assert.equal(spimMessage('Unknown character', 'ko'), '알 수 없는 문자');
+  assert.equal(spimMessage("Cannot open file: `x.s'", 'ko'), null);
 });

@@ -145,6 +145,18 @@ function checkRunParameters(run: RunParameters): void {
   }
 }
 
+/* The text the core reads always ends with a newline.  SPIM's scanner
+   (CPU/scanner.l) cannot report an error found at the very end of a file
+   that has none: the parser then holds the end-of-file marker that
+   yywrap() unput into the buffer, and yyerror() -> erroneous_line() reads
+   on past it to "flush the rest of the line" -- flex's own check stops
+   the process ("fatal flex scanner internal error--end of buffer missed",
+   exit code 2), or it reads freed memory (a segmentation fault).  A
+   misspelt last line ("syscalll" with no newline after it) did that.
+   With the newline the same error is an ordinary "syntax error" on its
+   line.  The line numbers do not change. */
+const endLine = (s: string): string => (s === '' || s.endsWith('\n') ? s : `${s}\n`);
+
 /** Resets the machine, loads the default exception handler, builds the
     stack from `run`, and assembles `source`.  Bytes are decoded by the rule
     in src/node/text-file.ts; a string is taken as it is. */
@@ -162,8 +174,8 @@ export function assemble(source: Uint8Array | string, options: AssembleOptions =
   }
   const handler = options.handler === undefined ? new Uint8Array(defaultHandler)
     : options.handler === null ? new Uint8Array(0)
-      : utf8(typeof options.handler === 'string' ? options.handler : decodeTextFile(options.handler).text);
-  const result = core.assemble(utf8(text), handler, run.argv.map(utf8), run.env.map(utf8),
+      : utf8(endLine(typeof options.handler === 'string' ? options.handler : decodeTextFile(options.handler).text));
+  const result = core.assemble(utf8(endLine(text)), handler, run.argv.map(utf8), run.env.map(utf8),
                                utf8(options.fileName ?? 'program.s'), { ...DEFAULT_MACHINE, ...options.machine });
   return { ...result, format };
 }

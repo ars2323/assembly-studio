@@ -568,15 +568,18 @@ export class Tutorial {
       for (const el of [this.card, this.rings, this.arrow]) { el.classList.remove('enter'); void el.offsetWidth; el.classList.add('enter'); }
     }
     // A click in the middle of each target reaches it (not the card, not
-    // something else drawn over it).
-    const hits = rects.list.map((r, i) => {
+    // something else drawn over it).  While a theme switch's view transition
+    // runs, it takes every point: tested again once it is over.
+    const hits = (): boolean[] => rects.list.map((r, i) => {
       const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
       return !!hit && !!rects.owners[i]?.contains(hit);
     });
-    this.shown = {
-      step: this.index + 1, id: step.id, phase: this.phase, result: this.result, targets: rects.list, lit, hits, did: [...this.did],
+    const shown = this.shown = {
+      step: this.index + 1, id: step.id, phase: this.phase, result: this.result, targets: rects.list, lit, hits: hits(), did: [...this.did],
       card: { left: at.left, top: at.top, right: at.left + size.width, bottom: at.top + size.height },
     };
+    const running = (document as Document & { activeViewTransition?: { finished: Promise<void> } | null }).activeViewTransition;
+    void running?.finished.then(() => { if (this.shown === shown) shown.hits = hits(); });
   }
 
   // The small arrow on the card's edge toward the first target, where the

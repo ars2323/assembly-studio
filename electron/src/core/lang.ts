@@ -1,7 +1,8 @@
 /* The two languages of the words the program says to the student: the first
-   screen, the questions, Settings' notes, the tutorial and the Inspector's
-   explanations.  (The names on the work screen -- panels, buttons, the
-   status line -- are English in both.)
+   screen, the questions, Settings' notes, the tutorial, the Inspector's
+   explanations, the Assemble panel and its errors, and the status line.
+   (The names on the work screen -- panels, buttons, keys -- are English in
+   both.)
 
    A message is the same thing said in both: { ko, en }, each a string (or
    the parts of a line) or a function of the same few plain values (a number, a name, a flag; never an
