@@ -21,7 +21,12 @@
       electron/engine/ when it holds all three (engines/fetch.mjs unpacks
       them there); else staged in build/package/engine/ from the JDK this
       runs with (its jlink), $RARS_HOME/rars-src.jar and probe/build/classes.
-   3. Runs electron-builder on it.
+   3. Runs electron-builder on it.  Nothing is published from here
+      (release.yml uploads dist/), but the GitHub publish entry makes
+      electron-builder write what electron-updater reads (src/main/updater.ts):
+      resources/app-update.yml in the package, and, next to the NSIS
+      installer, dist/latest.yml and the installer's .blockmap -- the release
+      carries both.
 
    The addon must already be built for Electron (npm run build:electron, or
    engines/fetch.mjs).
@@ -129,7 +134,9 @@ export const config: Configuration = {
   // Only the staged files: everything the program uses is in its bundles
   // (electron-builder would otherwise add the repository's dependencies).
   files: ['**/*', '!node_modules/**'],
-  publish: null,
+  // Where the program looks for updates (src/main/updater.ts): this repository's
+  // GitHub Releases, the one marked Latest.  Only read; publish: 'never' below.
+  publish: { provider: 'github', owner: 'ars2323', repo: 'assembly-studio' },
   asar: true,
   asarUnpack: ['spim.node'],
   // The RISC-V engine, outside app.asar: resources/engine (src/main/paths.ts engine()).

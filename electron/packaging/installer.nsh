@@ -72,8 +72,13 @@
 !macroend
 
 ; electron-builder's installer keeps a copy of itself (the whole
-; installer, over 100 MB) in %LOCALAPPDATA%\<name>-updater for electron-updater's
-; differential updates.  This program has no auto-updater: remove the copy.
+; installer, over 100 MB) in %LOCALAPPDATA%\<name>-updater, the old side of
+; electron-updater's differential downloads.  The program downloads every
+; update whole (src/main/updater.ts: disableDifferentialDownload), so the copy
+; is never read: remove it.  This runs after the files are in place and before
+; a silent update's installer starts the new version.  An update's installer
+; runs from pending\ in that folder: RMDir (not /r) leaves the folder while
+; pending\ is there, and electron-updater clears pending\ itself.
 !macro customInstall
   Delete "$LOCALAPPDATA\${APP_INSTALLER_STORE_FILE}"
   RMDir "$LOCALAPPDATA\@NPMNAME@-updater"
