@@ -15,6 +15,9 @@
 
 .startfield { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: #0d0d0d; }
 .startfield canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+/* Resizing (index.ts): out at once, back in when laid out again. */
+.startfield canvas { transition: opacity .35s ease; }
+.startfield.sf-resizing canvas { opacity: 0; transition: opacity .06s linear; }
 
 /* The chip's package: the card itself (welcome.ts), drawn once as it
    appears.  0.96 -> 1 once, and no loop afterwards -- there are buttons
