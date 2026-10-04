@@ -20,11 +20,11 @@ export interface Running {
 // STUDIO_E2E_EXE: run the tests against a packaged app (its executable)
 // instead of the source tree (an installed AssemblyStudio.exe, say).
 // STUDIO_E2E_SIZE=<width>x<height>: the window of every test that does not
-// size its own (default 1280x800) -- tools/e2e-widths.ts runs them all at
+// size its own (default 1920x1080) -- tools/e2e-widths.ts runs them all at
 // 1280, 1093, 1024 and 910.
 export const defaultSize = (() => {
   const m = /^(\d+)x(\d+)$/.exec(process.env.STUDIO_E2E_SIZE ?? '');
-  return m ? { width: Number(m[1]), height: Number(m[2]) } : { width: 1280, height: 800 };
+  return m ? { width: Number(m[1]), height: Number(m[2]) } : { width: 1920, height: 1080 };
 })();
 export async function launch(size: { width: number; height: number } = defaultSize,
                              options: { userData?: string; switches?: string[]; keepSize?: boolean; isa?: 'mips' | 'riscv' } = {}): Promise<Running> {

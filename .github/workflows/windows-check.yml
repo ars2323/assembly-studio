@@ -53,6 +53,14 @@ jobs:
           "STUDIO_E2E_EXE=$exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           Get-Item $exe | Select-Object FullName, Length, LastWriteTime
 
+      - name: A 1920x1080 screen (the runner's is 1024x768), if Windows allows it
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          Set-DisplayResolution -Width 1920 -Height 1080 -Force
+          Add-Type -AssemblyName System.Windows.Forms
+          [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+
       - name: The installed program, as a user sees it
         run: node tests/e2e/windows-check.ts ../windows-check
 

@@ -1,4 +1,4 @@
-/* The README's screenshots (docs/images/), at 1440x900:
+/* The README's screenshots (docs/images/), at 1920x1080:
 
      xvfb-run -a -s '-screen 0 2400x1400x24' node tests/e2e/doc-shots.ts ../docs/images start|mips|riscv|tutorial
 
@@ -7,7 +7,7 @@
 
 import { launch, openAndAssemble, sample, settled, textRow } from './harness.ts';
 const out = process.argv[2]; const which = process.argv[3];
-const size = { width: 1440, height: 900 };
+const size = { width: 1920, height: 1080 };
 const setTheme = async (p: any, t: string) => { await p.evaluate((t: string) => { document.documentElement.dataset.theme = t; window.dispatchEvent(new CustomEvent('themechange', { detail: t })); }, t); await p.waitForTimeout(700); };
 if (which === 'start') {
   const r = await launch(size, { isa: 'mips' });
