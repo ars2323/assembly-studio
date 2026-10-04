@@ -28,16 +28,18 @@ export const defaultSize = (() => {
   return m ? { width: Number(m[1]), height: Number(m[2]) } : { width: 1280, height: 800 };
 })();
 export async function launch(size: { width: number; height: number } = defaultSize,
-                             options: { userData?: string; switches?: string[]; keepSize?: boolean } = {}): Promise<Running> {
+                             options: { userData?: string; switches?: string[]; keepSize?: boolean; isa?: 'mips' | 'riscv' } = {}): Promise<Running> {
   const dir = mkdtempSync(path.join(tmpdir(), 'spim-e2e-'));
   const env = { ...process.env, STUDIO_USER_DATA: options.userData ?? path.join(dir, 'user-data') } as Record<string, string>;
   delete env.ELECTRON_RUN_AS_NODE; // set by VS Code; Electron would run as plain Node
   const exe = process.env.STUDIO_E2E_EXE;
   // switches: Chromium's, e.g. --force-device-scale-factor=1.25 (a 125% display).
   const switches = options.switches ?? [];
+  // isa: the app's --isa= (src/main/main.ts); none: its default, MIPS.
+  const appArgs = options.isa ? [`--isa=${options.isa}`] : [];
   const app = exe
-    ? await _electron.launch({ executablePath: exe, args: switches, env })
-    : await _electron.launch({ args: [...switches, path.join(root, 'src/main/main.ts')], env, cwd: root });
+    ? await _electron.launch({ executablePath: exe, args: [...switches, ...appArgs], env })
+    : await _electron.launch({ args: [...switches, path.join(root, 'src/main/main.ts'), ...appArgs], env, cwd: root });
   const page = await app.firstWindow();
   const pageErrors: string[] = [];
   page.on('pageerror', (e) => pageErrors.push(e.message));
