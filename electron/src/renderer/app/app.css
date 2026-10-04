@@ -1000,10 +1000,11 @@ html.theme-fade, html.theme-fade *:not(canvas), html.theme-fade *::before, html.
 /* ---- dialogs ------------------------------------------------------------ */
 .modal { width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto; padding: 20px 22px; border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 16px 48px rgba(var(--shadow-rgb), .20); color: var(--text); }
 .modal::backdrop { background: rgba(var(--scrim-rgb), .6); } /* logic/overlay.ts DIALOG_ALPHA: the caption buttons' patch matches */
-.modal.ask { width: min(480px, calc(100vw - 32px)); }
-.askbody { display: flex; gap: 18px; align-items: center; }
-.asktext h2 { margin: 0 0 6px; font-size: 17px; }
-.asktext p { margin: 0; color: var(--text-2); line-height: 1.55; }
+/* A question: the title, a sentence, the buttons at the bottom right. */
+.modal.ask { width: min(420px, calc(100vw - 32px)); padding: 22px 24px 18px; }
+.asktext h2 { margin: 0 0 8px; font-size: 17px; }
+.asktext p { margin: 0; color: var(--text-2); font-size: 14px; line-height: 1.6; }
+.modal .row.askrow { margin-top: 20px; }
 .asktext p.askfile { margin-bottom: 4px; color: var(--muted); font-size: 12px; }
 .asktext p.askfile .mono { color: var(--text); }
 .btn.danger { background: var(--error); border-color: var(--error); color: var(--surface); }
