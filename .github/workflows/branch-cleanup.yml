@@ -1,6 +1,6 @@
-# By hand only: delete branches that are no longer needed (an older version's
-# branch once the new one is the default, or windows-check-captures once its
-# captures have been fetched).  The default branch cannot be deleted; change it
+# By hand only: delete temporary branches (windows-check-captures once its
+# captures have been fetched, say).  Versions' branches, release/<version>,
+# are kept.  The default branch cannot be deleted; change it
 # first in the repository settings.
 name: branch-cleanup
 

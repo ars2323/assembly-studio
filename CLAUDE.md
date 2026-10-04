@@ -42,4 +42,4 @@ If `electron/engine/{runtime,rars.jar,classes}` exists, it is used first.
 - After 1.0.0, every change ships under a new version (fixes 1.x.y, features 1.x.0), on its own branch
   `release/<version>` made from the previous version's branch: update `electron/package.json`, write
   `docs/releases/<version>.md`, then run release.yml by hand on that branch (with `release` ticked) to publish
-  `v<version>`. Old branches are deleted with `branch-cleanup.yml` once the new version is the default branch.
+  `v<version>`. Earlier versions' branches are kept; `branch-cleanup.yml` is only for temporary branches.
