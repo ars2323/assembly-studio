@@ -1,7 +1,7 @@
 /* A question in the window's own dialog (not the operating system's
-   message box, which looks like another program): Haram on the left, the
-   question and the buttons on the right, the same place and size every
-   time.  Its backdrop darkens everything behind it, the tutorial's card
+   message box, which looks like another program): the question, a
+   sentence, and the two buttons at the bottom right, the same place and
+   size every time.  Its backdrop darkens everything behind it, the tutorial's card
    and rings included, and while it is up only its two buttons can be
    reached (showModal: the rest of the page is inert).  Esc is the cancel
    button -- the safe side; the other answer is only ever given by its
@@ -29,16 +29,14 @@ export function ask(q: Question): Promise<boolean> {
     const ok = h('button', { class: `btn ${q.danger ? 'danger' : 'primary'}`, type: 'button' }, q.ok);
     const cancel = h('button', { class: 'btn', type: 'button' }, q.cancel ?? '취소');
     const dialog = h('dialog', { class: 'modal ask', 'aria-label': q.title },
-      h('div', { class: 'askbody' },
-        h('div', { class: 'asktext' }, h('h2', {}, q.title),
-          q.file ? h('p', { class: 'askfile' }, 'File: ', code(q.file)) : null, h('p', {}, q.body),
-          h('div', { class: 'row end' }, cancel, ok))));
+      h('div', { class: 'asktext' }, h('h2', {}, q.title),
+        q.file ? h('p', { class: 'askfile' }, 'File: ', code(q.file)) : null, h('p', {}, q.body)),
+      h('div', { class: 'row end askrow' }, cancel, ok));
     let result = false;
     ok.addEventListener('click', () => { result = true; dialog.close(); });
     cancel.addEventListener('click', () => dialog.close());
-    dialog.addEventListener('close', () => { dialog.remove(); document.body.classList.remove('dialog-open'); answer(result); });
+    dialog.addEventListener('close', () => { dialog.remove(); answer(result); });
     document.body.append(dialog);
-    document.body.classList.add('dialog-open'); // app.css: the tutorial's own Haram gives way to this one
     dialog.showModal();
     ok.focus();
   });
