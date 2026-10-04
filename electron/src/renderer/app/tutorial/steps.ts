@@ -93,7 +93,7 @@ const bits: Step = {
 const store: Step = {
   id: 'store', kind: 'practice', file: 'tutorial.s', view: 'run', tab: 'data', keys: ['F10'],
   title: () => 'sw: 메모리에 쓰기',
-  doing: () => [{ key: 'F10' }, { key: 'F10' }, '두 번'],
+  doing: () => [{ key: 'F10' }, '두 번'],
   body: (t) => `${t.host.narrow() ? '' : '왼쪽에 표시한 '}\`sw $t3, total\` 줄은 \`$t3\` 의 값을 메모리의 \`total\` 자리에 씁니다. `
     + '이 줄은 명령 두 개가 되었으니 F10 키를 두 번 눌러 보세요. 실행하고 나면 `total` 자리가 어떻게 바뀌었는지 보여 드립니다.',
   targets: (t) => [...sideLine(t, SW), dataCell(t, 'total')],
