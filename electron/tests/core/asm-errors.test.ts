@@ -114,3 +114,25 @@ test('the line is where the quoted source is', () => {
   m = parseAssemblerMessage("Cannot open file: `x.s'\n");
   assert.equal(resolveMessageLine(m, file), 0);
 });
+
+// An error found at the very end of a file with no newline after it: SPIM's
+// scanner read past its buffer reporting it (flex's "end of buffer missed",
+// exit code 2, or a segmentation fault).  native/index.ts ends the text with
+// a newline, and the error is an ordinary message on its line.
+test('an error on the last line, with no newline after it, is reported on that line', () => {
+  const programs: [string, string][] = [
+    ['.text\n.globl main\nmain:\nli $t0, 1\nli $t1, 2\nadd $t3, $t0, $t1\nli $v0, 10\nsyscalll', 'syntax error'],
+    ['.text\nmain:\nli $v0,', 'syntax error'],
+    ['.data\nx: .word', 'syntax error'],
+    ['.data\nx: .asciiz "abc', 'Unknown character'],
+    [".text\nmain: li $t0, 'a", 'Unknown character'],
+  ];
+  for (const [source, message] of programs) {
+    const lines = source.split('\n');
+    const r = spim.assemble(source);
+    assert.equal(r.ok, false, source);
+    const m = parseAssemblerMessage(r.errors[0]);
+    assert.equal(m.message, message, source);
+    assert.equal(resolveMessageLine(m, lines), lines.length, source);
+  }
+});

@@ -49,7 +49,10 @@ export function resolveMessageLine(message: AssemblerMessage, fileLines: readonl
   const wanted = simplified(message.source);
   const from = Math.min(message.line, fileLines.length);
   for (let line = from; line >= 1 && line > from - 200; line -= 1) {
-    if (simplified(fileLines[line - 1]) === wanted) return line;
+    // The core quotes the whole line, or the statement without the labels
+    // in front of it when the error is past them ("x: .word" as ".word").
+    const text = simplified(fileLines[line - 1]);
+    if (text === wanted || text.replace(/^([A-Za-z_.][A-Za-z0-9_.]*\s*:\s*)+/, '') === wanted) return line;
   }
   return message.line;
 }
