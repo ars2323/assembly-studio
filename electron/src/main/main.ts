@@ -43,11 +43,6 @@ export type { ImageJob, ImageReply } from './export-image.ts';
 export type { UpdateCheck, UpdateProgress } from './updater.ts';
 
 app.setName(brand.name);
-// The top bar's height in the window (src/renderer/app/app.css --titlebar).
-const TITLE_BAR_HEIGHT = 36;
-// The caption buttons' patch stops one pixel short of it: the bar's bottom
-// border (app.css .titlebar) runs under the buttons instead of breaking there.
-const CAPTION_HEIGHT = TITLE_BAR_HEIGHT - 1;
 // The Start menu shortcut carries this id (tools/package.ts appId): the window groups with it.
 if (process.platform === 'win32') app.setAppUserModelId(brand.appId);
 // ---- this run's profile folder, and nothing else on disk --------------------
@@ -122,13 +117,14 @@ async function main(): Promise<void> {
     show: false,
     title: brand.name,
     backgroundColor: WINDOW_COLOURS.background,
-    // No system title bar: the window's own top bar carries the logo and the
-    // name (the toolbar is a row under it).  The caption buttons stay the system's own
-    // (titleBarOverlay), so Windows 11's snap layouts -- the flyout on the
-    // maximise button -- keep working, as do double-click to maximise and
-    // dragging to the top edge on the bar's drag region.
+    // No system title bar and no system caption buttons: the window's own
+    // top bar carries the logo, the name and its own minimise / maximise /
+    // close buttons (src/renderer/app/panels/caption.ts), drawn by the page
+    // so they change theme with it (Windows' own redraw a beat behind).
+    // Double-click to maximise and dragging to the top edge still work on
+    // the bar's drag region; Windows 11's snap-layout flyout, which belongs
+    // to the system's maximise button, does not (Win+Z does).
     titleBarStyle: 'hidden',
-    titleBarOverlay: { color: WINDOW_COLOURS.titlebar, symbolColor: WINDOW_COLOURS.symbol, height: CAPTION_HEIGHT },
     webPreferences: {
       preload: paths.preload,
       contextIsolation: true,
@@ -207,22 +203,19 @@ async function main(): Promise<void> {
   ipcMain.handle('settings:set', (_e, s: Settings) => {
     return setSettings(s);
   });
-  // The caption buttons' patch (titleBarOverlay, drawn by Windows) and
-  // their symbols take the colours the page asks for: transparent and white
-  // on the first screen, white or white under what covers the page (the
-  // tutorial's dim, a dialog's backdrop) elsewhere
-  // (src/renderer/app/logic/overlay.ts).  The buttons themselves keep
-  // working.  Kept on the window for the tests to read (Electron has no
-  // getter for it).
   // The page's theme (renderer theme.ts): the window's own background follows,
   // so a page loaded again does not flash the other theme's colour first.
   ipcMain.handle('win:theme', (_e, theme: unknown) => {
     try { win.setBackgroundColor(theme === 'light' ? LIGHT_BACKGROUND : WINDOW_COLOURS.background); } catch { /* closing */ }
   });
-  ipcMain.handle('win:overlay', (_e, patch: { color: string; symbolColor: string }) => {
-    Object.assign(win, { overlayColor: patch.color, overlaySymbol: patch.symbolColor });
-    try { win.setTitleBarOverlay({ color: patch.color, symbolColor: patch.symbolColor, height: CAPTION_HEIGHT }); } catch { /* no title bar overlay on this platform */ }
-  });
+  // The title bar's own caption buttons (panels/caption.ts): what they do,
+  // and whether the window is maximised (the middle one's symbol).
+  ipcMain.handle('win:minimize', () => { win.minimize(); });
+  ipcMain.handle('win:toggleMaximize', () => { if (win.isMaximized()) win.unmaximize(); else win.maximize(); });
+  ipcMain.handle('win:close', () => { win.close(); });
+  ipcMain.handle('win:isMaximized', () => win.isMaximized());
+  const sendMaximized = () => { if (!win.isDestroyed()) win.webContents.send('win:maximized', win.isMaximized()); };
+  for (const e of ['maximize', 'unmaximize', 'enter-full-screen', 'leave-full-screen'] as const) win.on(e as 'maximize', sendMaximized);
 
   // Maximised before it is shown -- every start, whatever the screen, since
   // nothing is kept: the whole screen is what the panels are laid out for

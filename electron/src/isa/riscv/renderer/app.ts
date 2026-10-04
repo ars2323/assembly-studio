@@ -1,8 +1,8 @@
 /* The window.
 
      title bar   the logo and the program's name in the middle; the
-                 system's own caption buttons on the right (titleBarOverlay,
-                 src/main/main.ts)
+                 window's minimise / maximise / close buttons on the right,
+                 drawn by the page (panels/caption.ts)
      toolbar     Save & Assemble, Run, its speed, Step, Reset (and the
                  Editor / Run tabs of a narrow window) from the left; the
                  tools (Tutorial, New, Open, Settings) at the right end
@@ -63,14 +63,13 @@ import type { ErrorItem, RunReply } from '../sim/protocol.ts';
 import { api, type AboutInfo } from './api.ts';
 import { brand } from '../../../brand.ts';
 import { asset, code, codeText, h, icon, markImg, monoCh, withHex } from '../../../renderer/app/dom.ts';
-import { onTheme, THEME_FADE_MS, themeSwitch } from '../../../renderer/app/theme.ts';
+import { themeSwitch } from '../../../renderer/app/theme.ts';
 import { currentLang, langSwitch, onLang, tr, words, type Words } from '../../../renderer/app/i18n.ts';
 import { DIALOGS } from '../../../renderer/app/messages/dialogs.ts';
 import { ASSEMBLE, STATUS } from '../../../renderer/app/messages/assemble.ts';
 import { STEPBACK } from '../../../renderer/app/messages/stepback.ts';
 import { backKeys, isStepBackKey, STEP_BACK_KEY } from '../../../renderer/app/logic/stepback.ts';
-import { captionPatch, mixPalette, palette } from '../../../renderer/app/logic/overlay.ts';
-import { WINDOW_COLOURS } from '../../../main/theme.ts';
+import { captionButtons } from '../../../renderer/app/panels/caption.ts';
 import { notice } from '../../../renderer/app/notice.ts';
 import { createEditor } from '../../../renderer/app/editor.ts';
 import { shortName } from '../../../renderer/app/logic/names.ts';
@@ -213,7 +212,8 @@ const viewSwitch = h('span', { class: 'seg viewswitch', role: 'tablist', hidden:
 const titlebar = h('header', { class: 'titlebar' },
   h('span', { class: 'brand' },
     markImg('logo'),
-    h('span', { class: 'appname' }, APP_NAME)));
+    h('span', { class: 'appname' }, APP_NAME)),
+  captionButtons(api));
 // The toolbar under it: everything that is pressed.
 const tools = h('span', { class: 'tools' },
   iconButton('Tutorial', 'circle-question-mark', () => void startTutorial()),
@@ -435,7 +435,7 @@ const asmRoom = (): number => Math.max(ASM_LEAST, paneEditor.clientHeight - edit
 
 function layout(): void {
   stageWelcome.hidden = open;
-  document.body.classList.toggle('first-screen', !open); // its bars over the board (app.css), the caption patch (updateOverlay)
+  document.body.classList.toggle('first-screen', !open); // its bars over the board (app.css)
   split.hidden = !open;
   /* After the two stages have been shown and hidden, never before: showing
      the first screen measures the card to put the board's pins on it, and
@@ -698,8 +698,9 @@ function fitBars(): void {
   }
 }
 function fitBrand(): void {
-  // The centred mark and name end before the room kept for the caption buttons.
-  const end = () => titlebar.getBoundingClientRect().right - parseFloat(getComputedStyle(titlebar).paddingRight);
+  // The centred mark and name end before the caption buttons.
+  const caption = titlebar.querySelector('.caption') as HTMLElement;
+  const end = () => caption.getBoundingClientRect().left - 8;
   const fits = () => brandMark.getBoundingClientRect().right <= end() + 0.5;
   titlebar.classList.remove('noapp', 'nobrand');
   if (fits()) return;
@@ -708,11 +709,6 @@ function fitBrand(): void {
   titlebar.classList.add('nobrand');
 }
 window.addEventListener('resize', () => fitBars());
-// The room kept for the caption buttons (the padding's env(titlebar-area-*))
-// is updated after the resize and the layout: fit again then, or a window
-// made wider keeps the name it had lost when narrow.
-(navigator as unknown as { windowControlsOverlay?: EventTarget }).windowControlsOverlay
-  ?.addEventListener('geometrychange', () => fitBars());
 
 // The status bar: cells (src/renderer/app/cells.ts), the engine's state when
 // it is not ready, then the machine's -- what it did last and where PC is --
@@ -1487,39 +1483,6 @@ async function refreshData(): Promise<void> {
   const pointers = [2, 8, 3].map((n) => ({ name: ['', '', 'sp', 'gp', '', '', '', '', 'fp'][n], value: regs.x[n] >>> 0 }));
   text.data.show(sections, settings.dataBase, labels, pointers);
 }
-
-// ---- the caption buttons' patch -----------------------------------------------------------
-// Windows draws the minimise / maximise / close buttons on a patch the page
-// cannot paint (titleBarOverlay).  On the first screen, whose title bar is
-// dark glass over the board, the patch is transparent and the symbols white.
-// Elsewhere, while the tutorial dims the window, or a dialog's backdrop
-// covers it, the patch takes the colour the title bar has under the same
-// layers (logic/overlay.ts), or it would stand out at the top right; the
-// title bar's own again after.  The buttons keep working throughout.
-let colours = palette(getComputedStyle(document.documentElement));
-let overlayNow = `${WINDOW_COLOURS.titlebar} ${WINDOW_COLOURS.symbol}`; // the window's own at its start (src/main/main.ts)
-function updateOverlay(): void {
-  const b = document.body.classList;
-  const p = captionPatch(colours, b.contains('first-screen'), b.contains('tutorial-on'), document.querySelector('dialog[open]') !== null);
-  if (`${p.color} ${p.symbolColor}` === overlayNow) return;
-  overlayNow = `${p.color} ${p.symbolColor}`;
-  void api.setOverlay(p);
-}
-// The patch follows the page's fade (theme.ts), frame by frame, from the colours it has to the new theme's.
-let paletteFade = 0;
-onTheme(() => {
-  const from = colours, to = palette(getComputedStyle(document.documentElement)), start = performance.now();
-  cancelAnimationFrame(paletteFade);
-  const frame = (now: number) => {
-    const t = Math.min(1, (now - start) / THEME_FADE_MS);
-    colours = mixPalette(from, to, t * t * (3 - 2 * t));
-    updateOverlay();
-    if (t < 1) paletteFade = requestAnimationFrame(frame);
-  };
-  paletteFade = requestAnimationFrame(frame);
-});
-new MutationObserver(updateOverlay).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'open'] });
-updateOverlay(); // the first screen is up before anything is watched
 
 // ---- keys -----------------------------------------------------------------------------------
 
