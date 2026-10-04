@@ -744,9 +744,60 @@ body.arriving .work { animation: arrive .45s ease-out both; }
   100% { opacity: 0; transform: scale(0) rotate(45deg) translateY(-8px); } }
 .actions.enter .action { animation: wenter .5s cubic-bezier(.2, .7, .2, 1) both; }
 .actions.enter .action:nth-child(2) { animation-delay: .08s; }
-@keyframes wenter { 0% { opacity: 0; transform: translateY(8px); box-shadow: 0 0 18px rgba(255,255,255,.55); }
-  60% { opacity: 1; box-shadow: 0 0 14px rgba(255,255,255,.35); } 100% { opacity: 1; transform: none; box-shadow: 0 0 0 rgba(255,255,255,0); } }
+/* The glow's colour is a variable, not a second set of keyframes, so a
+   switch of theme does not start the buttons coming in again. */
+@keyframes wenter { 0% { opacity: 0; transform: translateY(8px); box-shadow: 0 0 18px rgba(var(--wenter-rgb, 255,255,255),.55); }
+  60% { opacity: 1; box-shadow: 0 0 14px rgba(var(--wenter-rgb, 255,255,255),.35); } 100% { opacity: 1; transform: none; box-shadow: 0 0 0 rgba(var(--wenter-rgb, 255,255,255),0); } }
 @media (prefers-reduced-motion: reduce) { .wlogo, .wtitle, .wbody, .wcorner, .wisa { transition: none; } }
+
+/* ---- first screen by day (<html data-theme="light">) ----------------------
+   The same package in daylight: a pale face in a near-black rim, the die
+   frame in ink (its breath: startfield/glints.css), black words, and the
+   light that runs over the name and round the buttons a steel-blue sheen
+   rather than white -- white on a pale face is nothing.  Sizes, places and
+   timings are the night's; only the colours change.  The board behind is
+   the day look of the same board (startfield/render.ts LOOKS.light). */
+:root[data-theme="light"] .wcard { background: #fafafa; border-color: #16181d;
+  box-shadow: 0 1px 2px rgba(20,24,32,.10), 0 10px 30px rgba(20,24,32,.10); }
+:root[data-theme="light"] .wcard::before { border-color: rgba(30,34,42,.2); }
+:root[data-theme="light"] .wtitle { background-image: linear-gradient(90deg, #16181d, #16181d); }
+:root[data-theme="light"] .wtitle::after {
+  background-image: linear-gradient(90deg,
+    rgba(120,150,196,0) calc(var(--sp-at, 0) * 100% - 80px),
+    #8aa6d0 calc(var(--sp-at, 0) * 100%),
+    rgba(120,150,196,0) calc(var(--sp-at, 0) * 100% + 80px));
+  filter: drop-shadow(0 0 6px rgba(70,105,160,.45)); }
+:root[data-theme="light"] .action { border-color: rgba(30,34,42,.26); background: #f1f2f4; }
+:root[data-theme="light"] .action b { color: rgba(22,24,29,.74); }
+:root[data-theme="light"] .action.main { border-color: rgba(30,34,42,.62); background: #ffffff; }
+:root[data-theme="light"] .action.main b { color: #16181d; }
+:root[data-theme="light"] .action::after {
+  background: conic-gradient(from calc(var(--sp-at, 0) * 1turn),
+    rgba(20,36,68,0) 0deg,
+    rgba(20,36,68,0) calc(360deg - var(--sp-amp, 0) * 190deg),
+    rgba(20,36,68,.5) calc(360deg - var(--sp-amp, 0) * 70deg),
+    #0f1a30 352deg, rgba(20,36,68,0) 360deg); }
+:root[data-theme="light"] .action:hover { border-color: #16181d; background: #e9ebef; }
+:root[data-theme="light"] .action:focus-visible { outline-color: #16181d; }
+:root[data-theme="light"] .action img { filter: brightness(0); opacity: .78; }
+:root[data-theme="light"] .wback { border-color: rgba(30,34,42,.24); }
+:root[data-theme="light"] .wback img { filter: brightness(0); opacity: .72; }
+:root[data-theme="light"] .wback:hover { border-color: #16181d; background: rgba(30,34,42,.06); }
+:root[data-theme="light"] .wback:focus-visible { outline-color: #16181d; }
+:root[data-theme="light"] .wisa { color: rgba(22,24,29,.5); }
+/* The burst and the sparks: a steel-blue bloom and small ink glints. */
+:root[data-theme="light"] .wfx.burst::before {
+  background: radial-gradient(ellipse 60% 45% at 50% 66%, rgba(70,105,160,.16), rgba(70,105,160,0) 70%); }
+:root[data-theme="light"] .spark { background: #1d2b45; box-shadow: 0 0 5px 1px rgba(70,105,160,.45); }
+:root[data-theme="light"] .spark::before, :root[data-theme="light"] .spark::after {
+  background: linear-gradient(90deg, rgba(29,43,69,0), #1d2b45, rgba(29,43,69,0)); }
+:root[data-theme="light"] .actions { --wenter-rgb: 70,105,160; }
+/* The switch on the card, in the card's own colours. */
+:root[data-theme="light"] .wtheme .theme-switch { border-color: rgba(30,34,42,.24); background: #f1f2f4; }
+:root[data-theme="light"] .wtheme .theme-switch .ts-knob { background: #ffffff; border-color: rgba(30,34,42,.28);
+  box-shadow: 0 1px 2px rgba(20,24,32,.12); }
+:root[data-theme="light"] .wtheme .theme-switch img.icon { filter: none; }
+:root[data-theme="light"] .wtheme .theme-switch:hover { border-color: #16181d; }
 /* The bars on the first screen (body.first-screen, app.ts): the board shows
    through them, white words and icons, no dividing lines.  Nothing is
    blurred -- the board behind is flat, so a backdrop-filter would cost a

@@ -18,7 +18,7 @@
    - The board is cleared and drawn whole every time it is drawn at all.
      Laying a translucent rectangle over the last frame is cheaper, but the
      alpha in the code then has nothing to do with the brightness on screen.
-   - Light is composited with 'lighter'.  Drawn over, a soft white circle is
+   - Light is composited with 'lighter' (at night: LOOKS).  Drawn over, a soft white circle is
      a grey smudge; added, it is light.  A core, a wide halo and a long thin
      streak together are what reads as a flare -- one blurred circle does
      not.  The haze underneath is the exception: it is the board's own
@@ -27,6 +27,13 @@
    - A signal moves along a path by arc length, not by segment index: with an
      index a 60 px segment and a 200 px one take the same time and the light
      jumps at every corner.
+
+   Two looks, one drawing (LOOKS).  At night the board is white light on
+   near-black, added; by day it is the same board in ink on paper, laid
+   over: the traces at the same three depths, the light around them a soft
+   shadow, the pulses thin ink, the flares small dark glints.  Every number
+   of the dark look is the one it always had, so the night board is the
+   same picture it was.
 
    Nothing here starts or stops the animation; index.ts owns the clock. */
 
@@ -60,38 +67,110 @@ export const PULSE_WIDTHS = [
 /** The head: a small bright point with a soft glint. */
 export const PULSE_HEAD = { radius: 1.5, glow: 4.5, glowAlpha: 0.35 } as const;
 
-export const COLOURS = {
-  background: '#0d0d0d',
-  /* The ambient haze: the board's ground, brightest not at the chip but at a
-     ring out from it, so the package still sits in the calmest part of the
-     picture.  Without this the board is lines on black, and black is most of
-     what is on screen however many lines there are. */
-  hazeNear: '#1c1c1c',
-  hazePeak: '#282828',
-  hazeEdge: '#181818',
-  hazePeakAt: 0.46,            // of the way to the farthest corner
-  /* The light around a lit trace.  Concentric strokes, widest and faintest
-     first, added: a line with light around it, not a wider line.  This and
-     the haze are what fill the board -- without them a board whose traces
-     are at the right brightness is still mostly black, because a 2 px line
-     on a 22 px grid covers two pixels in a hundred.  A shadowBlur on every
-     stroke would cost far more and on a lab PC's built-in graphics that is
-     what spins the fan; all of these are stroked in one path per level. */
-  glow: [
-    { width: 12, alpha: 0.045 },
-    { width: 7, alpha: 0.120 },
-    { width: 4, alpha: 0.240 },
-    { width: 3, alpha: 0.420 },
-  ],
-  padRing: 0.5,
-  padFill: 0.15,
-  pin: 0.75,
-  pinWidth: 2.5,
-  cardHalo: 0.10,
-  cardHaloWidth: 24,
-} as const;
+export type Theme = 'dark' | 'light';
 
-const white = (a: number): string => `rgba(255,255,255,${Math.max(0, Math.min(1, a)).toFixed(3)})`;
+/** Everything that differs between the night board and the day one.  The
+    geometry, the timings and the shapes are the same for both. */
+export interface Look {
+  background: string;
+  /* The ambient haze: the board's ground.  At night brightest not at the
+     chip but at a ring out from it, so the package still sits in the calmest
+     part of the picture; by day the same ring is a shade darker than the
+     paper, for the same reason.  Without it the board is lines on a flat
+     ground, and the ground is most of what is on screen. */
+  hazeNear: string;
+  hazePeak: string;
+  hazeEdge: string;
+  hazePeakAt: number;          // of the way to the farthest corner
+  /** The colour of every line, pad, pulse and flare, as "r,g,b". */
+  ink: string;
+  /** The pulses' and flares' colour, as "r,g,b". */
+  signal: string;
+  /** How the light (or shade) around things is laid on what is there. */
+  blend: GlobalCompositeOperation;
+  /** The traces' own alphas, scaled. */
+  line: number;
+  /* The light around a lit trace.  Concentric strokes, widest and faintest
+     first: a line with light around it, not a wider line.  This and the
+     haze are what fill the board -- without them a board whose traces are
+     at the right brightness is still mostly ground, because a 2 px line on a
+     22 px grid covers two pixels in a hundred.  A shadowBlur on every stroke
+     would cost far more and on a lab PC's built-in graphics that is what
+     spins the fan; all of these are stroked in one path per level. */
+  glow: readonly { width: number; alpha: number }[];
+  padRing: number;
+  padFill: number;
+  pin: number;
+  pinWidth: number;
+  cardHalo: number;
+  cardHaloWidth: number;
+  /** A flare: its halo's radius and alpha, its streak's alpha, its core's
+      radius and alpha, each against the night board's. */
+  flare: { radius: number; halo: number; streak: number; core: number; coreAlpha: number };
+  /** The pulses' alphas, scaled. */
+  pulse: number;
+}
+
+export const LOOKS: Record<Theme, Look> = {
+  dark: {
+    background: '#0d0d0d',
+    hazeNear: '#1c1c1c',
+    hazePeak: '#282828',
+    hazeEdge: '#181818',
+    hazePeakAt: 0.46,
+    ink: '255,255,255',
+    signal: '255,255,255',
+    blend: 'lighter',
+    line: 1,
+    glow: [
+      { width: 12, alpha: 0.045 },
+      { width: 7, alpha: 0.120 },
+      { width: 4, alpha: 0.240 },
+      { width: 3, alpha: 0.420 },
+    ],
+    padRing: 0.5,
+    padFill: 0.15,
+    pin: 0.75,
+    pinWidth: 2.5,
+    cardHalo: 0.10,
+    cardHaloWidth: 24,
+    flare: { radius: 1, halo: 1, streak: 1, core: 2, coreAlpha: 1 },
+    pulse: 1,
+  },
+  /* By day: ink on paper.  Drawn over rather than added -- ink added to
+     paper is still paper -- and lighter than the night's white, because a
+     dark line on a light ground carries more than a light one on a dark
+     ground does; at the night's alphas the board is louder than the card. */
+  light: {
+    background: '#eef0f3',
+    hazeNear: '#f5f6f8',
+    hazePeak: '#e6e9ee',
+    hazeEdge: '#eceef2',
+    hazePeakAt: 0.46,
+    ink: '30,34,42',
+    signal: '16,28,52',
+    blend: 'source-over',
+    line: 0.5,
+    glow: [
+      { width: 9, alpha: 0.018 },
+      { width: 5, alpha: 0.035 },
+      { width: 3, alpha: 0.050 },
+    ],
+    padRing: 0.42,
+    padFill: 0.10,
+    pin: 0.62,
+    pinWidth: 2.5,
+    cardHalo: 0.05,
+    cardHaloWidth: 22,
+    flare: { radius: 0.55, halo: 0.22, streak: 0.55, core: 1.4, coreAlpha: 0.75 },
+    pulse: 0.85,
+  },
+};
+
+/** The night board's look; what drawBoard() and drawPulse() draw unless told otherwise. */
+export const COLOURS = LOOKS.dark;
+
+const rgba = (rgb: string, a: number): string => `rgba(${rgb},${Math.max(0, Math.min(1, a)).toFixed(3)})`;
 
 const cache = new WeakMap<Path, { line: Pt[]; cum: number[] }>();
 function shape(p: Path): { line: Pt[]; cum: number[] } {
@@ -136,57 +215,59 @@ function stroke(ctx: CanvasRenderingContext2D, pts: Pt[], colour: string, width:
   ctx.stroke();
 }
 
-function pad(ctx: CanvasRenderingContext2D, p: Pad, alpha: number): void {
+function pad(ctx: CanvasRenderingContext2D, p: Pad, alpha: number, look: Look): void {
   const f = alpha / LAYERS[2].alpha;             // the far layers' pads are fainter too
   ctx.beginPath();
   ctx.arc(p.at.x, p.at.y, p.r, 0, Math.PI * 2);
   if (p.r < 3) {                                 // too small for a ring to show
-    ctx.fillStyle = white(Math.min(0.9, alpha * 1.6));
+    ctx.fillStyle = rgba(look.ink, Math.min(0.9, alpha * 1.6) * look.line);
     ctx.fill();
     return;
   }
-  ctx.fillStyle = white(COLOURS.padFill * f);
+  ctx.fillStyle = rgba(look.ink, look.padFill * f);
   ctx.fill();
-  ctx.strokeStyle = white(COLOURS.padRing * f);
+  ctx.strokeStyle = rgba(look.ink, look.padRing * f);
   ctx.lineWidth = 1;
   ctx.stroke();
 }
 
-/** Core, halo and streak, added to what is there.  The caller has already
-    put the context into 'lighter'.  `gain` scales the whole thing: 1 while
+/** Core, halo and streak, added to what is there (by day, laid over it).
+    The caller has already put the context into the look's blend.  `gain` scales the whole thing: 1 while
     it lights, less while it fades in, and a fraction of it again on the
     layer above when it beats. */
-function flare(ctx: CanvasRenderingContext2D, f: Flare, gain: number): void {
+function flare(ctx: CanvasRenderingContext2D, f: Flare, gain: number, look: Look): void {
   if (gain <= 0) return;
+  const { radius, halo: h, streak, core, coreAlpha } = look.flare;
+  const c = look.signal, r = f.halo * radius;
   /* The brightest few are meant to be blown out, so the middle of the halo
      is a plateau rather than a point: a core that is white across a dozen
      pixels, not one pixel of white with a gradient around it. */
-  const halo = ctx.createRadialGradient(f.at.x, f.at.y, 0, f.at.x, f.at.y, f.halo);
-  halo.addColorStop(0, white(f.strength * gain));
-  halo.addColorStop(0.22, white(f.strength * gain * 0.85));
-  halo.addColorStop(0.5, white(f.strength * gain * 0.20));
-  halo.addColorStop(1, 'rgba(255,255,255,0)');
+  const halo = ctx.createRadialGradient(f.at.x, f.at.y, 0, f.at.x, f.at.y, r);
+  halo.addColorStop(0, rgba(c, f.strength * gain * h));
+  halo.addColorStop(0.22, rgba(c, f.strength * gain * 0.85 * h));
+  halo.addColorStop(0.5, rgba(c, f.strength * gain * 0.20 * h));
+  halo.addColorStop(1, `rgba(${c},0)`);
   ctx.fillStyle = halo;
   ctx.beginPath();
-  ctx.arc(f.at.x, f.at.y, f.halo, 0, Math.PI * 2);
+  ctx.arc(f.at.x, f.at.y, r, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.save();
   ctx.translate(f.at.x, f.at.y);
   if (f.streak === 'diagonal') ctx.rotate(Math.PI / 4);
   const line = ctx.createLinearGradient(-f.streakLength / 2, 0, f.streakLength / 2, 0);
-  line.addColorStop(0, 'rgba(255,255,255,0)');
-  line.addColorStop(0.5, white(0.4 * f.strength * gain));
-  line.addColorStop(1, 'rgba(255,255,255,0)');
+  line.addColorStop(0, `rgba(${c},0)`);
+  line.addColorStop(0.5, rgba(c, 0.4 * f.strength * gain * streak));
+  line.addColorStop(1, `rgba(${c},0)`);
   ctx.fillStyle = line;
   ctx.beginPath();
   ctx.ellipse(0, 0, f.streakLength / 2, 1, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 
-  ctx.fillStyle = white(gain);
+  ctx.fillStyle = rgba(c, gain * coreAlpha);
   ctx.beginPath();
-  ctx.arc(f.at.x, f.at.y, 2, 0, Math.PI * 2);
+  ctx.arc(f.at.x, f.at.y, core, 0, Math.PI * 2);
   ctx.fill();
 }
 
@@ -198,12 +279,13 @@ export const dieAlpha = (t: number): number =>
   DIE.min + (DIE.max - DIE.min) * (0.5 - 0.5 * Math.cos((2 * Math.PI * t) / DIE.periodMs));
 
 /** The board: everything that stays once it is there.  Drawn while it grows
-    and once more when it has (index.ts), and not again. */
-export function drawBoard(ctx: CanvasRenderingContext2D, g: Geometry, t: number): void {
+    and once more when it has (index.ts), and again only for a change of
+    look. */
+export function drawBoard(ctx: CanvasRenderingContext2D, g: Geometry, t: number, look: Look = COLOURS): void {
   ctx.save();
   ctx.setTransform(g.dpr, 0, 0, g.dpr, 0, 0);
   ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = COLOURS.background;
+  ctx.fillStyle = look.background;
   ctx.fillRect(0, 0, g.width, g.height);
   ctx.lineJoin = 'miter';        // never 'round': that is what makes ribbons
   ctx.lineCap = 'butt';
@@ -215,9 +297,9 @@ export function drawBoard(ctx: CanvasRenderingContext2D, g: Geometry, t: number)
     const cx = g.card.x + g.card.width / 2, cy = g.card.y + g.card.height / 2;
     const reach = Math.hypot(Math.max(cx, g.width - cx), Math.max(cy, g.height - cy));
     const haze = ctx.createRadialGradient(cx, cy, 0, cx, cy, reach);
-    haze.addColorStop(0, COLOURS.hazeNear);
-    haze.addColorStop(COLOURS.hazePeakAt, COLOURS.hazePeak);
-    haze.addColorStop(1, COLOURS.hazeEdge);
+    haze.addColorStop(0, look.hazeNear);
+    haze.addColorStop(look.hazePeakAt, look.hazePeak);
+    haze.addColorStop(1, look.hazeEdge);
     ctx.globalAlpha = hazeIn;
     ctx.fillStyle = haze;
     ctx.fillRect(0, 0, g.width, g.height);
@@ -228,8 +310,8 @@ export function drawBoard(ctx: CanvasRenderingContext2D, g: Geometry, t: number)
   const pinsIn = ease(clamp01((t - 60) / 240));
   if (pinsIn > 0) {
     ctx.globalAlpha = pinsIn;
-    ctx.strokeStyle = white(COLOURS.pin);
-    ctx.lineWidth = COLOURS.pinWidth;
+    ctx.strokeStyle = rgba(look.ink, look.pin);
+    ctx.lineWidth = look.pinWidth;
     ctx.beginPath();
     for (const pin of g.pins) {
       ctx.moveTo(pin.at.x, pin.at.y);
@@ -267,12 +349,12 @@ export function drawBoard(ctx: CanvasRenderingContext2D, g: Geometry, t: number)
        same halo and the board reads flat -- three depths drawn and one
        depth seen. */
     const share = Math.pow(LAYERS[layer].alpha / LAYERS[2].alpha, GLOW_DEPTH);
-    ctx.globalCompositeOperation = 'lighter';
-    for (const level of COLOURS.glow) {
+    ctx.globalCompositeOperation = look.blend;
+    for (const level of look.glow) {
       ctx.beginPath();
       for (const pts of plain) trace(pts);
       for (const pts of lit) trace(pts);
-      ctx.strokeStyle = white(level.alpha * share);
+      ctx.strokeStyle = rgba(look.ink, level.alpha * share);
       ctx.lineWidth = level.width;
       ctx.stroke();
     }
@@ -280,19 +362,19 @@ export function drawBoard(ctx: CanvasRenderingContext2D, g: Geometry, t: number)
     if (plain.length) {
       ctx.beginPath();
       for (const pts of plain) trace(pts);
-      ctx.strokeStyle = white(LAYERS[layer].alpha);
+      ctx.strokeStyle = rgba(look.ink, LAYERS[layer].alpha * look.line);
       ctx.lineWidth = LAYERS[layer].width;
       ctx.stroke();
     }
     if (lit.length) {
       ctx.beginPath();
       for (const pts of lit) trace(pts);
-      ctx.strokeStyle = white(BRIGHT.alpha);
+      ctx.strokeStyle = rgba(look.ink, BRIGHT.alpha * look.line);
       ctx.lineWidth = BRIGHT.width;
       ctx.stroke();
     }
     for (const h of heads) {
-      ctx.fillStyle = white(0.95);
+      ctx.fillStyle = rgba(look.ink, 0.95 * look.line);
       ctx.beginPath();
       ctx.arc(h.x, h.y, 2.2, 0, Math.PI * 2);
       ctx.fill();
@@ -300,22 +382,23 @@ export function drawBoard(ctx: CanvasRenderingContext2D, g: Geometry, t: number)
   }
 
   // ---- the pads, each when what it belongs to has arrived ---------------
-  for (const p of g.pads) if (t >= p.atMs) pad(ctx, p, LAYERS[p.layer].alpha);
+  for (const p of g.pads) if (t >= p.atMs) pad(ctx, p, LAYERS[p.layer].alpha, look);
 
-  // ---- light, added ------------------------------------------------------
-  ctx.globalCompositeOperation = 'lighter';
-  // A quiet halo around the package, so the chip sits in light of its own.
+  // ---- light, added (by day, shade laid over) ----------------------------
+  ctx.globalCompositeOperation = look.blend;
+  // A quiet halo around the package, so the chip sits in light of its own
+  // (by day, in a soft shadow of its own).
   const glowIn = ease(clamp01((t - 120) / 400));
   if (glowIn > 0) {
     const { x, y, width, height } = g.card;
     for (let n = 6; n >= 1; n--) {
-      const grow = (COLOURS.cardHaloWidth * n) / 6;
-      ctx.strokeStyle = white((COLOURS.cardHalo / 6) * glowIn);
+      const grow = (look.cardHaloWidth * n) / 6;
+      ctx.strokeStyle = rgba(look.ink, (look.cardHalo / 6) * glowIn);
       ctx.lineWidth = grow * 2;
       ctx.strokeRect(x - grow, y - grow, width + grow * 2, height + grow * 2);
     }
   }
-  for (const f of g.flares) flare(ctx, f, ease(clamp01((t - f.atMs) / FLARE_IN)));
+  for (const f of g.flares) flare(ctx, f, ease(clamp01((t - f.atMs) / FLARE_IN)), look);
   ctx.globalCompositeOperation = 'source-over';
   ctx.restore();
 }
@@ -340,15 +423,15 @@ export function livePulses(g: Geometry, t: number): { path: Path; progress: numb
 }
 
 /** The layer above the board: cleared and drawn every frame, and never more
-    than a handful of things on it.  Everything it draws is added, so the
-    board underneath is left exactly as it was drawn. */
-export function drawPulse(ctx: CanvasRenderingContext2D, g: Geometry, t: number): void {
+    than a handful of things on it.  Everything it draws is added (by day,
+    laid over), so the board underneath is left exactly as it was drawn. */
+export function drawPulse(ctx: CanvasRenderingContext2D, g: Geometry, t: number, look: Look = COLOURS): void {
   ctx.save();
   ctx.setTransform(g.dpr, 0, 0, g.dpr, 0, 0);
   ctx.clearRect(0, 0, g.width, g.height);
   ctx.lineJoin = 'miter';
   ctx.lineCap = 'butt';
-  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalCompositeOperation = look.blend;
 
   for (const { path, progress } of livePulses(g, t)) {
     const { cum } = shape(path);
@@ -364,15 +447,15 @@ export function drawPulse(ctx: CanvasRenderingContext2D, g: Geometry, t: number)
       const pts = run(path, head - PULSE_TAIL * part.of, head);
       if (pts.length < 2) continue;
       drew = true;
-      for (const w of PULSE_WIDTHS) stroke(ctx, pts, white(w.alpha * part.alpha * fade), w.width);
+      for (const w of PULSE_WIDTHS) stroke(ctx, pts, rgba(look.signal, w.alpha * part.alpha * fade * look.pulse), w.width);
     }
     if (!drew) continue;
     const tip = run(path, head - 1, head)[1] ?? path.points[0];
-    ctx.fillStyle = white(PULSE_HEAD.glowAlpha * fade);
+    ctx.fillStyle = rgba(look.signal, PULSE_HEAD.glowAlpha * fade * look.pulse);
     ctx.beginPath();
     ctx.arc(tip.x, tip.y, PULSE_HEAD.glow, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = white(0.95 * fade);
+    ctx.fillStyle = rgba(look.signal, 0.95 * fade * look.pulse);
     ctx.beginPath();
     ctx.arc(tip.x, tip.y, PULSE_HEAD.radius, 0, Math.PI * 2);
     ctx.fill();
@@ -382,7 +465,7 @@ export function drawPulse(ctx: CanvasRenderingContext2D, g: Geometry, t: number)
     const f = g.flares[b.flare];
     if (!f || t < f.atMs) continue;
     const swell = 0.5 - 0.5 * Math.cos(2 * Math.PI * (t / b.periodMs + b.phase));
-    flare(ctx, f, BEAT_GAIN * swell);
+    flare(ctx, f, BEAT_GAIN * swell, look);
   }
 
   ctx.globalCompositeOperation = 'source-over';

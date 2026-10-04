@@ -1,12 +1,15 @@
 /* The first screen's circuit board.  The only surface a caller uses:
 
-     const field = startfield({ seed: 20261002 });
+     const field = startfield({ seed: 20261002, theme: 'dark' });
      container.append(field.root, card);   // the card carries data-startfield-chip
      field.show(true);
+     field.setTheme('light');              // the day board, at the same moment
 
-   One parameter, and no import of anything outside this folder, so the
+   A seed and a look, and no import of anything outside this folder, so the
    folder can be copied whole into another simulator: there the call is the
-   same with its own seed and nothing else changes.  The chip is found by the
+   same with its own seed and nothing else changes.  The look is the
+   caller's to tell (night: white light on black; day: ink on paper), not
+   read from the page, for the same reason.  The chip is found by the
    attribute, not passed in, which keeps it at one.
 
    onFrame() hands the caller the same clock, so whatever it draws of its own
@@ -33,7 +36,9 @@
 
 import { generate, type Geometry } from './generate.ts';
 import glintsCss from './glints.css';
-import { dieAlpha, drawBoard, drawPulse } from './render.ts';
+import { dieAlpha, drawBoard, drawPulse, LOOKS, type Theme } from './render.ts';
+
+export type { Theme };
 
 export interface Startfield {
   root: HTMLElement;
@@ -44,6 +49,10 @@ export interface Startfield {
   /** When the board has finished growing, in ms of the opening (Infinity
       until it has been laid out). */
   grownAt(): number;
+  /** Night or day.  The board is drawn again in the other look at the
+      moment it is at -- the clock goes on, nothing grows a second time --
+      and the old picture fades out over the new one. */
+  setTheme(theme: Theme): void;
   destroy(): void;
 }
 
@@ -76,8 +85,10 @@ declare global {
 
 /* options.from (ms): where the opening starts -- a page loaded again in the
    middle of the first screen (the ISA chosen: the window is reloaded for it)
-   comes back with the board as it was, not growing a second time. */
-export function startfield(options: { seed: number; from?: number }): Startfield {
+   comes back with the board as it was, not growing a second time.
+   options.theme: the look it starts in; options.fadeMs: how long a change of
+   look takes (the page's own change of colours, so the two go together). */
+export function startfield(options: { seed: number; from?: number; theme?: Theme; fadeMs?: number }): Startfield {
   if (!document.getElementById(STYLE_ID)) {
     const style = document.createElement('style');
     style.id = STYLE_ID;
@@ -91,6 +102,8 @@ export function startfield(options: { seed: number; from?: number }): Startfield
   const root = document.createElement('div');
   root.className = 'startfield';
   root.setAttribute('aria-hidden', 'true');
+  let theme: Theme = options.theme ?? 'dark';
+  root.classList.toggle('sf-light', theme === 'light');
   // The canvases go in when the screen is shown and come out when it is not.
 
   const reduce = matchMedia('(prefers-reduced-motion: reduce)');
@@ -121,11 +134,11 @@ export function startfield(options: { seed: number; from?: number }): Startfield
     times.push(t);
     const began = performance.now();
     if (drawnAt < geo.grownMs || t < drawnAt) {
-      drawBoard(lower, geo, Math.min(t, geo.grownMs));
+      drawBoard(lower, geo, Math.min(t, geo.grownMs), LOOKS[theme]);
       drawnAt = Math.min(t, geo.grownMs);
       boardDraws++;
     }
-    drawPulse(upper, geo, t);
+    drawPulse(upper, geo, t, LOOKS[theme]);
     work.push(performance.now() - began);
     chip()?.style.setProperty('--sf-die', dieAlpha(t).toFixed(3));
     for (const listener of listeners) listener(t);
@@ -247,6 +260,51 @@ export function startfield(options: { seed: number; from?: number }): Startfield
     };
   }
 
+  /* The other look.  What is on screen now is copied to a third canvas
+     laid over the two, the board is drawn again under it in the new look
+     at the moment it is at, and the copy fades out: a cross-fade, with the
+     pulses running on underneath and the clock not touched.  Without a
+     board on screen (not shown, not laid out yet) only the look changes,
+     and the next drawing is in it. */
+  let fading: HTMLCanvasElement | null = null, fadeTimer = 0;
+  const endFade = (): void => { clearTimeout(fadeTimer); fading?.remove(); fading = null; };
+  const setTheme = (next: Theme): void => {
+    if (next === theme) return;
+    theme = next;
+    root.classList.toggle('sf-light', theme === 'light');
+    if (!geo || !shown || !board.isConnected) {
+      endFade();
+      return;
+    }
+    // Switched again before the last fade ended: the copy is of what is on
+    // screen, the half-faded picture included, so nothing jumps.
+    const before = fading;
+    const beforeAlpha = before ? Number(getComputedStyle(before).opacity) : 0;
+    if (!reduce.matches && !root.classList.contains('sf-resizing')) {
+      const copy = document.createElement('canvas');
+      copy.className = 'sf-fade';
+      copy.width = board.width;
+      copy.height = board.height;
+      const g = copy.getContext('2d');
+      if (g) {
+        g.drawImage(board, 0, 0);
+        g.drawImage(pulse, 0, 0);
+        if (before && beforeAlpha > 0) { g.globalAlpha = beforeAlpha; g.drawImage(before, 0, 0); }
+        endFade();
+        root.append(copy);
+        fading = copy;
+        void copy.offsetWidth;                 // laid out opaque, then faded
+        const ms = options.fadeMs ?? 500;
+        copy.style.transition = `opacity ${ms}ms ease`;
+        copy.style.opacity = '0';
+        fadeTimer = window.setTimeout(endFade, ms + 60);
+      }
+    }
+    if (fading !== null && fading === before) endFade();   // no copy made: no fade left over
+    drawnAt = -1;                              // the board below, again, in the new look
+    paint(lastT);
+  };
+
   /* Off the first screen there is nothing of this left: no frame asked for,
      no canvas in the document, no geometry held, nothing watched, and the
      properties it was setting on the card gone.  A board that went on
@@ -254,6 +312,7 @@ export function startfield(options: { seed: number; from?: number }): Startfield
      nothing. */
   const teardown = (): void => {
     stop();
+    endFade();
     clearTimeout(resizeTimer);
     observer.disconnect();
     board.remove();
@@ -266,6 +325,7 @@ export function startfield(options: { seed: number; from?: number }): Startfield
   return {
     root,
     grownAt: () => geo?.grownMs ?? Infinity,
+    setTheme,
     show(on: boolean) {
       if (on === shown) return;
       shown = on;

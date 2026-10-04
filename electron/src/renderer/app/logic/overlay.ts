@@ -54,13 +54,18 @@ export function overlayColor(p: Palette, tutorial: boolean, dialog: boolean): st
 }
 
 // The patch and its symbols' colour.  On the first screen the title bar is
-// dark glass over the board: the patch is transparent there (Windows takes
-// the alpha), so the bar shows through it -- and so does whatever covers
-// the page -- and the symbols are white.  Everywhere else the patch is the
-// title bar's colour, or that colour under what covers the page.
+// glass over the board: the patch is transparent there (Windows takes the
+// alpha), so the bar shows through it -- and so does whatever covers the
+// page.  Its symbols are the board's: white over the night board, and over
+// the day board the theme's own dark symbols (a theme whose symbols are
+// light is a dark one).  Everywhere else the patch is the title bar's
+// colour, or that colour under what covers the page.
 export interface CaptionPatch { color: string; symbolColor: string }
 export const FIRST_SCREEN_PATCH: CaptionPatch = { color: '#00000000', symbolColor: '#ffffff' };
+const lightInk = (colour: string): boolean => {
+  try { const [r, g, b] = rgb(colour); return 0.2126 * r + 0.7152 * g + 0.0722 * b >= 128; } catch { return true; }
+};
 export function captionPatch(p: Palette, firstScreen: boolean, tutorial: boolean, dialog: boolean): CaptionPatch {
-  if (firstScreen) return FIRST_SCREEN_PATCH;
+  if (firstScreen) return lightInk(p.symbol) ? FIRST_SCREEN_PATCH : { color: FIRST_SCREEN_PATCH.color, symbolColor: p.symbol };
   return { color: overlayColor(p, tutorial, dialog), symbolColor: p.symbol };
 }
