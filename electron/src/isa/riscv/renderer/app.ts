@@ -193,7 +193,7 @@ viewRun.addEventListener('click', () => showView('run'));
 const viewSwitch = h('span', { class: 'seg viewswitch', role: 'tablist', hidden: true }, viewEditor, viewRun);
 // The title bar: the mark and the program's name, nothing else (it moves the window).
 const titlebar = h('header', { class: 'titlebar' },
-  h('span', { class: 'brand home', title: 'Home (choose the ISA)', role: 'button', tabindex: '0' },
+  h('span', { class: 'brand' },
     markImg('logo'),
     h('span', { class: 'appname' }, APP_NAME)));
 // The toolbar under it: everything that is pressed.
@@ -211,9 +211,7 @@ const toolbar = h('div', { class: 'toolbar', role: 'toolbar', 'aria-label': 'Too
   viewSwitch,
   h('span', { class: 'drag' }),
   tools);
-const homeButton = titlebar.querySelector<HTMLElement>('.brand')!;
-homeButton.addEventListener('click', () => void goHome());
-homeButton.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void goHome(); } });
+const brandMark = titlebar.querySelector<HTMLElement>('.brand')!;
 const status = h('footer', { class: 'status' });
 // The KO/EN and light/dark switches at the status line's right end (i18n.ts,
 // theme.ts); kept across its re-renders.
@@ -671,7 +669,7 @@ function fitBars(): void {
 function fitBrand(): void {
   // The centred mark and name end before the room kept for the caption buttons.
   const end = () => titlebar.getBoundingClientRect().right - parseFloat(getComputedStyle(titlebar).paddingRight);
-  const fits = () => homeButton.getBoundingClientRect().right <= end() + 0.5;
+  const fits = () => brandMark.getBoundingClientRect().right <= end() + 0.5;
   titlebar.classList.remove('noapp', 'nobrand');
   if (fits()) return;
   titlebar.classList.add('noapp');
@@ -766,20 +764,6 @@ async function exportImage(): Promise<void> {
 // Before another file takes the Editor's place.  Unsaved changes are always
 // asked about; a new file is asked about even when everything is saved --
 // it empties the Editor, which a student does not expect from one click.
-// The title bar's mark and name: back to the first screen, where the ISA is
-// chosen.  The page is loaded again (?isa= the same: the engine stays;
-// ?home: the first screen without its opening);
-// unsaved changes are asked about first.
-async function goHome(): Promise<void> {
-  if (open && dirty && !(await ask({
-    title: tr(DIALOGS.unsaved.title),
-    file: file.name,
-    body: tr(DIALOGS.unsaved.home),
-    ok: tr(DIALOGS.unsaved.discard), cancel: tr(DIALOGS.unsaved.back), danger: true,
-  }))) return;
-  location.replace(`?isa=riscv&home=1`);
-}
-
 async function mayReplace(what: 'new' | 'open'): Promise<boolean> {
   if (!open) return true;
   if (dirty) {
