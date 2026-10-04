@@ -92,7 +92,7 @@ export const STEPS = {
     result: {
       title: { ko: '어셈블되었습니다', en: 'Assembled' },
       body: {
-        ko: 'Editor 아래 Assemble 패널에 결과(어셈블 완료), 만들어진 명령 수, 저장 여부, 어셈블한 때가 나옵니다. 예제는 저장하지 않습니다. '
+        ko: 'Editor 아래 Assemble 패널에 결과(Assembled), 만들어진 명령 수, 저장 여부, 어셈블한 때가 나옵니다. 예제는 저장하지 않습니다. '
           + '맨 아래 상태 표시줄은 지금 상태와 PC 를, 오른쪽 끝에는 지금 쓸 수 있는 키를 보여 줍니다.',
         en: 'The Assemble panel under the Editor shows the result (Assembled), how many instructions it made, whether the file was saved, and when. Examples are never saved. '
           + 'The status bar at the bottom shows the state and PC, and at its right end the keys you can use now.',
@@ -494,7 +494,7 @@ export const MIPS = {
   changed: {
     body: {
       ko: '노란 줄은 방금 실행한 명령이 바꾼 레지스터입니다. `add $t3, $t1, $t2` 가 5 + 7 = 12 를 `$t3` 에 넣었습니다. '
-        + '아래 상태 표시줄에도 바뀜: `$t3` 으로 나옵니다. 다음 줄을 실행하면 노란 표시는 그 줄이 바꾼 레지스터로 옮겨 갑니다.',
+        + '아래 상태 표시줄의 Changed: 칸에도 나옵니다. 다음 줄을 실행하면 노란 표시는 그 줄이 바꾼 레지스터로 옮겨 갑니다.',
       en: 'The yellow row is the register the instruction that just ran changed: `add $t3, $t1, $t2` put 5 + 7 = 12 in `$t3`. '
         + 'The status bar below says Changed: `$t3` too. Run the next line and the yellow moves to the register that line changes.',
     },
@@ -549,7 +549,7 @@ export const RISCV = {
   changed: {
     body: {
       ko: '노란 줄은 방금 실행한 명령이 바꾼 레지스터입니다. `add t3, t1, t2` 가 5 + 7 = 12 를 `t3`(번호로는 `x28`)에 넣었습니다. '
-        + '아래 상태 표시줄에도 바뀜: 으로 나옵니다. 다음 줄을 실행하면 노란 표시는 그 줄이 바꾼 레지스터로 옮겨 갑니다.',
+        + '아래 상태 표시줄의 Changed: 칸에도 나옵니다. 다음 줄을 실행하면 노란 표시는 그 줄이 바꾼 레지스터로 옮겨 갑니다.',
       en: 'The yellow row is the register the instruction that just ran changed: `add t3, t1, t2` put 5 + 7 = 12 in `t3` (by number, `x28`). '
         + 'The status bar below shows it under Changed: too. Run the next line and the yellow moves to the register that line changes.',
     },

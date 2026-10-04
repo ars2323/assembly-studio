@@ -16,8 +16,8 @@ test('agoText: just now, seconds, minutes, hours', () => {
   assert.equal(after(-3), 'just now');   // a clock set back is not "in the future"
 });
 
-test('agoText in Korean', () => {
+test('agoText in Korean: the status words are English in both languages', () => {
   const at = new Date('2026-10-04T10:00:00Z');
   const after = (s: number) => agoText(at, at.getTime() + s * 1000, 'ko');
-  assert.deepEqual([0, 5, 60, 7200].map(after), ['방금', '5초 전', '1분 전', '2시간 전']);
+  assert.deepEqual([0, 5, 60, 7200].map(after), ['just now', '5s ago', '1 min ago', '2 h ago']);
 });

@@ -22,7 +22,7 @@ test('Shift+F10 alone is step back; F10 is Step', () => {
 
 test('the status bar after a step back', () => {
   assert.equal(STATUS.stepBack.en('0x00400024'), 'Stepped back · PC `0x00400024`');
-  assert.equal(STATUS.stepBack.ko('0x00400024'), '한 단계 되돌림 · PC `0x00400024`');
+  assert.equal(STATUS.stepBack.ko('0x00400024'), 'Stepped back · PC `0x00400024`'); // English in both
   assert.deepEqual(backKeys(true)[0], ['Shift+F10', 'Step back']);
   assert.ok(!backKeys(false).some(([k]) => k === 'Shift+F10'));
 });
