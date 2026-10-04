@@ -68,8 +68,7 @@ export const version: string = bundled
    with the binary). */
 export const LICENSES: { name: string; title: string }[] = [
   { name: 'LICENSE', title: 'Assembly Studio — BSD 3-Clause License' },
-  { name: 'NOTICE', title: 'NOTICE — SPIM, RARS, Java runtime, Electron, fonts, icons, brand assets' },
-  ...(brand.id === 'hallym' ? [{ name: 'hallym-assets.md', title: 'Hallym University assets (marks, characters, app icon)' }] : []),
+  { name: 'NOTICE', title: 'NOTICE — SPIM, RARS, Java runtime, Electron, fonts, icons' },
   { name: 'OFL-Pretendard.txt', title: 'Pretendard — SIL Open Font License 1.1' },
   { name: 'OFL-D2Coding.txt', title: 'D2Coding — SIL Open Font License 1.1' },
   { name: 'lucide-LICENSE.txt', title: 'Lucide icons — ISC License' },
@@ -81,7 +80,6 @@ export const LICENSES: { name: string; title: string }[] = [
 export const LICENSE_SOURCES: Record<string, string> = {
   'LICENSE': '../LICENSE',
   'NOTICE': '../NOTICE',
-  ...(brand.id === 'hallym' ? { 'hallym-assets.md': 'brands/hallym/assets/README.md' } : {}),
   'OFL-Pretendard.txt': 'src/renderer/assets/fonts/OFL-Pretendard.txt',
   'OFL-D2Coding.txt': 'src/renderer/assets/fonts/OFL-D2Coding.txt',
   'lucide-LICENSE.txt': 'src/renderer/assets/icons/lucide/LICENSE.txt',

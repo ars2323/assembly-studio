@@ -1,6 +1,6 @@
 /* Packages the app with electron-builder, for one brand (electron/brands/<id>/).
 
-     node tools/package.ts [--brand generic|hallym]          Windows: the NSIS installer (on Windows)
+     node tools/package.ts [--brand generic]                 Windows: the NSIS installer (on Windows)
      node tools/package.ts [--brand …] --dir                 this platform, unpacked only (a check)
 
    The brand defaults to $STUDIO_BRAND, else generic.  It gives the names

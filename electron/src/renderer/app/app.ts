@@ -110,7 +110,6 @@ let errors: { message: AssemblerMessage; line: number }[] = [];
 let saveNote = '';     // what Ctrl+S did with the file: shown until the first step
 let saveWarn = false;  // ...and whether it is a warning (not saved)
 let note = '';                          // a one-off word in the status bar (breakpoints)
-let exportNote = '';                    // the same, for an export that went well
 let crashNote = '';
 let progress: { pc: number; instructions: number } | null = null;
 let lastReason: RunResult['reason'] = 'limit';
@@ -163,8 +162,6 @@ const speedBox = h('span', { class: 'speedbox' }, h('span', { class: 'speedlabel
 const divider = (cls = ''): HTMLElement => h('span', { class: `tsep${cls ? ` ${cls}` : ''}`, 'aria-hidden': 'true' });
 const runctl = h('span', { class: 'runctl' }, bAssemble, divider(), bRun, speedBox, bStep, divider(), bRestart);
 const bSettings = iconButton('Settings', 'settings', () => settingsBox.open());
-// The assembled program as an executable image (.hmx): only a brand with brand.hmx shows it.
-const bExport = iconButton('Export executable image (.hmx)', 'file-output', () => void exportImage());
 const viewEditor = h('button', { type: 'button', role: 'tab' }, 'Editor');
 const viewRun = h('button', { type: 'button', role: 'tab' }, 'Run');
 viewEditor.addEventListener('click', () => showView('editor'));
@@ -181,7 +178,6 @@ const tools = h('span', { class: 'tools' },
   divider(),
   iconButton('New file', 'file-plus', () => void newFile()),
   iconButton('Open file (Ctrl+O)', 'folder-open', () => void openFile()),
-  bExport,
   divider(),
   bSettings);
 const toolbar = h('div', { class: 'toolbar', role: 'toolbar', 'aria-label': 'Toolbar' },
@@ -597,8 +593,6 @@ function renderChrome(): void {
   setBtn(bRun, open && (running || (runState !== 'finished' && runState !== 'input')), running);
   setBtn(bStep, open && !running && runState !== 'finished', current() && !running);
   setBtn(bRestart, lastGood !== null && !busy, false);
-  bExport.hidden = !open || !brand.hmx;
-  bExport.disabled = lastGood === null || busy;
   speedFast.classList.toggle('on', speed === 'fast');
   speedSlow.classList.toggle('on', speed === 'slow');
   speedFast.setAttribute('aria-checked', String(speed === 'fast'));
@@ -730,27 +724,11 @@ function renderStatus(): void {
     else if (!sameAdvanced(advanced, applied)) parts.push(cell('warn', 'Settings changed · Ctrl+S to apply'));
   }
   if (note) parts.push(cell('warn', note));
-  else if (exportNote) parts.push(cell('ok', exportNote));
   if (open && hints.length) parts.push(keys(...hints));
   status.replaceChildren(...parts, statusTheme);
 }
 
 // ---- files -------------------------------------------------------------------------
-
-// The program on the machine -- the last assembled, which Run and Step go
-// on with -- as an executable image, even when the Editor has changed since
-// (then the note says so).  Its source-sha256 is of that program's source.
-async function exportImage(): Promise<void> {
-  if (lastGood === null || busy) return;
-  const good = lastGood;
-  const changed = editor.text() !== good.source;
-  const r = await api.exportImage({ source: good.source, options: good.options, name: good.name, path: good.path, format: good.format,
-                                    assembled: (lastAssembly?.at ?? new Date()).getTime() }).catch((e: Error) => ({ error: e.message }));
-  if (r === null) return;
-  if ('error' in r) note = r.error;
-  else { note = ''; exportNote = `Saved ${changed ? 'the last assembled code ' : ''}as an executable image · ${r.name}`; }
-  renderStatus();
-}
 
 // Before another file takes the Editor's place.  Unsaved changes are always
 // asked about; a new file is asked about even when everything is saved --
@@ -973,7 +951,6 @@ async function assemble(source: string): Promise<boolean> {
   busy = true;
   let after: Signal | null = null;
   note = '';
-  exportNote = '';
   congrats.hidden = true;
   // An assemble that takes a while says so in the Assemble panel.
   const slowAssemble = setTimeout(() => { assembling = true; renderAssemble(); }, 150);
@@ -1124,7 +1101,6 @@ async function step(): Promise<void> {
 async function go(call: () => Promise<RunResult>): Promise<RunResult | null> {
   busy = true;
   note = '';
-  exportNote = '';
   congrats.hidden = true;
   const before = lastRegs;
   let result: RunResult;
@@ -1231,7 +1207,6 @@ async function restart(): Promise<void> {
   const good = lastGood;
   busy = true;
   note = '';
-  exportNote = '';
   congrats.hidden = true;
   [saveNote, saveWarn] = ['', false]; // Reset saves nothing
   try {

@@ -13,12 +13,6 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
-    inputs:
-      brand:
-        description: 'Brand (electron/brands/<id>)'
-        type: choice
-        options: [generic, hallym]
-        default: generic
 
 permissions:
   contents: write
@@ -40,7 +34,6 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # no code signing
-      STUDIO_BRAND: ${{ inputs.brand || 'generic' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -88,7 +81,7 @@ jobs:
           cat ../release-notes.md
           if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
             gh release create "$TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
-              --title "Assembly Studio $VERSION (trial $GITHUB_RUN_NUMBER, $STUDIO_BRAND)" --notes-file ../release-notes.md --latest=false
+              --title "Assembly Studio $VERSION (trial $GITHUB_RUN_NUMBER)" --notes-file ../release-notes.md --latest=false
           else
             gh release create "$TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --verify-tag \
               --title "Assembly Studio $VERSION" --notes-file ../release-notes.md --latest

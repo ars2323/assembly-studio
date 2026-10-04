@@ -11,5 +11,4 @@ export const brand: Brand = {
   mark: 'brand/mark.svg',
   markOnLight: 'brand/mark-black.svg',
   characters: false,
-  hmx: false,
 };
