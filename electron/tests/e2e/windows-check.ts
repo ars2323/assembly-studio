@@ -9,6 +9,7 @@
    for a person to look at:
 
      01-start          the first screen (maximised, as it opens)
+     01b-restored      the same after the title bar's own Maximise button restored it
      02-mips           MIPS: a sample assembled and stepped
      03-mips-light     the same in the light theme
      04-dialog         a question dialog over it (the caption buttons under the backdrop)
@@ -54,6 +55,20 @@ for (const isa of ['mips', 'riscv'] as const) {
     if (isa === 'mips') {
       await wait(10_000); // the board grows
       desktop('01-start');
+      // The caption buttons are the page's own (panels/caption.ts): they move the real window.
+      const maximized = () => r.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isMaximized());
+      const before = await maximized();
+      await r.page.locator('.cap-max').click(); await wait(800);
+      const restored = await maximized();
+      desktop('01b-restored');
+      await r.page.locator('.cap-max').click(); await wait(800);
+      const again = await maximized();
+      await r.page.locator('.cap-min').click(); await wait(800);
+      const minimized = await r.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isMinimized());
+      await r.app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows()[0]; w.restore(); w.focus(); });
+      await wait(800);
+      console.log(`caption buttons: maximised ${before} -> ${restored} -> ${again}; minimised ${minimized}`);
+      if (!before || restored || !again || !minimized) throw new Error('the caption buttons did not move the window');
     }
     const file = isa === 'mips' ? 'tests/samples/lab04-ok.s' : 'tests/riscv/samples/lab04-ok.s';
     await openAndAssemble(r, sample(r.dir, file, 'lab04.s'));
