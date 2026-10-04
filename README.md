@@ -17,6 +17,7 @@ installer includes the Java runtime that RARS needs, so there is nothing else to
 ## Contents
 
 - [Download and install](#download-and-install)
+- [Updates](#updates)
 - [First run](#first-run)
 - [Using Assembly Studio](#using-assembly-studio)
 - [Executable image export (.asx)](#executable-image-export-asx)
@@ -40,6 +41,18 @@ To uninstall, use Windows Settings › Apps.
 
 ![Assembly Studio running on Windows, with the taskbar visible](docs/images/windows.png)
 *Assembly Studio on Windows.*
+
+## Updates
+
+At launch, while the first screen opens, the program checks [Releases](../../releases) for a newer version (only
+the release marked Latest; trial pre-releases are never offered). If there is one, the first screen shows its
+download with a progress bar instead of the MIPS / RISC-V choice; when the download is complete, the program
+installs it silently and starts the new version. With no update, no connection or no answer within a few seconds,
+the first screen goes on as usual; a failed download is shown for a moment, then the first screen goes on.
+
+For maintainers: every release keeps its `latest.yml` and `.exe.blockmap` assets next to the installer
+(`release.yml` uploads them); installed copies read them to update. Do not delete the `engines-<hash>`
+pre-releases either: `release.yml` builds every installer from them.
 
 ## First run
 
