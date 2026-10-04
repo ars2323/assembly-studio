@@ -2,11 +2,13 @@
    window's classes, the Editor's lines through the host. */
 
 import type { Target, Tutorial } from './engine.ts';
+import { tr } from '../i18n.ts';
+import { STATUS } from '../messages/assemble.ts';
 
 export const $ = (sel: string): Element | null => document.querySelector(sel);
 export const $$ = (sel: string): Element[] => [...document.querySelectorAll(sel)];
 
-// A toolbar button by its data-tut (app.ts): assemble, run, step, reset.
+// A toolbar button by its data-tut (app.ts): assemble, run, step, stepback, reset.
 export const button = (name: string) => $(`[data-tut="${name}"]`);
 export const scrollIn = (el: Element | null | undefined) => el?.scrollIntoView({ block: 'center', inline: 'nearest' });
 
@@ -20,6 +22,12 @@ export const tab = (name: 'Text' | 'Data') => $$('.textpanel .ptab').find((b) =>
 // The status bar: its first cell (the state), the "Changed" cell, all of it.
 export const statusLead = () => $('.status .cell.lead') ?? $('.status');
 export const statusChanged = () => $('.status .cell.changed');
+// The status bar's word after a step back that undid a call that printed or read.
+export const statusBackIo = () => $$('.status .cell').find((e) => e.textContent === tr(STATUS.backIo)) ?? null;
+// The toolbar's icons at its right end: Tutorial, New file, Open file, Export, Settings.
+export const toolIcons = () => $$('.toolbar .tools .iconbtn');
+// An element only while it is on screen (a fold line with nothing folded is hidden).
+export const ifShown = (el: Element | null): Element[] => (el && (el as HTMLElement).checkVisibility?.() ? [el] : []);
 // The word at a label in Data.
 export const dataCell = (t: Tutorial, label: string) => {
   const a = t.host.labelAddress(label);

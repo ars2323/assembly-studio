@@ -1,8 +1,8 @@
 # RISC-V 튜토리얼 예제 (읽기 전용)
-# 5 + 7 을 계산해 메모리와 스택에 넣고, 결과를 출력합니다.
+# 5 + 7 을 계산해 메모리와 스택에 넣고, 입력받은 수를 더해 출력합니다.
 
         .data
-msg:    .string "sum = "        # 출력할 문자열
+msg:    .string "number? "      # 출력할 문자열
 total:  .word   0               # 계산 결과를 넣을 자리
 
         .text
@@ -21,9 +21,12 @@ main:
         li      a7, 4           # ecall 4: 문자열 출력
         la      a0, msg         # 출력할 문자열의 주소
         ecall
-        lw      a0, 0(sp)       # 스택에서 값을 꺼내
+        li      a7, 5           # ecall 5: 정수 입력 (읽은 수는 a0 에)
+        ecall
+        lw      t5, 0(sp)       # 스택에서 12 를 꺼내고
+        addi    sp, sp, 4       # 스택을 원래대로 돌려놓습니다
+        add     a0, a0, t5      # 입력받은 수에 더해
         li      a7, 1           # ecall 1: 정수 출력
         ecall
-        addi    sp, sp, 4       # 스택을 원래대로 돌려놓습니다
         li      a7, 10          # ecall 10: 프로그램 끝
         ecall

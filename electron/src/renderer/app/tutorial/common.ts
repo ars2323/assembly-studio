@@ -8,7 +8,8 @@ import type { Step, Tutorial } from './engine.ts';
 import { tr, type Msg } from '../i18n.ts';
 import { STEPS } from '../messages/tutorial.ts';
 import {
-  $, $$, button, gutterAndLine, labelTags, lines, pcLine, pinnedReg, reg, regCells, regShown, scrollIn, statusLead, tab, textOf, trow,
+  $, $$, button, gutterAndLine, ifShown, labelTags, lines, pcLine, pinnedReg, reg, regCells, regShown, scrollIn, statusBackIo, statusLead,
+  tab, textOf, toolIcons, trow,
 } from './targets.ts';
 
 // A register as the steps name it: its key in the Registers panel and its
@@ -16,12 +17,36 @@ import {
 export interface Reg { key: string; name: string }
 
 // The first line of both examples' code (li $t1, 5 / li t1, 5).
-const FIRST = /^\s+li\s+\$?t1, 5\b/;
+export const FIRST = /^\s+li\s+\$?t1, 5\b/;
 
 // The alias the student is asked for.
 const ALIAS = 'sum';
 
-// ---- 1 the screen ------------------------------------------------------------------------
+// The number the Console step types for the student (Skip), and the one it asks for.
+const NUMBER = '30';
+
+// ---- running the example on, quietly (prepare, skip) ----------------------------------------
+
+// Runs on (as F5 does) until the program waits for its line or has ended;
+// a red dot on the way is run past.
+async function runToInput(t: Tutorial): Promise<void> {
+  for (let i = 0; i < 4 && !t.host.waiting() && !t.host.finished(); i += 1) {
+    void t.host.run(); // (RISC-V's run is still on its way while it waits for the line)
+    await t.until(() => t.host.running(), 300);
+    await t.until(() => !t.host.running());
+  }
+}
+
+// The program run to its end, the number typed when it asks: the Console
+// holds its output.  `print`: the line from which it prints and reads.
+async function toEnd(t: Tutorial, print: RegExp): Promise<void> {
+  if (t.host.finished()) return;
+  await t.atLeast(print);
+  await runToInput(t);
+  if (t.host.waiting()) await t.host.input(NUMBER);
+}
+
+// ---- 1 a look around ---------------------------------------------------------------------
 
 export const welcome = (isa: string): Step => ({
   id: 'welcome', kind: 'explain', file: 'tutorial.s', view: 'editor',
@@ -39,7 +64,7 @@ export const editor = (): Step => ({
   reveal: (t) => t.host.revealLine(1),
 });
 
-// ---- 2 assemble ------------------------------------------------------------------------
+// ---- 2 assembling ------------------------------------------------------------------------
 
 export const assemble = (): Step => ({
   id: 'assemble', kind: 'practice', file: 'tutorial.s', view: 'editor', keys: ['Ctrl+S'],
@@ -56,18 +81,42 @@ export const assemble = (): Step => ({
   skip: async (t) => { await t.host.assemble(); },
 });
 
-export const textColumns = (): Step => ({
+// `kernel`: the ISA's Text has kernel instructions, folded away (MIPS).
+export const textColumns = (kernel: boolean): Step => ({
   id: 'text', kind: 'explain', file: 'tutorial.s', view: 'run', tab: 'text',
   title: () => tr(STEPS.text.title),
-  body: () => tr(STEPS.text.body),
-  // The column heads and the first line of the student's code; the card keeps off the rows.
-  targets: (t) => [$('.textpanel .theader'), trow(t.addr(FIRST))],
+  body: () => tr(STEPS.text.body, kernel),
+  // The column heads, the first line of the student's code and the fold
+  // line under the list; the card keeps off the rows.
+  targets: (t) => [$('.textpanel .theader'), trow(t.addr(FIRST)), ...(kernel ? ifShown($('.textpanel .fold')) : [])],
   avoid: () => [$('.textpanel .text')],
   prepare: async (t) => { if (!t.host.assembled()) await t.host.assemble(); t.column('text', 'word'); },
   reveal: (t) => t.host.revealAddr(t.addr(FIRST)),
 });
 
-// ---- 3 one line at a time ------------------------------------------------------------------
+// ---- 3 one line forward, one back ----------------------------------------------------------
+
+// `add`: the line that has just run (PC on `next`); `r` the register it changed.
+export const stepBack = (r: Reg, add: RegExp, next: RegExp): Step => ({
+  id: 'stepback', kind: 'practice', file: 'tutorial.s', view: 'run', keys: ['Shift+F10'],
+  title: () => tr(STEPS.stepback.title),
+  doing: () => tr(STEPS.stepback.doing),
+  body: () => tr(STEPS.stepback.body),
+  targets: () => [button('stepback'), reg(r.key)],
+  // The Editor's lines where the PC line goes back: the card keeps off them.
+  avoid: (t) => (t.host.narrow() ? [] : [lines(t, t.line(add), t.line(next))]),
+  prepare: async (t) => { if (t.host.pc() !== t.addr(next)) await t.exactly(next); },
+  reveal: (t) => t.host.revealRegister(r.key),
+  done: (_t, s) => (s.kind === 'back' ? 'next' : null),
+  result: { view: 'run',
+    title: () => tr(STEPS.stepback.result.title),
+    body: () => tr(STEPS.stepback.result.body, r.name),
+    targets: (t) => [reg(r.key), ...pcLine(t), statusLead()],
+    reveal: (t) => { t.host.revealRegister(r.key); if (!t.host.narrow()) t.host.revealLine(t.line(add)); } },
+  skip: async (t) => { await t.host.stepBack(); },
+});
+
+// ---- 4 Registers and the Inspector -------------------------------------------------------------
 
 export const hexDecBin = (r: Reg, after: RegExp): Step => ({
   id: 'radix', kind: 'explain', file: 'tutorial.s', view: 'run',
@@ -124,7 +173,25 @@ export const alias = (r: Reg, after: RegExp): Step => ({
   skip: async (t) => { withPin(t, r.key, ALIAS); },
 });
 
-// ---- 4 memory ------------------------------------------------------------------------------
+// A row of Text clicked: the Inspector stays on that instruction (`add`, run already: PC past `after`).
+export const inspect = (add: RegExp, after: RegExp): Step => ({
+  id: 'inspect', kind: 'practice', file: 'tutorial.s', view: 'run', tab: 'text', quietPc: true,
+  title: () => tr(STEPS.inspect.title),
+  doing: () => tr(STEPS.inspect.doing),
+  body: () => tr(STEPS.inspect.body),
+  targets: (t) => [trow(t.addr(add))],
+  prepare: async (t) => { await t.atLeast(after); },
+  reveal: (t) => t.host.revealAddr(t.addr(add)),
+  done: (t, s) => (s.kind === 'select' && s.addr === t.addr(add) ? 'next' : null),
+  result: { view: 'run', tab: 'text',
+    title: () => tr(STEPS.inspect.result.title),
+    body: () => tr(STEPS.inspect.result.body),
+    targets: () => [$('.insp .ititle'), $('.insp .bitgrid'), $('.insp .phead')],
+    avoid: (t) => [trow(t.addr(add))] },
+  skip: async (t) => { t.host.pin(t.addr(add)); },
+});
+
+// ---- 5 memory ------------------------------------------------------------------------------
 
 export const dataTab = (): Step => ({
   id: 'data', kind: 'practice', file: 'tutorial.s', view: 'run',
@@ -142,7 +209,7 @@ export const dataTab = (): Step => ({
   skip: async (t) => { t.host.setTab('data'); },
 });
 
-// ---- 5 running ----------------------------------------------------------------------------
+// ---- 6 controlling a run ---------------------------------------------------------------------
 
 export const breakpoint = (print: RegExp): Step => ({
   id: 'breakpoint', kind: 'practice', file: 'tutorial.s', view: 'editor',
@@ -156,6 +223,12 @@ export const breakpoint = (print: RegExp): Step => ({
   },
   reveal: (t) => t.host.revealLine(t.line(print)),
   done: (t, s) => (s.kind === 'breakpoint' && s.on && s.line === t.line(print) ? 'next' : null),
+  // The same dot in Text.
+  result: { tab: 'text',
+    title: () => tr(STEPS.breakpoint.result.title),
+    body: () => tr(STEPS.breakpoint.result.body),
+    targets: (t) => [...(t.host.narrow() ? [] : [gutterAndLine(t, t.line(print))]), trow(t.addr(print))],
+    reveal: (t) => { if (!t.host.narrow()) t.host.revealLine(t.line(print)); t.host.revealAddr(t.addr(print)); } },
   skip: async (t) => { await t.host.setBreakpointLine(t.line(print), true); },
 });
 
@@ -179,20 +252,6 @@ export const run = (print: RegExp): Step => ({
   skip: async (t) => { await t.host.run(); },
 });
 
-export const slow = (): Step => ({
-  id: 'slow', kind: 'practice', file: 'tutorial.s', keys: ['F5'],
-  title: () => tr(STEPS.slow.title),
-  doing: () => tr(STEPS.slow.doing),
-  body: () => tr(STEPS.slow.body),
-  targets: () => [$('.speedbox'), button('run')],
-  // The Editor's lines are what to watch: the card keeps off them.
-  avoid: (t) => (t.host.narrow() ? [] : [$('.editor-panel .cm-scroller')]),
-  prepare: async (t) => { await t.notFinished(); },
-  done: (_t, s) => (s.kind === 'slow-ended' ? 'next' : null),
-  skip: async (t) => { if (t.host.running()) await t.host.stop(); },
-  leave: async (t) => { if (t.host.running()) await t.host.stop(); await t.host.setSpeed('fast'); },
-});
-
 export const reset = (r: Reg): Step => ({
   id: 'reset', kind: 'practice', file: 'tutorial.s',
   title: () => tr(STEPS.reset.title),
@@ -209,23 +268,75 @@ export const reset = (r: Reg): Step => ({
   skip: async (t) => { await t.host.restart(); },
 });
 
-// ---- 6 output and errors ---------------------------------------------------------------------
+// From before `print` (the program reads nothing on the way), so that the run ends at the red dot or at Esc.
+export const slow = (print: RegExp): Step => ({
+  id: 'slow', kind: 'practice', file: 'tutorial.s', keys: ['F5'],
+  title: () => tr(STEPS.slow.title),
+  doing: () => tr(STEPS.slow.doing),
+  body: () => tr(STEPS.slow.body),
+  targets: () => [$('.speedbox'), button('run')],
+  // The Editor's lines are what to watch: the card keeps off them.
+  avoid: (t) => (t.host.narrow() ? [] : [$('.editor-panel .cm-scroller')]),
+  // From the first line of `main` (MIPS's start-up code is not the Editor's: no PC line there).
+  prepare: async (t) => {
+    await t.notFinished();
+    const pc = t.host.pc() ?? 0;
+    if (pc >= t.addr(print) && pc < 0x80000000) await t.host.restart();
+    await t.atLeast(FIRST);
+  },
+  done: (_t, s) => (s.kind === 'slow-ended' ? 'next' : null),
+  skip: async (t) => { if (t.host.running()) await t.host.stop(); },
+  leave: async (t) => { if (t.host.running()) await t.host.stop(); await t.host.setSpeed('fast'); },
+});
 
-// `call`: the line that prints msg (its regular expression), and how the step says it (the ISA's messages).
-export const console = (call: RegExp, say: Msg, printed: Msg): Step => ({
-  id: 'console', kind: 'practice', file: 'tutorial.s', view: 'run', keys: ['F5'],
-  title: () => tr(STEPS.console.title),
-  doing: () => tr(STEPS.console.doing),
-  body: (t) => tr(STEPS.console.body, t.host.narrow(), t.line(call), tr(say)),
-  targets: (t) => [...(t.host.narrow() ? [] : [lines(t, t.line(call))]), $('.console')],
-  prepare: async (t) => { await t.notFinished(); if (t.host.expandConsole()) t.did.push('console opened'); },
-  reveal: (t) => { if (!t.host.narrow()) t.host.revealLine(t.line(call)); },
-  done: (_t, s) => (s.kind === 'stopped' && (s.reason === 'exit' || s.reason === 'error') ? 'next' : null),
+// ---- 7 input, output and errors ----------------------------------------------------------------
+
+/* Run, the program prints and waits for a number (phase 0); typed and
+   Enter, it adds, prints and ends (phase 1).  `print`: the first line that
+   prints; `read`: the line that asks for the number; `says`: how the ISA
+   prints and reads (its messages). */
+export const consoleIo = (print: RegExp, read: RegExp, says: Msg): Step => ({
+  id: 'console', kind: 'practice', file: 'tutorial.s', view: 'run', phases: 2,
+  keys: (t) => (t.phase === 0 ? ['F5'] : []),
+  title: (t) => tr(STEPS.console.title, t.phase),
+  doing: (t) => tr(STEPS.console.doing, t.phase),
+  body: (t) => tr(STEPS.console.body, t.phase, tr(says)),
+  targets: (t) => (t.phase === 0 ? [button('run'), $('.console')] : [$('.console .cinrow')]),
+  // What the program printed is what to read before typing: the card keeps off it.
+  avoid: (t) => (t.phase === 1 ? [$('.console .clog')] : []),
+  prepare: async (t) => {
+    await t.between(print, read);
+    if (t.host.expandConsole()) t.did.push('console opened');
+  },
+  done: (t, s) => (s.kind !== 'stopped' ? null
+    : t.phase === 0 ? (s.reason === 'input' ? 'phase' : null)
+    : s.reason === 'exit' || s.reason === 'error' ? 'next' : null),
   result: { view: 'run',
     title: () => tr(STEPS.console.result.title),
-    body: () => tr(STEPS.console.result.body, tr(printed)),
-    targets: () => [$('.console .clog'), statusLead()] },
-  skip: async (t) => { for (let i = 0; i < 3 && !t.host.finished(); i += 1) await t.host.run(); },
+    body: () => tr(STEPS.console.result.body),
+    targets: () => [$('.console .clog'), $('.console .phead .hbtn'), statusLead()] },
+  skip: async (t) => {
+    if (t.phase === 0) await runToInput(t);
+    else await t.host.input(NUMBER);
+  },
+});
+
+// Step back over the end: `exit` (the line that asks for the end) and the
+// `call` that printed are undone; the Console keeps what was printed.
+export const undoIo = (print: RegExp, exit: string, call: string): Step => ({
+  id: 'undo', kind: 'practice', file: 'tutorial.s', view: 'run', keys: ['Shift+F10'],
+  title: () => tr(STEPS.undo.title),
+  doing: () => tr(STEPS.undo.doing),
+  body: () => tr(STEPS.undo.body, exit, call),
+  targets: () => [button('stepback'), $('.console .clog')],
+  avoid: (t) => (t.host.narrow() ? [] : [$('.editor-panel .cm-scroller')]),
+  prepare: async (t) => { await toEnd(t, print); if (t.host.expandConsole()) t.did.push('console opened'); },
+  done: (_t, s) => (s.kind === 'back' && s.io ? 'next' : null),
+  result: { view: 'run',
+    title: () => tr(STEPS.undo.result.title),
+    body: () => tr(STEPS.undo.result.body),
+    targets: () => [$('.console .clog'), statusBackIo()] },
+  skip: async (t) => { for (let i = 0; i < 4 && !statusBackIo(); i += 1) await t.host.stepBack(); },
 });
 
 export const error = (): Step => ({
@@ -262,7 +373,31 @@ export const fixLine = (): Step => ({
   reveal: (t) => { const n = t.host.errorLine(); if (n) t.host.revealLine(n); },
 });
 
-// ---- 7 your own screen ------------------------------------------------------------------------
+// ---- 8 writing your own --------------------------------------------------------------------------
+
+export const tools = (): Step => ({
+  id: 'tools', kind: 'explain', file: 'tutorial.s',
+  title: () => tr(STEPS.tools.title),
+  body: () => tr(STEPS.tools.body),
+  targets: () => toolIcons(),
+  prepare: async (t) => { if (!t.host.assembled()) await t.host.assemble(); },
+});
+
+export const editing = (): Step => ({
+  id: 'editing', kind: 'explain', file: 'tutorial.s', view: 'editor',
+  title: () => tr(STEPS.editing.title),
+  body: () => tr(STEPS.editing.body),
+  targets: (t) => [$('.editor-panel .phead'), lines(t, t.line(FIRST), t.line(FIRST) + 3)],
+  reveal: (t) => t.host.revealLine(t.line(FIRST)),
+});
+
+// `advanced`: the ISA's Settings has Advanced (MIPS).
+export const settings = (advanced: boolean): Step => ({
+  id: 'settings', kind: 'explain', file: 'tutorial.s',
+  title: () => tr(STEPS.settings.title),
+  body: () => tr(STEPS.settings.body, advanced),
+  targets: () => toolIcons().slice(-1),
+});
 
 export const separators = (): Step => ({
   id: 'separators', kind: 'explain', file: 'tutorial.s', view: 'run',
@@ -273,11 +408,11 @@ export const separators = (): Step => ({
   prepare: async (t) => { if (!t.host.assembled()) await t.host.assemble(); },
 });
 
-export const theme = (): Step => ({
-  id: 'theme', kind: 'explain', file: 'tutorial.s',
-  title: () => tr(STEPS.theme.title),
-  body: () => tr(STEPS.theme.body),
-  targets: () => [$('.status .stheme .theme-switch')],
+export const switches = (): Step => ({
+  id: 'switches', kind: 'explain', file: 'tutorial.s',
+  title: () => tr(STEPS.switches.title),
+  body: () => tr(STEPS.switches.body),
+  targets: () => [$('.status .stheme .lang-switch'), $('.status .stheme .theme-switch')],
 });
 
 export const end = (): Step => ({
