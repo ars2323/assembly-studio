@@ -23,6 +23,8 @@ import { hex32 } from '../../../../core/format.ts';
 import { immediateLine, meaningOf, pieceName, pieceSource } from '../../core/instruction-text.ts';
 import { code, codeText, h } from '../../../../renderer/app/dom.ts';
 import { notice } from '../../../../renderer/app/notice.ts';
+import { currentLang, onLang, tr } from '../../../../renderer/app/i18n.ts';
+import { INSPECTOR } from '../../../../renderer/app/messages/inspector.ts';
 import { bitGrid, explanation, fieldTable, inspectorHead, prose, type FieldView } from '../../../../renderer/app/panels/inspector.ts';
 import type { TextRow } from '../logic/machine.ts';
 import { headButton, panelHead, type Head } from '../../../../renderer/app/ui.ts';
@@ -39,7 +41,8 @@ export class Inspector {
 
   constructor() {
     this.head = panelHead('Inspector');
-    this.follow = headButton('Follow PC', '다시 PC 위치의 명령을 따라갑니다 (Esc)', () => this.onFollow());
+    this.follow = headButton('Follow PC', tr(INSPECTOR.follow), () => this.onFollow());
+    onLang(() => { this.follow.title = tr(INSPECTOR.follow); });
     this.head.aside.append(this.follow);
     this.body = h('div', { class: 'pbody ibody' });
     this.root = h('section', { class: 'panel insp', 'aria-label': 'Inspector' }, this.head.root, this.body);
@@ -66,9 +69,7 @@ export class Inspector {
     if (!d.fields) {
       this.body.replaceChildren(head, explanation({
         title: `${format} format`,
-        sentence: format === 'R4'
-          ? '`fmadd.s` 같은 Fused multiply-add 명령의 R4 format은 Field로 나누어 보여 주지 않습니다.'
-          : 'RV32 명령 형식 어디에도 맞지 않는 Word입니다.',
+        sentence: tr(format === 'R4' ? INSPECTOR.r4 : INSPECTOR.noFormat),
       }, false));
       return;
     }
@@ -88,9 +89,9 @@ export class Inspector {
       const k = parts && f.cls === 'f-imm' ? pieceAt(f.high - i) : 0;
       return k ? `pk p${k}` : '';
     });
-    const imm = immediateLine(d, parts);
+    const imm = immediateLine(d, parts, currentLang());
     this.body.replaceChildren(head, grid, ...(parts ? [immediateRow(parts)] : []),
-      explanation(explain(d, x, row.addr), d.name !== '', imm ? h('div', { class: 'note' }, prose(imm)) : null),
+      explanation(explain(d, x, row.addr, currentLang()), d.name !== '', imm ? h('div', { class: 'note' }, prose(imm)) : null),
       fieldTable(fields));
   }
 

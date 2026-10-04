@@ -4,7 +4,9 @@
 
 import type { AboutInfo } from '../api.ts';
 import { brand } from '../../../brand.ts';
-import { code, h, markImg } from '../dom.ts';
+import { code, codeText, h, markImg } from '../dom.ts';
+import { tr } from '../i18n.ts';
+import { DIALOGS } from '../messages/dialogs.ts';
 
 // `engine`: what the simulator is built on, in About's first tab (the ISA's engine).
 export function aboutDialog(engine: (info: AboutInfo) => (string | Node)[] = () => ['Simulator engine: SPIM ', code('9.1.24'), ' by James R. Larus (BSD)']):
@@ -22,7 +24,7 @@ export function aboutDialog(engine: (info: AboutInfo) => (string | Node)[] = () 
           h('div', { class: 'about-id' }, markImg('about-mark'),
             h('div', {}, h('div', { class: 'about-name' }, brand.name), h('div', { class: 'about-ver' }, 'Version ', code(info.version)), h('div', { class: 'about-by' }, 'Made by ', brand.author))),
           h('p', {}, ...engine(info)),
-          h('p', { class: 'hint' }, brand.about),
+          h('p', { class: 'hint' }, tr(brand.about)),
           h('p', { class: 'hint' }, 'Electron ', code(info.electron), ' · Chromium ', code(info.chrome), ' · Node.js ', code(info.node)));
       } else {
         const list = h('div', { class: 'licenses' });
@@ -37,8 +39,7 @@ export function aboutDialog(engine: (info: AboutInfo) => (string | Node)[] = () 
         });
         const credits = h('button', { class: 'btn small', type: 'button' }, 'Open the Chromium · Node.js notices (LICENSES.chromium.html)');
         credits.addEventListener('click', () => void window.app.openCredits());
-        list.append(h('p', { class: 'hint' }, 'Chromium · Node.js 고지(그 안의 라이브러리 포함)는 설치 폴더에 있습니다: ',
-          code('LICENSES.chromium.html'), ' (약 20 MB)'), credits);
+        list.append(h('p', { class: 'hint' }, codeText(tr(DIALOGS.about.credits))), credits);
         body.replaceChildren(list);
       }
     };

@@ -19,6 +19,8 @@ import { explain, type Explanation } from '../../../core/explain.ts';
 import { hex32 } from '../../../core/format.ts';
 import { instructionDetailLines, instructionNoteLines, meaningOf } from '../../../core/instruction-text.ts';
 import { code, codeText, h } from '../dom.ts';
+import { currentLang, onLang, tr } from '../i18n.ts';
+import { INSPECTOR } from '../messages/inspector.ts';
 import { notice } from '../notice.ts';
 import type { TextRow } from '../logic/machine.ts';
 import { headButton, panelHead, type Head } from '../ui.ts';
@@ -32,7 +34,8 @@ export class Inspector {
 
   constructor() {
     this.head = panelHead('Inspector');
-    this.follow = headButton('Follow PC', '다시 PC 위치의 명령을 따라갑니다 (Esc)', () => this.onFollow());
+    this.follow = headButton('Follow PC', tr(INSPECTOR.follow), () => this.onFollow());
+    onLang(() => { this.follow.title = tr(INSPECTOR.follow); });
     this.head.aside.append(this.follow);
     this.body = h('div', { class: 'pbody ibody' });
     this.root = h('section', { class: 'panel insp', 'aria-label': 'Inspector' }, this.head.root, this.body);
@@ -64,13 +67,14 @@ export class Inspector {
         meaning: meaningOf(f, d),
       };
     });
-    const note = instructionNoteLines(d, convention)[0];
+    // The note comes in both languages (Korean, then English).
+    const note = instructionNoteLines(d, convention)[currentLang() === 'en' ? 1 : 0];
     // "Dest = PC + (offset×4) = 0x..." for a branch or a jump.
     const dest = instructionDetailLines(d, row.addr, row.disassembly, '', convention).slice(7);
     this.body.replaceChildren(
       inspectorHead(row, formatName(d.format)),
       bitGrid(fields),
-      explanation(explain(d, general, row.addr), d.known,
+      explanation(explain(d, general, row.addr, currentLang()), d.known,
         note ? h('div', { class: 'note' }, note) : null,
         dest.length ? h('pre', { class: 'dest mono' }, dest.join('\n')) : null),
       fieldTable(fields));

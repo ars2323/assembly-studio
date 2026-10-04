@@ -11,9 +11,13 @@
 
    A file's name is never part of the sentence (no particle after a name:
    "lab04.s 은" reads wrong whatever the name); it stands on a line of its
-   own, "File: lab04.s". */
+   own, "File: lab04.s".  The words are the caller's, in the language in use
+   (messages/dialogs.ts); the language cannot change while a question is up
+   (the page behind it is inert). */
 
 import { code, h } from '../dom.ts';
+import { tr } from '../i18n.ts';
+import { DIALOGS } from '../messages/dialogs.ts';
 
 export interface Question {
   title: string;
@@ -27,7 +31,7 @@ export interface Question {
 export function ask(q: Question): Promise<boolean> {
   return new Promise((answer) => {
     const ok = h('button', { class: `btn ${q.danger ? 'danger' : 'primary'}`, type: 'button' }, q.ok);
-    const cancel = h('button', { class: 'btn', type: 'button' }, q.cancel ?? '취소');
+    const cancel = h('button', { class: 'btn', type: 'button' }, q.cancel ?? tr(DIALOGS.cancel));
     const dialog = h('dialog', { class: 'modal ask', 'aria-label': q.title },
       h('div', { class: 'asktext' }, h('h2', {}, q.title),
         q.file ? h('p', { class: 'askfile' }, 'File: ', code(q.file)) : null, h('p', {}, q.body)),

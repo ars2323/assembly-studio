@@ -3,6 +3,7 @@
 
      Font size        the code font, the UI font follows (Ctrl +/- too)
      Data radix       the base the Data tab shows its words in
+     Language         KO / EN (renderer/app/i18n.ts)
 
    (MIPS's dialog also has Advanced: SPIM's machine options, run arguments
    and exception handler.  RARS's own options -- pseudo instructions, start
@@ -11,6 +12,9 @@
    here until they are.) */
 
 import { code, h } from '../../../../renderer/app/dom.ts';
+import { onLang, tr } from '../../../../renderer/app/i18n.ts';
+import { SETTINGS } from '../../../../renderer/app/messages/settings.ts';
+import { languageControl } from '../../../../renderer/app/panels/settings.ts';
 
 export interface SettingsEvents {
   fontSize(): number;
@@ -22,6 +26,7 @@ export interface SettingsEvents {
 
 export function settingsDialog(events: SettingsEvents): { root: HTMLDialogElement; open(): void } {
   const dialog = h('dialog', { class: 'modal settings', 'aria-label': 'Settings' });
+  onLang(() => { if (dialog.open) render(); });
 
   const render = () => {
     const size = code(`${events.fontSize()}px`, 'value');
@@ -49,9 +54,11 @@ export function settingsDialog(events: SettingsEvents): { root: HTMLDialogElemen
     dialog.replaceChildren(
       h('h2', {}, 'Settings'),
       h('div', { class: 'prow' }, h('span', {}, 'Font size'), h('span', { class: 'grow' }), minus, size, plus),
-      h('small', { class: 'hint' }, '이번 실행에만 적용됩니다. Ctrl + / Ctrl − / Ctrl 0 키로도 바꿀 수 있습니다.'),
+      h('small', { class: 'hint' }, tr(SETTINGS.fontSize)),
       h('div', { class: 'prow' }, h('span', {}, 'Data radix'), h('span', { class: 'grow' }), bases),
-      h('small', { class: 'hint' }, 'Data 탭의 값을 이 진법으로 보여 줍니다. 이번 실행에만 적용됩니다.'),
+      h('small', { class: 'hint' }, tr(SETTINGS.dataRadix)),
+      h('div', { class: 'prow' }, h('span', {}, 'Language'), h('span', { class: 'grow' }), languageControl()),
+      h('small', { class: 'hint' }, tr(SETTINGS.language)),
       h('div', { class: 'row' }, aboutButton, h('span', { class: 'grow' }), close));
   };
   return { root: dialog, open: () => { render(); dialog.showModal(); } };

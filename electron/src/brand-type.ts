@@ -9,7 +9,7 @@ export interface Brand {
   exe: string;           // executable, temp folder (no blanks)
   appId: string;         // Windows AppUserModelId, electron-builder appId
   wordmark: string;      // under the mark on the first screen
-  about: string;         // About's one line about the program
+  about: { ko: string; en: string }; // About's one line about the program, in both languages (core/lang.ts)
   author: string;        // who made it: About ("Made by …"), the package's author
   mark: string;          // under src/renderer/assets/ (asset()): on the dark theme
   markOnLight: string;   // the same, on the light theme
