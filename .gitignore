@@ -20,3 +20,4 @@ electron/src/renderer/assets/brand/
 .vscode/
 .claude/worktrees/
 review/
+probe/build/

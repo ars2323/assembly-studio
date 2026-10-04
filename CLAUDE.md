@@ -9,7 +9,7 @@ MIPS(SPIM)와 RISC-V(RARS) 어셈블리 시뮬레이터. 실행하면 ISA 를 �
 |---|---|
 | `CPU/` | SPIM 코어. **고치지 않는다** |
 | `probe/` | RARS 래퍼(`RarsProbe.java`). RARS 자체는 고정 커밋에서 빌드하고 **고치지 않는다** |
-| `electron/src` | 앱 (main, renderer, core, sim) |
+| `electron/src` | 앱 (main, renderer, core, sim). MIPS 는 `core/ sim/ renderer/app/`, RISC-V 만의 것은 `isa/riscv/` |
 | `electron/native` | SPIM N-API 애드온 |
 | `electron/brands/<id>` | 브랜드(`generic`, `hallym`): 이름, appId, 마크, 아이콘, 설치 관리자 그림 |
 | `engines/`, `.github/workflows/` | 엔진 빌드(`engines.yml`)와 배포(`release.yml`) |
@@ -20,8 +20,12 @@ MIPS(SPIM)와 RISC-V(RARS) 어셈블리 시뮬레이터. 실행하면 ISA 를 �
     npm run brand [generic|hallym]   # 브랜드 배치 (src/brand.ts, src/renderer/assets/brand/ 생성)
     npm run typecheck
     npm test                     # core 단위 테스트
-    npm run electron             # 앱 실행
-    xvfb-run -a -s '-screen 0 2400x1400x24' npm run shot -- <out-dir> [width]   # 화면 캡처
+    npm run electron [-- --isa=riscv]   # 앱 실행 (기본 MIPS)
+    xvfb-run -a -s '-screen 0 2400x1400x24' npm run shot -- <out-dir> [width] [--isa riscv]   # 화면 캡처
+
+RISC-V 엔진 (저장소 루트): `bash probe/setup.sh` (RARS 를 `~/.cache/assembly-studio/rars` 에 받아 빌드),
+`bash probe/run.sh build` (RarsProbe → `probe/build/classes`). JDK 21 이 PATH 에 있어야 한다.
+`electron/engine/{runtime,rars.jar,classes}` 가 있으면 그것을 먼저 쓴다.
 
 ## 지킬 것
 
