@@ -301,8 +301,9 @@ License:    SIL Open Font License, Version 1.1
 Copyright:  Copyright (c) 2015, NAVER Corporation (https://www.navercorp.com),
             with Reserved Font Names D2Coding and D2Coding-Bold.
             https://github.com/naver/d2codingfont
-Used for:   The monospaced font for code, registers and memory, converted to
-            WOFF2.
+Used for:   The monospaced font for code, registers and memory. Only the file
+            format was changed (to WOFF2); the glyphs and names are as
+            published.
 Files:      electron/src/renderer/assets/fonts/D2Coding.woff2
 Full text:  electron/src/renderer/assets/fonts/OFL-D2Coding.txt;
             About > Licenses > "D2Coding — SIL Open Font License 1.1".
