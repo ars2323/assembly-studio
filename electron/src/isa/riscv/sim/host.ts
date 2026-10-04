@@ -24,7 +24,7 @@ import { EventEmitter } from 'node:events';
 import { PROTOCOL, type CallName, type Calls, type EngineMessage, type RunReply } from './protocol.ts';
 import type { ExitInfo, Transport, TransportFactory } from './transport.ts';
 
-export const CRASH_MESSAGE = '시뮬레이터 엔진이 멈췄습니다';
+export const CRASH_MESSAGE = 'The simulator engine stopped';
 
 export type EngineState = 'starting' | 'ready' | 'restarting' | 'dead';
 
@@ -136,7 +136,7 @@ export class Simulator extends EventEmitter<SimulatorEvents> {
             clearTimeout(timer);
             if (ev.protocol !== PROTOCOL) {
               // An engine from another build: never talk to it (8.5).
-              this.die(`엔진의 프로토콜 버전(${ev.protocol})이 앱(${PROTOCOL})과 다릅니다 — 설치가 깨졌습니다`);
+              this.die(`The engine speaks protocol ${ev.protocol}, the app ${PROTOCOL}: the installation is broken.`);
               transport.kill();
               failReady(new EngineDead(this.deadReason));
               return;
@@ -184,8 +184,8 @@ export class Simulator extends EventEmitter<SimulatorEvents> {
     const giveUp = exit.spawnError !== undefined || !this.restartOnCrash || this.crashes.length > this.maxCrashes;
     if (giveUp) {
       const reason = exit.spawnError
-        ? `시뮬레이터 엔진(Java)을 시작할 수 없습니다: ${exit.spawnError}`
-        : `시뮬레이터 엔진이 ${this.crashes.length}번 멈춰 다시 시작하지 않습니다 (${cause})`;
+        ? `The simulator engine (Java) cannot start: ${exit.spawnError}.`
+        : `The simulator engine stopped ${this.crashes.length} times and is not restarted (${cause}).`;
       this.die(reason);
       this.emit('crashed', { message: CRASH_MESSAGE, cause, restarted: false });
       return;

@@ -130,3 +130,23 @@ export function nearMiss(sourceLine: string, flagged: string | null = null): Nea
   }
   return null;
 }
+
+/* The slip a line shows, as a hint under RARS's message in the Assemble
+   panel: a name a letter or two from one RARS knows, a register that does
+   not exist, a MIPS habit.  RARS names the word it could not take ('"spp":
+   operand is of incorrect type'); only that word is guessed at as a
+   misspelt register.  `code` in backticks (the window sets it in the code
+   font).  Nothing to name: ''. */
+export function rarsHint(message: string, source: string): string {
+  const flagged = /^"([^"]+)"/.exec(message)?.[1] ?? null;
+  const near = nearMiss(source, flagged);
+  if (near?.why === 'spelling') return `No ${near.kind} \`${near.token}\`. Did you mean \`${near.meant}\`?`;
+  if (near?.why === 'no-such-register') return `No register \`${near.token}\`. The \`${near.family}\` registers are \`${near.range}\`.`;
+  if (near?.why === 'mips' && near.token.startsWith('$')) {
+    return findRegister(near.meant)
+      ? `RISC-V register names have no \`$\`: \`${near.token}\` → \`${near.meant}\`.`
+      : `RISC-V register names have no \`$\`, and \`${near.meant}\` is a MIPS register. The system call number goes in \`a7\`.`;
+  }
+  if (near?.why === 'mips') return `\`${near.token}\` is a MIPS instruction. RISC-V uses \`${near.meant}\`.`;
+  return '';
+}

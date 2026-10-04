@@ -175,7 +175,7 @@ async function main(): Promise<void> {
         target = r.filePath;
       }
       const encoded = encodeTextFile(file.text, file.format ?? NEW_FILE_FORMAT);
-      if (!encoded.ok) throw new Error(`${encoded.firstBadLine}행의 글자는 이 파일의 인코딩(${file.format?.encoding})으로 저장할 수 없습니다`);
+      if (!encoded.ok) throw new Error(`Not saved: line ${encoded.firstBadLine} has characters the file's encoding (${file.format?.encoding}) cannot hold`);
       writeFileSync(target, encoded.bytes);
       return { path: target, name: path.basename(target) };
     }));
