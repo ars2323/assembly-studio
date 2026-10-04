@@ -56,15 +56,15 @@ test('labels, strings, numbers and comments are not looked at', () => {
 
 test('the hint under an assembler message: what is wrong, no guess, in both languages', () => {
   const both = (message: string, line: string) => [assemblerHint(message, line, 'ko'), assemblerHint(message, line, 'en')];
-  assert.deepEqual(both('syntax error', '    lii $v0, 10'), ['`lii` 라는 명령은 없습니다.', 'There is no instruction `lii`.']);
-  assert.deepEqual(both('syntax error', '    srll $t1, $t0, 2'), ['`srll` 라는 명령은 없습니다.', 'There is no instruction `srll`.']);
-  assert.deepEqual(both('syntax error', '    .global main'), ['`.global` 라는 지시어는 없습니다.', 'There is no directive `.global`.']);
+  assert.deepEqual(both('syntax error', '    lii $v0, 10'), ['명령어를 확인해 주세요: `lii`', 'Check the instruction: `lii`']);
+  assert.deepEqual(both('syntax error', '    srll $t1, $t0, 2'), ['명령어를 확인해 주세요: `srll`', 'Check the instruction: `srll`']);
+  assert.deepEqual(both('syntax error', '    .global main'), ['지시어를 확인해 주세요: `.global`', 'Check the directive: `.global`']);
   assert.deepEqual(both('syntax error', '    li $s10, 1'),
-    ['`$s10` 라는 레지스터는 없습니다. `$s` 레지스터는 `$s0–$s7` 입니다.', 'There is no register `$s10`. The `$s` registers are `$s0–$s7`.']);
-  assert.deepEqual(both('syntax error', '    lw $t0, 0($spp)'), ['`$spp` 라는 레지스터는 없습니다.', 'There is no register `$spp`.']);
+    ['레지스터 이름을 확인해 주세요: `$s10`. `$s` 레지스터는 `$s0–$s7` 입니다.', 'Check the register name: `$s10`. The `$s` registers are `$s0–$s7`.']);
+  assert.deepEqual(both('syntax error', '    lw $t0, 0($spp)'), ['레지스터 이름을 확인해 주세요: `$spp`', 'Check the register name: `$spp`']);
   assert.deepEqual(both('syntax error', '    add t0, $t1, $t2'), ['레지스터 이름은 `$` 로 시작합니다.', 'Register names start with `$`.']);
   assert.deepEqual(both('syntax error', '    add $t0 $t1'),
-    ['명령 이름, 레지스터 이름(`$t0` 처럼), 쉼표를 확인하세요.', 'Check the instruction name, the register names (like `$t0`) and the commas.']);
+    ['명령어 이름, 레지스터 이름(`$t0` 처럼), 쉼표를 확인해 주세요.', 'Check the instruction name, the register names (like `$t0`) and the commas.']);
   assert.equal(assemblerHint('Label is defined for the second time', 'main:', 'en'), 'Two labels have this name. Rename one of them.');
   assert.equal(assemblerHint('Immediate value is too large for field', 'addi $t0, $t0, 0x12345', 'en'),
     'The value is too big for this instruction. Put it in a register with `li` first.');

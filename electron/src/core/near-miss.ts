@@ -36,28 +36,28 @@ export type NearMiss =
    (isa/riscv/core/near-miss.ts) where they say the same thing. */
 export const HINTS = {
   unknown: {
-    instruction: { ko: (t: string) => `\`${t}\` 라는 명령은 없습니다.`, en: (t: string) => `There is no instruction \`${t}\`.` },
-    directive: { ko: (t: string) => `\`${t}\` 라는 지시어는 없습니다.`, en: (t: string) => `There is no directive \`${t}\`.` },
+    instruction: { ko: (t: string) => `명령어를 확인해 주세요: \`${t}\``, en: (t: string) => `Check the instruction: \`${t}\`` },
+    directive: { ko: (t: string) => `지시어를 확인해 주세요: \`${t}\``, en: (t: string) => `Check the directive: \`${t}\`` },
   },
-  unknownRegister: { ko: (t: string) => `\`${t}\` 라는 레지스터는 없습니다.`, en: (t: string) => `There is no register \`${t}\`.` },
+  unknownRegister: { ko: (t: string) => `레지스터 이름을 확인해 주세요: \`${t}\``, en: (t: string) => `Check the register name: \`${t}\`` },
   noSuchRegister: {
-    ko: (t: string, family: string, range: string) => `\`${t}\` 라는 레지스터는 없습니다. \`${family}\` 레지스터는 \`${range}\` 입니다.`,
-    en: (t: string, family: string, range: string) => `There is no register \`${t}\`. The \`${family}\` registers are \`${range}\`.`,
+    ko: (t: string, family: string, range: string) => `레지스터 이름을 확인해 주세요: \`${t}\`. \`${family}\` 레지스터는 \`${range}\` 입니다.`,
+    en: (t: string, family: string, range: string) => `Check the register name: \`${t}\`. The \`${family}\` registers are \`${range}\`.`,
   },
   missingDollar: { ko: '레지스터 이름은 `$` 로 시작합니다.', en: 'Register names start with `$`.' },
   // What a message's kind usually needs, when the line shows nothing more.
   syntax: {
-    ko: '명령 이름, 레지스터 이름(`$t0` 처럼), 쉼표를 확인하세요.',
+    ko: '명령어 이름, 레지스터 이름(`$t0` 처럼), 쉼표를 확인해 주세요.',
     en: 'Check the instruction name, the register names (like `$t0`) and the commas.',
   },
-  twice: { ko: '같은 이름의 Label 이 둘 있습니다. 하나의 이름을 바꾸세요.', en: 'Two labels have this name. Rename one of them.' },
+  twice: { ko: '같은 이름의 Label 이 둘 있습니다. 하나의 이름을 바꿔 주세요.', en: 'Two labels have this name. Rename one of them.' },
   shift: { ko: '시프트 양은 0 부터 31 까지입니다.', en: 'A shift amount is 0 to 31.' },
   tooLarge: {
-    ko: '이 명령에 넣기에는 값이 너무 큽니다. 먼저 `li` 로 레지스터에 넣으세요.',
+    ko: '이 명령에 넣기에는 값이 너무 큽니다. 먼저 `li` 로 레지스터에 넣어 주세요.',
     en: 'The value is too big for this instruction. Put it in a register with `li` first.',
   },
   undefined: {
-    ko: '쓰였지만 정의되지 않은 이름입니다. 철자와 `.globl` 을 확인하세요.',
+    ko: '쓰였지만 정의되지 않은 이름입니다. 철자와 `.globl` 을 확인해 주세요.',
     en: 'This name is used but never defined. Check its spelling and `.globl`.',
   },
 };

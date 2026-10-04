@@ -34,13 +34,13 @@ export type NearMiss =
 // RISC-V's own hints; the rest are MIPS's (core/near-miss.ts HINTS).
 export const RISCV_HINTS = {
   mipsInstruction: {
-    ko: (t: string) => `\`${t}\` 은 MIPS 명령입니다. RISC-V 에는 이 명령이 없습니다.`,
-    en: (t: string) => `\`${t}\` is a MIPS instruction. RISC-V has no such instruction.`,
+    ko: (t: string) => `RISC-V 명령어를 확인해 주세요. MIPS 명령어입니다: \`${t}\``,
+    en: (t: string) => `Check the RISC-V instruction. This is a MIPS one: \`${t}\``,
   },
   dollar: { ko: 'RISC-V 레지스터 이름에는 `$` 가 붙지 않습니다.', en: 'RISC-V register names have no `$`.' },
   mipsRegister: {
-    ko: (bare: string) => `RISC-V 레지스터 이름에는 \`$\` 가 붙지 않고, \`${bare}\` 은 MIPS 레지스터입니다.`,
-    en: (bare: string) => `RISC-V register names have no \`$\`, and \`${bare}\` is a MIPS register.`,
+    ko: (bare: string) => `레지스터 이름을 확인해 주세요. RISC-V 레지스터 이름에는 \`$\` 가 붙지 않습니다. MIPS 레지스터입니다: \`${bare}\``,
+    en: (bare: string) => `Check the register name. RISC-V register names have no \`$\`. This is a MIPS register: \`${bare}\``,
   },
 };
 

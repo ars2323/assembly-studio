@@ -49,17 +49,17 @@ test('labels, strings, numbers and comments are not looked at; a bare word is a 
 
 test("the hint under RARS's message: what is wrong, no guess, in both languages", () => {
   const both = (message: string, line: string) => [rarsHint(message, line, 'ko'), rarsHint(message, line, 'en')];
-  assert.deepEqual(both('"ecalll" is not a recognized operator', 'ecalll'), ['`ecalll` 라는 명령은 없습니다.', 'There is no instruction `ecalll`.']);
-  assert.deepEqual(both('"srll" is not a recognized operator', 'srll t1, t0, 2'), ['`srll` 라는 명령은 없습니다.', 'There is no instruction `srll`.']);
+  assert.deepEqual(both('"ecalll" is not a recognized operator', 'ecalll'), ['명령어를 확인해 주세요: `ecalll`', 'Check the instruction: `ecalll`']);
+  assert.deepEqual(both('"srll" is not a recognized operator', 'srll t1, t0, 2'), ['명령어를 확인해 주세요: `srll`', 'Check the instruction: `srll`']);
   assert.deepEqual(both('"t7": operand is of incorrect type', 'li t7, 1'),
-    ['`t7` 라는 레지스터는 없습니다. `t` 레지스터는 `t0–t6` 입니다.', 'There is no register `t7`. The `t` registers are `t0–t6`.']);
-  assert.deepEqual(both('"spp": operand is of incorrect type', 'addi spp, spp, -4'), ['`spp` 라는 레지스터는 없습니다.', 'There is no register `spp`.']);
+    ['레지스터 이름을 확인해 주세요: `t7`. `t` 레지스터는 `t0–t6` 입니다.', 'Check the register name: `t7`. The `t` registers are `t0–t6`.']);
+  assert.deepEqual(both('"spp": operand is of incorrect type', 'addi spp, spp, -4'), ['레지스터 이름을 확인해 주세요: `spp`', 'Check the register name: `spp`']);
   assert.deepEqual(both('"$t0": operand is of incorrect type', 'li $t0, 1'),
     ['RISC-V 레지스터 이름에는 `$` 가 붙지 않습니다.', 'RISC-V register names have no `$`.']);
   assert.deepEqual(both('"$v0": operand is of incorrect type', 'li $v0, 4'),
-    ['RISC-V 레지스터 이름에는 `$` 가 붙지 않고, `v0` 은 MIPS 레지스터입니다.', 'RISC-V register names have no `$`, and `v0` is a MIPS register.']);
+    ['레지스터 이름을 확인해 주세요. RISC-V 레지스터 이름에는 `$` 가 붙지 않습니다. MIPS 레지스터입니다: `v0`', 'Check the register name. RISC-V register names have no `$`. This is a MIPS register: `v0`']);
   assert.deepEqual(both('"syscall" is not a recognized operator', 'syscall'),
-    ['`syscall` 은 MIPS 명령입니다. RISC-V 에는 이 명령이 없습니다.', '`syscall` is a MIPS instruction. RISC-V has no such instruction.']);
+    ['RISC-V 명령어를 확인해 주세요. MIPS 명령어입니다: `syscall`', 'Check the RISC-V instruction. This is a MIPS one: `syscall`']);
   assert.equal(rarsHint('Too many operands', 'li a0, 1, 2', 'en'), '');
   assert.equal(rarsHint('forward reference or invalid parameters for macro "done"', 'done 1', 'en'), '');
   for (const lang of ['ko', 'en'] as const) {
