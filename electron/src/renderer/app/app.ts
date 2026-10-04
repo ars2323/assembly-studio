@@ -497,7 +497,7 @@ function renderAssemble(): void {
   asmHead.setMeta('');
   asmBody.replaceChildren(assembling ? busyState()
     : errors.length ? errorList({
-      errors: errors.map((e) => ({ line: e.line, message: e.message.message, source: e.message.source, hint: assemblerHint(e.message.message, e.message.source) })),
+      errors: errors.map((e) => ({ line: e.line, message: e.message.message, source: e.message.source, hint: assemblerHint(e.message.message, e.message.source, currentLang()) })),
       at: failedAt, kept: machineShown(), narrow, goTo: (n) => goToErrorLine(n), toEditor: () => showView('editor'),
     })
     : lastAssembly ? assembledState({ instructions: lastAssembly.instructions, at: lastAssembly.at, saveNote, saveWarn })

@@ -1,152 +1,102 @@
-/* A guess at the name a student meant, for the error list's hint: on the
-   line RARS could not read, a name a letter or two away from one it knows
-   -- srll for srl, ecal for ecall, .wrod for .word, spp for sp --, a
-   register that does not exist (t7, s12, a8, x32), and the habits a
-   student brings from MIPS, the course's first half: a register written
-   with its $ ($t0), syscall for ecall, move for mv.  RARS says only that
-   it does not know the word.  (The same rule and the same ties as MIPS's
-   src/core/near-miss.ts, with RARS's names.)
+/* What is wrong on the line RARS could not read, for the error list's
+   hint: a first word that is no instruction or directive RARS knows
+   (srll, ecalll, .wrod), a register that does not exist (t7, s12, a8,
+   x32), a register name misspelt (spp), and the habits a student brings
+   from MIPS: a register written with its $ ($t0), syscall, move.  RARS
+   says only that it does not know the word.
+
+   As for MIPS (src/core/near-miss.ts, which says why): the hint says what
+   is wrong, never what the student may have meant.
 
    Where it looks: the statement's first word (an instruction or a
-   directive), compared with RARS's instructions only or its directives
-   only (op-table.ts, generated from RARS); and among the operands, a word
-   written as a register: one with a $, one of a register family out of its
-   range, and -- only the word RARS named as "of incorrect type", since a
-   bare word may be the student's own label -- a register name misspelt.
-   Labels in front of the statement, numbers, strings and the comment are
-   left alone.  A wrong guess is worse than none.
+   directive), against RARS's instructions or its directives (op-table.ts,
+   generated from RARS; in any case, as RARS reads them); and among the
+   operands, a word written as a register: one with a $, one of a register
+   family out of its range, and -- only the word RARS named as "of
+   incorrect type", since a bare word may be the student's own label, and
+   only when it is a letter or two from a register's name -- a register
+   name misspelt.  Labels in front of the statement, numbers, strings and
+   the comment are left alone. */
 
-   What counts as near (nearMissRule): Damerau-Levenshtein distance 1 for
-   a name of up to five characters, 2 from six on; one candidate at that
-   distance, or, among those tied, the one sharing the longest prefix with
-   the word, then the longest suffix (srll: srl over sll) -- still tied, no
-   guess.  A word of two characters or less is never guessed at (too many
-   names are one letter from it). */
-
+import { say, type Lang } from '../../../core/lang.ts';
+import { nearAny, nearMissHint } from '../../../core/near-miss.ts';
+import { firstName, statements, withoutLabels } from '../../../core/precheck.ts';
 import { OP_TABLE } from './op-table.ts';
 import { ABI_NAMES, FP_ABI_NAMES, findRegister } from './registers.ts';
 
 export type NearMiss =
-  | { why: 'spelling'; kind: 'directive' | 'instruction' | 'register'; token: string; meant: string }
+  | { why: 'unknown'; kind: 'directive' | 'instruction'; token: string }
+  | { why: 'unknown-register'; token: string }
   | { why: 'no-such-register'; token: string; family: string; range: string }
-  | { why: 'mips'; token: string; meant: string };
+  | { why: 'mips-instruction'; token: string }
+  | { why: 'mips-register'; token: string; bare: string }; // bare: the word without its $
 
-const INSTRUCTIONS = OP_TABLE.filter(([, t]) => t !== 'directive').map(([n]) => n);
-const DIRECTIVES = OP_TABLE.filter(([, t]) => t === 'directive').map(([n]) => n);
+// RISC-V's own hints; the rest are MIPS's (core/near-miss.ts HINTS).
+export const RISCV_HINTS = {
+  mipsInstruction: {
+    ko: (t: string) => `\`${t}\` 은 MIPS 명령입니다. RISC-V 에는 이 명령이 없습니다.`,
+    en: (t: string) => `\`${t}\` is a MIPS instruction. RISC-V has no such instruction.`,
+  },
+  dollar: { ko: 'RISC-V 레지스터 이름에는 `$` 가 붙지 않습니다.', en: 'RISC-V register names have no `$`.' },
+  mipsRegister: {
+    ko: (bare: string) => `RISC-V 레지스터 이름에는 \`$\` 가 붙지 않고, \`${bare}\` 은 MIPS 레지스터입니다.`,
+    en: (bare: string) => `RISC-V register names have no \`$\`, and \`${bare}\` is a MIPS register.`,
+  },
+};
+
+const INSTRUCTIONS = new Set(OP_TABLE.filter(([, t]) => t !== 'directive').map(([n]) => n));
+const DIRECTIVES = new Set(OP_TABLE.filter(([, t]) => t === 'directive').map(([n]) => n));
 const REGISTERS = [...Array.from({ length: 32 }, (_, i) => `x${i}`), ...ABI_NAMES, 'fp',
   ...Array.from({ length: 32 }, (_, i) => `f${i}`), ...FP_ABI_NAMES];
 // A register family and its numbers: t7 is "not a t register", not "a label called t7".
 const FAMILIES: [string, number, number][] = [['ft', 0, 11], ['fs', 0, 11], ['fa', 0, 7], ['x', 0, 31], ['f', 0, 31], ['t', 0, 6], ['s', 0, 11], ['a', 0, 7]];
-// MIPS's names that RISC-V spells otherwise (and that are not RISC-V names).
-const FROM_MIPS: Record<string, string> = { syscall: 'ecall', move: 'mv', subi: 'addi', addiu: 'addi', addu: 'add', subu: 'sub' };
-
-// The distance allowed for a word of `length` characters.
-export const nearMissRule = (length: number): number => (length <= 2 ? 0 : length <= 5 ? 1 : 2);
-
-// Damerau-Levenshtein (optimal string alignment): insert, delete,
-// substitute, swap two neighbours.
-export function editDistance(a: string, b: string): number {
-  const d: number[][] = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array<number>(b.length).fill(0)]);
-  for (let j = 1; j <= b.length; j += 1) d[0][j] = j;
-  for (let i = 1; i <= a.length; i += 1) {
-    for (let j = 1; j <= b.length; j += 1) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
-      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
-    }
-  }
-  return d[a.length][b.length];
-}
-
-const commonPrefix = (a: string, b: string): number => {
-  let n = 0;
-  while (n < a.length && n < b.length && a[n] === b[n]) n += 1;
-  return n;
-};
-const reverse = (s: string): string => [...s].reverse().join('');
-const commonSuffix = (a: string, b: string): number => commonPrefix(reverse(a), reverse(b));
-
-// The one name of `names` near `word`, or null.
-export function nearest(word: string, names: readonly string[]): string | null {
-  const allowed = nearMissRule(word.length);
-  if (allowed === 0 || names.includes(word)) return null;
-  let best: { name: string; distance: number; prefix: number; suffix: number }[] = [];
-  for (const name of names) {
-    const distance = editDistance(word, name);
-    if (distance === 0 || distance > allowed) continue;
-    const entry = { name, distance, prefix: commonPrefix(word, name), suffix: commonSuffix(word, name) };
-    if (best.length === 0 || distance < best[0].distance) best = [entry];
-    else if (distance === best[0].distance) best.push(entry);
-  }
-  if (best.length === 0) return null;
-  for (const key of ['prefix', 'suffix'] as const) {
-    const longest = Math.max(...best.map((b) => b[key]));
-    best = best.filter((b) => b[key] === longest);
-  }
-  return best.length === 1 ? best[0].name : null;
-}
-
-// The line without its comment and its strings, and without the labels in
-// front of the statement.
-function statementOf(line: string): string {
-  let s = line.replace(/"(?:[^"\\]|\\.)*"/g, '""');
-  const hash = s.indexOf('#');
-  if (hash >= 0) s = s.slice(0, hash);
-  return s.replace(/^\s*(?:[A-Za-z_.$][\w.$]*\s*:\s*)+/, '').trim();
-}
+// MIPS's instructions that RISC-V does not have.
+const FROM_MIPS = new Set(['syscall', 'move', 'subi', 'addiu', 'addu', 'subu']);
 
 // `flagged`: the word RARS's message names ('"spp": operand is of incorrect type'), if any.
 export function nearMiss(sourceLine: string, flagged: string | null = null): NearMiss | null {
-  const statement = statementOf(sourceLine);
+  const statement = withoutLabels(statements(sourceLine, null)[0]);
   if (statement === '') return null;
-  const words = statement.split(/[\s,()]+/).filter(Boolean);
-  const [first, ...operands] = words;
   // The instruction or directive.
-  if (first.startsWith('.')) {
-    const meant = nearest(first, DIRECTIVES);
-    if (meant) return { why: 'spelling', kind: 'directive', token: first, meant };
-  } else if (/^[A-Za-z][\w.]*$/.test(first) && !INSTRUCTIONS.includes(first.toLowerCase())) {
+  const first = firstName(statement);
+  if (first !== null) {
     const lower = first.toLowerCase();
-    if (lower in FROM_MIPS) return { why: 'mips', token: first, meant: FROM_MIPS[lower] };
-    const meant = nearest(lower, INSTRUCTIONS);
-    if (meant) return { why: 'spelling', kind: 'instruction', token: first, meant };
+    if (lower.startsWith('.') ? !DIRECTIVES.has(lower) : !INSTRUCTIONS.has(lower)) {
+      if (FROM_MIPS.has(lower)) return { why: 'mips-instruction', token: first };
+      // A word RARS took for a macro of the program's is not looked at
+      // here: RARS names that itself.
+      return { why: 'unknown', kind: lower.startsWith('.') ? 'directive' : 'instruction', token: first };
+    }
   }
   // The registers among the operands.
+  const [, ...operands] = statement.replace(/"(?:[^"\\]|\\.)*"/g, '""').split(/[\s,()]+/).filter(Boolean);
   for (const w of operands) {
-    if (w.startsWith('$')) {
-      const bare = w.slice(1);
-      return { why: 'mips', token: w, meant: findRegister(bare) ? bare : /^\d+$/.test(bare) && Number(bare) < 32 ? `x${bare}` : bare };
-    }
+    if (w.startsWith('$')) return { why: 'mips-register', token: w, bare: w.slice(1) };
     if (findRegister(w)) continue;
     const family = /^([a-z]{1,2})(\d+)$/.exec(w);
     const range = family && FAMILIES.find(([f]) => f === family[1]);
     if (family && range && (Number(family[2]) < range[1] || Number(family[2]) > range[2])) {
       return { why: 'no-such-register', token: w, family: range[0], range: `${range[0]}${range[1]}–${range[0]}${range[2]}` };
     }
-    if (w === flagged) {
-      const meant = nearest(w.toLowerCase(), REGISTERS);
-      if (meant) return { why: 'spelling', kind: 'register', token: w, meant };
-    }
+    if (w === flagged && nearAny(w.toLowerCase(), REGISTERS)) return { why: 'unknown-register', token: w };
   }
   return null;
 }
 
-/* The slip a line shows, as a hint under RARS's message in the Assemble
-   panel: a name a letter or two from one RARS knows, a register that does
-   not exist, a MIPS habit.  RARS names the word it could not take ('"spp":
-   operand is of incorrect type'); only that word is guessed at as a
-   misspelt register.  `code` in backticks (the window sets it in the code
-   font).  Nothing to name: ''. */
-export function rarsHint(message: string, source: string): string {
+/* The hint under RARS's message in the Assemble panel, in `lang`: what the
+   line shows is wrong.  RARS names the word it could not take ('"spp":
+   operand is of incorrect type'); only that word is taken for a misspelt
+   register.  Nothing to say: ''. */
+export function rarsHint(message: string, source: string, lang: Lang): string {
+  // A macro of the program's used wrongly: its name is no instruction, and
+  // RARS has said what is wrong with it.
+  if (/macro/i.test(message)) return '';
   const flagged = /^"([^"]+)"/.exec(message)?.[1] ?? null;
   const near = nearMiss(source, flagged);
-  if (near?.why === 'spelling') return `No ${near.kind} \`${near.token}\`. Did you mean \`${near.meant}\`?`;
-  if (near?.why === 'no-such-register') return `No register \`${near.token}\`. The \`${near.family}\` registers are \`${near.range}\`.`;
-  if (near?.why === 'mips' && near.token.startsWith('$')) {
-    return findRegister(near.meant)
-      ? `RISC-V register names have no \`$\`: \`${near.token}\` → \`${near.meant}\`.`
-      : `RISC-V register names have no \`$\`, and \`${near.meant}\` is a MIPS register. The system call number goes in \`a7\`.`;
+  switch (near?.why) {
+    case 'mips-instruction': return say(lang, RISCV_HINTS.mipsInstruction, near.token);
+    case 'mips-register': return findRegister(near.bare) ? say(lang, RISCV_HINTS.dollar) : say(lang, RISCV_HINTS.mipsRegister, near.bare);
+    case 'unknown': case 'unknown-register': case 'no-such-register': return nearMissHint(near, lang) ?? '';
+    default: return '';
   }
-  if (near?.why === 'mips') return `\`${near.token}\` is a MIPS instruction. RISC-V uses \`${near.meant}\`.`;
-  return '';
 }
