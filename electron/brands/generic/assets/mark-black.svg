@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" color="#ffffff">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" color="#000000">
   <!-- Assembly Studio: a chip; on it the A and S of Pretendard Bold, the A's right leg laid over the S with a knockout gap -->
   <defs><mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64"><rect width="64" height="64" fill="#fff"/><path d="M15.01 44 23.33 20H29.73L38.01 44H32.68L30.87 38.46H22.18L20.38 44ZM29.61 34.59 26.61 25.4H26.44L23.44 34.59Z" fill="#000" stroke="#000" stroke-width="3.6" stroke-linejoin="round"/></mask></defs>
   <g fill="none" stroke="currentColor" stroke-width="4"><rect x="10" y="10" width="44" height="44" rx="6"/><path d="M22 2v6M32 2v6M42 2v6M22 56v6M32 56v6M42 56v6M2 22h6M2 32h6M2 42h6M56 22h6M56 32h6M56 42h6"/></g>
