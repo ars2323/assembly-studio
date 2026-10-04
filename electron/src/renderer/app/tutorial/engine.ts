@@ -37,7 +37,7 @@
    Keys a step does not ask for (F5 while it teaches F10) do nothing, so the
    machine stays where the next steps expect it. */
 
-import { codeText, h } from '../dom.ts';
+import { codeText, h, icon } from '../dom.ts';
 import { progress } from '../logic/chapters.ts';
 import { merge, place, type Rect } from '../logic/placement.ts';
 import { ask } from '../panels/ask.ts';
@@ -463,7 +463,11 @@ export class Tutorial {
       buttons.push(button('건너뛰기', 'tut-skip', () => void this.skip(), { title: '대신 해 두고 넘어갑니다 (→)' }));
     }
     if (p.number > 1) buttons.push(button('이전', 'tut-back', () => this.back(), { title: '이전 (←)' }));
-    if (step.kind === 'explain' || res) buttons.push(button('다음', 'primary tut-next', () => this.next(), { title: '다음 (→)' }));
+    if (step.kind === 'explain' || res) {
+      const next = button('다음', 'primary tut-next', () => this.next(), { title: '다음 (→)' });
+      next.append(icon('arrow-right'));
+      buttons.push(next);
+    }
     if (end) buttons.push(button('끝내기', 'primary tut-finish', () => void this.end()));
     const quit = h('button', { class: 'tut-quit', type: 'button', title: '튜토리얼 그만두기' }, h('kbd', {}, 'Esc'), h('span', {}, '그만두기'));
     quit.addEventListener('click', () => void this.quit());
@@ -663,7 +667,7 @@ function targetRects(targets: Target[]): { list: Rect[]; owners: Element[]; miss
     if (!owner || !box || !owner.isConnected || !(owner as HTMLElement).checkVisibility?.()) { missing = true; continue; }
     let r: Rect = box;
     if (r.right - r.left <= 0 || r.bottom - r.top <= 0) { missing = true; continue; }
-    const full = { ...r };
+    const full = { left: box.left, top: box.top, right: box.right, bottom: box.bottom }; // (a DOMRect spreads to nothing)
     for (let p: Element | null = t instanceof Element ? owner.parentElement : owner; p && p !== document.body; p = p.parentElement) {
       const s = getComputedStyle(p);
       if (s.overflowX === 'visible' && s.overflowY === 'visible') continue;

@@ -1072,7 +1072,7 @@ html.theme-fade, html.theme-fade *:not(canvas), html.theme-fade *::before, html.
 .tut-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px;
   font: 600 12px/1.2 var(--ui); letter-spacing: .02em; color: var(--muted); }
 .tut-count { flex: none; font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: 0; }
-.tut-card h3 { margin: 0 0 8px; font-size: 18px; font-weight: 700; line-height: 1.38; letter-spacing: -.01em; color: var(--strong); }
+.tut-card h3 { margin: 0 0 8px; font-size: 18px; font-weight: 600; line-height: 1.38; letter-spacing: -.01em; color: var(--strong); }
 .tut-card p { margin: 0; font-size: 14.5px; line-height: 1.68; color: var(--tut-text); }
 /* `code` in the words: a quiet chip in the code font. */
 .tut-card p .mono { padding: 1px 5px; margin: 0 1px; border: 1px solid var(--tut-code-border); border-radius: 5px; background: var(--tut-code-bg);
@@ -1106,7 +1106,8 @@ html.theme-fade, html.theme-fade *:not(canvas), html.theme-fade *::before, html.
 .tut-quit:hover { color: var(--strong); background: var(--hover); }
 .tut-buttons { display: flex; align-items: center; gap: 6px; flex: none; }
 .tut-buttons .btn { height: 32px; padding: 0 14px; font-size: 13.5px; }
-.tut-buttons .btn.primary { min-width: 72px; justify-content: center; font-weight: 600; }
+.tut-buttons .btn.primary { min-width: 76px; justify-content: center; gap: 5px; font-weight: 600; }
+.tut-buttons .btn.primary img { width: 15px; height: 15px; margin-right: -3px; }
 .tut-buttons .tut-back { border-color: transparent; background: none; color: var(--text-2); }
 .tut-buttons .tut-back:hover:not(:disabled) { background: var(--hover); color: var(--strong); }
 .tut-buttons .tut-skip { padding: 0 8px; border-color: transparent; background: none; color: var(--text-2); text-decoration: underline;
