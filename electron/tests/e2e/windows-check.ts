@@ -1,5 +1,5 @@
 /* The installed program on Windows, looked at as a user sees it: the whole
-   desktop captured (the window's own caption buttons and the taskbar icon
+   desktop captured (the window's frame, the taskbar icon and the installer
    are drawn by Windows, so a page screenshot cannot show them).
 
      STUDIO_E2E_EXE=<installed AssemblyStudio.exe> node tests/e2e/windows-check.ts <out-dir>
@@ -11,7 +11,7 @@
      01-start          the first screen (maximised, as it opens)
      02-mips           MIPS: a sample assembled and stepped
      03-mips-light     the same in the light theme
-     04-dialog         a question dialog over it (the caption patch under the backdrop)
+     04-dialog         a question dialog over it (the caption buttons under the backdrop)
      05-riscv          RISC-V: a sample assembled and stepped (the bundled Java runtime)
      06-riscv-dark     the same back in the dark theme */
 

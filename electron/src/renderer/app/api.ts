@@ -31,7 +31,12 @@ export interface AppApi {
   openCredits(): Promise<void>;             // LICENSES.chromium.html, in the browser
   getSettings(): Promise<Settings>;
   setSettings(s: Settings): Promise<Settings>;
-  setOverlay(patch: { color: string; symbolColor: string }): Promise<void>;  // the caption buttons' patch and symbols (logic/overlay.ts)
+  // The title bar's own caption buttons (panels/caption.ts).
+  minimizeWindow(): Promise<void>;
+  toggleMaximizeWindow(): Promise<void>;
+  closeWindow(): Promise<void>;
+  isMaximized(): Promise<boolean>;
+  onMaximized(listener: (maximized: boolean) => void): void;
   setTheme(theme: 'dark' | 'light'): Promise<void>;  // the window's own background for the theme (theme.ts)
   // Updates (src/main/updater.ts; the first screen, panels/welcome.ts): is there
   // a newer release (no answer after about 6 s: no); its download, with

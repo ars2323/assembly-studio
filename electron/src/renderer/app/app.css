@@ -24,8 +24,8 @@
      colour only where it means something (a field, a format, a value that
      just changed, an error), and then dimmed to sit on the dark.
      The *-rgb tokens are "r, g, b" for rgba(var(--x-rgb), alpha).
-     src/main/theme.ts repeats the three the window needs before the page
-     has loaded (window and title bar background, caption symbols). */
+     src/main/theme.ts repeats --bg, which the window paints before the
+     page has loaded. */
   color-scheme: dark;       /* scrollbars, form controls */
   --bg: #0d0d0d;            /* the window behind the panels */
   --surface: #141414;       /* panels, title bar, dialogs */
@@ -65,8 +65,11 @@
   --piece3-bg: #241f33; --piece3-text: #c3b2ea; --piece4-bg: #1a2638; --piece4-text: #8fb6ec;
   --ibox-bg: #161c1c;
   --shadow-rgb: 0, 0, 0;    /* shadows */
-  --scrim-rgb: 0, 0, 0;     /* the tutorial's dimming and a dialog's backdrop (logic/overlay.ts reads it) */
-  --caption-symbol: #e6e6e6; /* the system caption buttons' symbols on the title bar */
+  --scrim-rgb: 0, 0, 0;     /* the tutorial's dimming and a dialog's backdrop */
+  /* The title bar's minimise / maximise / close buttons (panels/caption.ts),
+     under the pointer: a light wash, and Windows' own red for close. */
+  --caption-hover: rgba(255, 255, 255, .1); --caption-press: rgba(255, 255, 255, .06);
+  --caption-close: #c42b1c; --caption-close-press: #b22a1e; --caption-close-symbol: #ffffff;
   --ui: Pretendard, sans-serif; --code: D2Coding, monospace;
   --fs: 13px; --row: 22px; --rrow: 21px;
   --titlebar: 36px; --toolbar: 44px; --head: 34px; /* --titlebar: src/main/main.ts TITLE_BAR_HEIGHT */
@@ -117,7 +120,7 @@
   --ibox-bg: #edf6f4;
   --shadow-rgb: 16, 24, 40;
   --scrim-rgb: 52, 58, 70;
-  --caption-symbol: #1f2328;
+  --caption-hover: rgba(0, 0, 0, .06); --caption-press: rgba(0, 0, 0, .1);
 }
 
 * { box-sizing: border-box; }
@@ -156,19 +159,29 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* ---- title bar: the window's own ---------------------------------------- */
 /* The mark and the program's name in the middle; nothing else.  The whole
    bar moves the window (and double-click maximises); the mark (Home) opts
-   out.  The system's caption buttons sit over the right end
-   (titleBarOverlay, src/main/main.ts TITLE_BAR_HEIGHT = --titlebar): keep
-   clear of them.  Everything that is pressed is in the toolbar under it. */
+   out.  The window's caption buttons are its own, at the right end
+   (panels/caption.ts).  Everything else that is pressed is in the toolbar
+   under it. */
 .titlebar {
   display: flex; align-items: center; min-width: 0;
-  /* --caption-extra: the tests make the room Windows' wider caption buttons take. */
-  padding: 0 calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 8px + var(--caption-extra, 0px)) 0 12px;
+  padding: 0 0 0 12px;
   background: var(--surface); border-bottom: 1px solid var(--border);
   -webkit-app-region: drag; user-select: none; position: relative;
 }
 .titlebar button, .titlebar input, .titlebar select, .titlebar a { -webkit-app-region: no-drag; }
 .titlebar .brand { display: flex; align-items: center; gap: 8px; flex: none; position: absolute; left: 50%; top: 0; bottom: 0; transform: translateX(-50%); }
 .titlebar.nobrand .brand { display: none; }
+/* The caption buttons (panels/caption.ts): Windows' size, the bar's full
+   height above its bottom border, which runs on under them. */
+.titlebar .caption { display: flex; align-self: stretch; margin-left: auto; }
+.capbtn { display: grid; place-items: center; width: 46px; height: 100%; padding: 0; border: 0; border-radius: 0;
+  background: transparent; color: var(--strong); cursor: default; }
+.capbtn svg { fill: none; stroke: currentColor; stroke-width: 1; shape-rendering: crispEdges; }
+.capbtn.cap-close svg { shape-rendering: geometricPrecision; }
+.capbtn:hover { background: var(--caption-hover); }
+.capbtn:active { background: var(--caption-press); }
+.capbtn.cap-close:hover { background: var(--caption-close); color: var(--caption-close-symbol); }
+.capbtn.cap-close:active { background: var(--caption-close-press); color: var(--caption-close-symbol); }
 .titlebar .logo { height: 18px; width: auto; }
 .titlebar .appname { font-weight: 700; color: var(--strong); white-space: nowrap; letter-spacing: .1px; }
 /* A window too narrow for the name beside the caption buttons: the mark alone, then nothing (app.ts fitBars). */
@@ -979,8 +992,7 @@ body.arriving .work { animation: arrive .45s ease-out both; }
 /* The bars on the first screen (body.first-screen, app.ts): the board shows
    through them, white words and icons, no dividing lines.  Nothing is
    blurred -- the board behind is flat, so a backdrop-filter would cost a
-   layer for no difference.  The caption buttons' patch is transparent, their
-   symbols white (app.ts, updateOverlay). */
+   layer for no difference.  The caption buttons are clear over it too. */
 body.first-screen .work { background: transparent; }
 body.first-screen .titlebar { position: relative; z-index: 2; background: transparent; border-color: transparent; }
 /* No status line on the first screen: the board runs to the window's edge. */
@@ -989,7 +1001,7 @@ body.first-screen .status { visibility: hidden; }
    at the size they are meant to be read at, and the two ways in are on it.
    A second small copy of the mark in the corner, and four buttons for what
    the card already offers, are what the board has to be seen through.  The
-   bar itself stays -- it is what the window is dragged by, and the system's
+   bar itself stays -- it is what the window is dragged by, and the
    caption buttons sit in it.  The toolbar under it is not there at all
    (app.ts hides it; its grid row is then nothing), so the board still
    reaches the window's top edge. */

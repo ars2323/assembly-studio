@@ -43,7 +43,12 @@ contextBridge.exposeInMainWorld('app', {
   openCredits: () => ipcRenderer.invoke('about:openCredits').then(unwrap),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (s) => ipcRenderer.invoke('settings:set', s),
-  setOverlay: (patch) => ipcRenderer.invoke('win:overlay', patch),
+  // The title bar's own caption buttons (src/renderer/app/panels/caption.ts).
+  minimizeWindow: () => ipcRenderer.invoke('win:minimize'),
+  toggleMaximizeWindow: () => ipcRenderer.invoke('win:toggleMaximize'),
+  closeWindow: () => ipcRenderer.invoke('win:close'),
+  isMaximized: () => ipcRenderer.invoke('win:isMaximized'),
+  onMaximized: (listener) => ipcRenderer.on('win:maximized', (_e, maximized) => listener(maximized)),
   setTheme: (theme) => ipcRenderer.invoke('win:theme', theme),
   // Updates (src/main/updater.ts), asked for by the first screen only.
   checkUpdate: () => ipcRenderer.invoke('update:check'),
