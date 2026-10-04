@@ -1,27 +1,41 @@
 /* Assembling and its errors, and the status bar, in both ISAs' windows: the
    Assemble panel (panels/assemble.ts), the Run side's card before there is
    a program (app.ts renderPlaceholder), the status line (renderStatus) and
-   its notes.  The names on screen -- panels (Editor, Run, Console), the
-   buttons (Save & Assemble, Run, Step, Reset), the keys -- stay as they are
-   in both languages.  `code` in backticks; { key } a key (set as <kbd>).
+   its notes.  `code` in backticks; { key } a key (set as <kbd>).
+
+   The work screen's states are words of its own, in English in both
+   languages, like the names on it -- panels (Editor, Run, Console), buttons
+   (Save & Assemble, Run, Step, Reset), keys: the whole status line
+   (STATUS), the Assemble panel's state cells and its "12s ago".  What is
+   said in sentences -- an error, how to fix it, what to do next, the Run
+   side's card -- is in Korean or English.  english() gives an entry the
+   same words in both.
 
    A count is said as the words before the number and after it ([before,
    after]): the number itself is set in the code font (cells.ts count()). */
 
 type Part = string | { key: string };
 
+// The same words in both languages: { en } -> { ko: en, en }, through a table.
+type English<T> = T extends { en: infer E } ? { ko: E; en: E } : { [K in keyof T]: English<T[K]> };
+function english<T>(t: T): English<T> {
+  const o = t as Record<string, unknown>;
+  if ('en' in o) return { ko: o.en, en: o.en } as English<T>;
+  return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, english(v)])) as English<T>;
+}
+
 export const ASSEMBLE = {
   // The first cell: the state.
-  notAssembled: { ko: '어셈블 안 됨', en: 'Not assembled' },
-  assembling: { ko: '어셈블 중…', en: 'Assembling…' },
-  assembled: { ko: '어셈블 완료', en: 'Assembled' },
-  errors: { ko: (n: number) => `오류 ${n}개`, en: (n: number) => `${n} ${n === 1 ? 'error' : 'errors'}` },
+  notAssembled: english({ en: 'Not assembled' }),
+  assembling: english({ en: 'Assembling…' }),
+  assembled: english({ en: 'Assembled' }),
+  errors: english({ en: (n: number) => `${n} ${n === 1 ? 'error' : 'errors'}` }),
   // The cells after it.
-  instructions: { ko: (_n: number): [string, string] => ['명령 ', '개'], en: (n: number): [string, string] => ['', n === 1 ? ' instruction' : ' instructions'] },
-  kept: { ko: '이전 프로그램 유지', en: 'Last program kept' },
-  saved: { ko: '저장됨', en: 'Saved' },
-  notSaved: { ko: '저장 안 됨', en: 'Not saved' },
-  example: { ko: '예제 · 저장하지 않음', en: 'Example · not saved' },
+  instructions: english({ en: (n: number): [string, string] => ['', n === 1 ? ' instruction' : ' instructions'] }),
+  kept: english({ en: 'Last program kept' }),
+  saved: english({ en: 'Saved' }),
+  notSaved: english({ en: 'Not saved' }),
+  example: english({ en: 'Example · not saved' }),
   // What to do.
   fresh: {
     ko: (saves: boolean): Part[] => [{ key: 'Ctrl+S' }, ` 키를 누르면 ${saves ? '저장하고 ' : ''}어셈블합니다. 결과와 오류는 여기에 나옵니다.`],
@@ -45,12 +59,12 @@ export const ASSEMBLE = {
   // The Assemble button's tooltip for an example.
   exampleTitle: { ko: 'Assemble (Ctrl+S): 예제는 저장하지 않습니다', en: 'Assemble (Ctrl+S): examples are not saved' },
   // When: "just now", "12s ago" (logic/ago.ts).
-  ago: {
-    now: { ko: '방금', en: 'just now' },
-    seconds: { ko: (n: number) => `${n}초 전`, en: (n: number) => `${n}s ago` },
-    minutes: { ko: (n: number) => `${n}분 전`, en: (n: number) => `${n} min ago` },
-    hours: { ko: (n: number) => `${n}시간 전`, en: (n: number) => `${n} h ago` },
-  },
+  ago: english({
+    now: { en: 'just now' },
+    seconds: { en: (n: number) => `${n}s ago` },
+    minutes: { en: (n: number) => `${n} min ago` },
+    hours: { en: (n: number) => `${n} h ago` },
+  }),
   // The Run side before there is a program to show.
   placeholder: {
     freshTitle: { ko: '아직 어셈블하지 않았습니다', en: 'Not assembled yet' },
@@ -79,76 +93,68 @@ export const ASSEMBLE = {
   },
 };
 
-export const STATUS = {
-  ready: { ko: '준비', en: 'Ready' },
-  running: { ko: '실행 중…', en: 'Running…' },
-  slowRun: { ko: '천천히 실행 · 1 line/s', en: 'Slow run · 1 line/s' },
-  edited: { ko: '고친 뒤 어셈블 안 됨', en: 'Edited · not assembled' },
+export const STATUS = english({
+  ready: { en: 'Ready' },
+  running: { en: 'Running…' },
+  slowRun: { en: 'Slow run · 1 line/s' },
+  edited: { en: 'Edited · not assembled' },
   errorsInEdited: {
-    ko: (n: number) => `고친 코드에 오류 ${n}개`,
     en: (n: number) => `${n} ${n === 1 ? 'error' : 'errors'} in the edited code`,
   },
-  steps: { ko: (_n: number): [string, string] => ['', '단계 실행'], en: (n: number): [string, string] => ['', n === 1 ? ' step' : ' steps'] },
-  selected: { ko: '선택 ', en: 'Selected ' },
-  changed: { ko: '바뀜: ', en: 'Changed: ' },
-  more: { ko: (n: number) => ` 외 ${n}개`, en: (n: number) => ` +${n} more` },
+  steps: { en: (n: number): [string, string] => ['', n === 1 ? ' step' : ' steps'] },
+  selected: { en: 'Selected ' },
+  changed: { en: 'Changed: ' },
+  more: { en: (n: number) => ` +${n} more` },
   // After Step back (logic/stepback.ts); after undoing a call that printed or read, the Console keeps it.
-  stepBack: { ko: (pc: string) => `한 단계 되돌림 · PC \`${pc}\``, en: (pc: string) => `Stepped back · PC \`${pc}\`` },
-  backIo: { ko: '콘솔에 출력된 내용과 이미 읽은 입력은 그대로입니다', en: 'Console output and input already read stay' },
-  settingsChanged: { ko: '설정 바뀜 · Ctrl+S 로 적용', en: 'Settings changed · Ctrl+S to apply' },
+  stepBack: { en: (pc: string) => `Stepped back · PC \`${pc}\`` },
+  backIo: { en: 'Console output and input already read stay' },
+  settingsChanged: { en: 'Settings changed · Ctrl+S to apply' },
   // After a stop (logic/machine.ts stopMessage).
   stop: {
-    exit: { ko: '종료됨', en: 'Exited' },
-    error: { ko: '실행 오류', en: 'Runtime error' },
-    breakpoint: { ko: (pc: string) => `Breakpoint · \`${pc}\``, en: (pc: string) => `Breakpoint at \`${pc}\`` },
-    input: { ko: '입력 기다리는 중', en: 'Waiting for input' },
-    stopped: { ko: (pc: string) => `멈춤 · \`${pc}\``, en: (pc: string) => `Stopped at \`${pc}\`` },
-    limit: { ko: (pc: string) => `한 단계 실행 · PC \`${pc}\``, en: (pc: string) => `Stepped · PC \`${pc}\`` },
+    exit: { en: 'Exited' },
+    error: { en: 'Runtime error' },
+    breakpoint: { en: (pc: string) => `Breakpoint at \`${pc}\`` },
+    input: { en: 'Waiting for input' },
+    stopped: { en: (pc: string) => `Stopped at \`${pc}\`` },
+    limit: { en: (pc: string) => `Stepped · PC \`${pc}\`` },
   },
   // The keys' words at the far end (Step, Run, Stop: the buttons' names).
   keys: {
-    again: { ko: 'Reset 으로 다시 실행', en: 'Reset to run again' },
-    console: { ko: 'Console 확인 · Reset 으로 다시 실행', en: 'See the Console · Reset to run again' },
-    inConsole: { ko: 'Console 에 입력', en: 'in the Console' },
-    resume: { ko: '계속', en: 'Continue' },
-    instant: { ko: 'Instant 로 바꾸면 최고 속도', en: 'Instant for full speed' },
+    again: { en: 'Reset to run again' },
+    console: { en: 'See the Console · Reset to run again' },
+    inConsole: { en: 'in the Console' },
+    resume: { en: 'Continue' },
+    instant: { en: 'Instant for full speed' },
   },
   // RISC-V: the engine, while it is not ready.
   engine: {
-    starting: { ko: '엔진 시작 중…', en: 'Starting the engine…' },
-    restarting: { ko: '엔진 다시 시작 중…', en: 'Restarting the engine…' },
-    dead: { ko: '엔진을 쓸 수 없음', en: 'Engine unavailable' },
-    noAnswer: { ko: '엔진이 응답하지 않아 다시 시작했습니다', en: 'The engine did not answer and was restarted' },
+    starting: { en: 'Starting the engine…' },
+    restarting: { en: 'Restarting the engine…' },
+    dead: { en: 'Engine unavailable' },
+    noAnswer: { en: 'The engine did not answer and was restarted' },
   },
   // The simulator's process ended (`what`: what it said, in its words).
   crashed: {
-    ko: (what: string) => `시뮬레이터가 멈췄습니다 (${what}) · 다시 어셈블하세요 (Ctrl+S)`,
     en: (what: string) => `The simulator stopped (${what}) · assemble again (Ctrl+S)`,
   },
   engineCrashed: {
-    ko: (what: string, restarted: boolean) => `시뮬레이터 엔진이 멈췄습니다 (${what})${restarted ? ' · 엔진을 다시 시작했습니다. 다시 어셈블하세요 (Ctrl+S)' : ''}`,
     en: (what: string, restarted: boolean) => `The simulator engine stopped (${what})${restarted ? ' · engine restarted, assemble again (Ctrl+S)' : ''}`,
   },
   // Notes: breakpoints, input, the export.  `lines`: ASSEMBLE.line(s), said already.
-  bpRemoved: { ko: (lines: string) => `${lines}: 명령이 없어 Breakpoint 를 지웠습니다`, en: (lines: string) => `${lines}: no instruction, breakpoint removed` },
-  bpIdle: { ko: (lines: string) => `${lines}: 명령이 없어 Breakpoint 가 효과가 없습니다`, en: (lines: string) => `${lines}: no instruction, breakpoint has no effect` },
+  bpRemoved: { en: (lines: string) => `${lines}: no instruction, breakpoint removed` },
+  bpIdle: { en: (lines: string) => `${lines}: no instruction, breakpoint has no effect` },
   bpNoInstruction: {
-    ko: (line: number) => `${line}행에는 명령이 없습니다 · Breakpoint 는 명령이 있는 줄에 둡니다`,
     en: (line: number) => `Line ${line} has no instruction · breakpoints go on instruction lines`,
   },
-  bpEdited: { ko: '고친 코드의 Breakpoint 는 다음 어셈블 때 적용됩니다 (Ctrl+S)', en: 'Breakpoints in edited code apply at the next assemble (Ctrl+S)' },
+  bpEdited: { en: 'Breakpoints in edited code apply at the next assemble (Ctrl+S)' },
   bpTextEdited: {
-    ko: '고친 코드에서는 Text 의 Breakpoint 를 바꿀 수 없습니다 · 먼저 어셈블하세요 (Ctrl+S)',
     en: 'Breakpoints in Text cannot change in edited code · assemble first (Ctrl+S)',
   },
   inputCancelled: {
-    ko: (undone: boolean) => (undone ? '입력을 기다리다 멈춤 · Run 하면 다시 입력을 받습니다'
-      : '입력을 기다리다 멈췄고 되돌리지 못했습니다 · 다시 어셈블하세요 (Ctrl+S)'),
     en: (undone: boolean) => (undone ? 'Stopped while waiting for input · Run asks for it again'
       : 'Stopped while waiting for input and could not undo it · assemble again (Ctrl+S)'),
   },
   exported: {
-    ko: (last: boolean, name: string) => `${last ? '마지막으로 어셈블된 코드를 ' : ''}실행 이미지로 저장했습니다 · ${name}`,
     en: (last: boolean, name: string) => `Saved ${last ? 'the last assembled code ' : ''}as an executable image · ${name}`,
   },
-};
+});
