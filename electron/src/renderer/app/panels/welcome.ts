@@ -86,8 +86,9 @@ const LABEL_OUT = 130;
 // main process's own limit (updater.ts CHECK_TIMEOUT_MS).
 const UPDATE_KEY = 'studio-update-checked';
 const UPDATE_WAIT = 6_500;
-// "Installing update…" is on the card this long before the program quits to install it.
-const INSTALL_AFTER = 1_000;
+// "Installing update…" (and that the program will open again by itself) is
+// on the card this long before the program quits to install it.
+const INSTALL_AFTER = 3_000;
 // A failed download: its message is on the card this long, then the ISA step comes up.
 const FAILED_FOR = 2_200;
 
@@ -113,13 +114,17 @@ function updatePanel(): { root: HTMLElement; start(version: string): void; progr
   const bar = h('div', { class: 'wupd-bar', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100' }, fill);
   const percent = h('span', {});
   const size = h('span', {});
-  const root = h('div', { class: 'wupd', role: 'status', 'aria-live': 'polite' }, line, bar, h('div', { class: 'wupd-meta' }, percent, size));
+  const note = h('div', { class: 'wupd-note' });
+  const root = h('div', { class: 'wupd', role: 'status', 'aria-live': 'polite' },
+    line, bar, h('div', { class: 'wupd-meta' }, percent, size), note);
   let version = '';
   let state: 'downloading' | 'installing' | 'failed' = 'downloading';
   let last: Progress = { percent: 0, transferred: 0, total: 0 };
   const draw = () => {
     line.textContent = state === 'downloading' ? tr(WELCOME.update.downloading, version)
       : state === 'installing' ? tr(WELCOME.update.installing) : tr(WELCOME.update.failed);
+    note.textContent = state === 'downloading' ? tr(WELCOME.update.willRestart)
+      : state === 'installing' ? tr(WELCOME.update.restarting) : '';
     const at = state === 'installing' ? 100 : progressFill(last);
     fill.style.width = `${at}%`;
     bar.setAttribute('aria-valuenow', String(at));

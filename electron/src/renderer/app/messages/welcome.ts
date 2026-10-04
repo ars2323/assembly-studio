@@ -13,6 +13,15 @@ export const WELCOME = {
   update: {
     downloading: { ko: (v: string) => `v${v} 업데이트 중`, en: (v: string) => `Updating to v${v}` },
     installing: { ko: '업데이트를 설치하는 중…', en: 'Installing update…' },
+    // Under the bar: the program closes to install, then starts again by itself.
+    willRestart: {
+      ko: '다 받으면 설치한 뒤 자동으로 다시 실행됩니다',
+      en: 'When it is done, it installs and restarts by itself',
+    },
+    restarting: {
+      ko: '잠시 창이 닫혔다가 새 버전이 저절로 다시 열립니다',
+      en: 'Closes for a moment, then reopens by itself',
+    },
     failed: { ko: '업데이트를 받지 못했습니다', en: 'Could not download the update' },
   },
 };
