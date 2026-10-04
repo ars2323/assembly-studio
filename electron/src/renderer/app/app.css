@@ -504,44 +504,111 @@ img.icon { filter: var(--icon-filter); }
 
 /* Registers: hex first, decimal quieter, binary quietest; the register that
    just changed in yellow.  The columns and how tight they sit are
-   panels/registers.ts's (--rcols, data-style, hide-*): Hex, Dec and Bin
-   give way last. */
-.regs { font-family: var(--code); font-size: var(--fs); --rpad: 9px; --rpadr: 10px; --rgap: 10px; }
-.regs[data-style=tight] { --rpad: 5px; --rpadr: 6px; --rgap: 6px; }
-.regs[data-style=small] { --rpad: 5px; --rpadr: 6px; --rgap: 6px; font-size: calc(var(--fs) - 1px); }
+   panels/regtable.ts's (--rcols, data-style, hide-*): Hex, Dec and Bin
+   give way last.  The row's left padding holds its star (--rpad: the gaps
+   between the columns gave it the room); the column head and the pinned
+   registers stay at the top while the rest scrolls (.rtop). */
+.regs { font-family: var(--code); font-size: var(--fs); --rpad: 15px; --rpadr: 10px; --rgap: 8px; }
+.regs[data-style=tight] { --rpad: 11px; --rpadr: 6px; --rgap: 4px; }
+.regs[data-style=small] { --rpad: 11px; --rpadr: 6px; --rgap: 4px; font-size: calc(var(--fs) - 1px); }
 .regs .phead { font-family: var(--ui); font-size: var(--fs); }
 .regs-list { overflow-y: auto; overflow-x: hidden; }
 .regs.overflow .regs-list { overflow-x: auto; }
 .rhead, .rrow { display: grid; column-gap: var(--rgap); padding: 0 var(--rpadr) 0 calc(var(--rpad) + 3px); align-items: center; white-space: nowrap;
-  grid-template-columns: var(--rcols, 7ch 10.5ch 10.5ch 28.5ch minmax(0, 1fr)); }
-.regs.overflow .rhead, .regs.overflow .rrow { width: max-content; min-width: 100%; }
-.rhead { position: sticky; top: 0; z-index: 2; height: 24px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  grid-template-columns: var(--rcols, [rn] 7ch [hex] 10.5ch [dec] 10.5ch [bin] 28.5ch [tag rest] minmax(0, 1fr)); }
+.regs.overflow .rhead, .regs.overflow .rrow, .regs.overflow .rtop { width: max-content; min-width: 100%; }
+.rtop { position: sticky; top: 0; z-index: 2; background: var(--surface); }
+.rhead { height: 24px; background: var(--surface); border-bottom: 1px solid var(--border); }
 .rhead > span { font: 500 11px var(--ui); color: var(--dim); }
 .rhead > span.strong { color: var(--text-2); font-weight: 600; }
 .rhead .right { text-align: right; }
-.rrow { height: var(--rrow); border-left: 3px solid transparent; padding-left: var(--rpad); }
-.rrow .rn { font-weight: 700; color: var(--strong); } /* mono: $t0 in Pretendard reads $tO */
+.rrow { position: relative; height: var(--rrow); border-left: 3px solid transparent; padding-left: var(--rpad); }
+.rrow .rn { display: flex; align-items: center; gap: 4px; min-width: 0; font-weight: 700; color: var(--strong); } /* mono: $t0 in Pretendard reads $tO */
+/* A name longer than its column (BadVAddr) is set smaller and may run into
+   the gap; with an alias beside it the two share the column, the alias cut short. */
+.rrow .rn:has(> .alias:not([hidden]):not(.empty)) { overflow: hidden; }
+.rrow .rname { flex: none; }
+.rrow .rname.long { font-size: .86em; letter-spacing: -.2px; }
 .rrow .hex { color: var(--text); }
 .rrow .dec { color: var(--muted); font-size: .92em; text-align: right; overflow: hidden; }
 .rrow .bin { color: var(--dim); font-size: .82em; letter-spacing: -.3px; overflow: hidden; }
 .rrow .bin span + span { margin-left: 3px; }
-.rrow .tag { display: none; font: 600 10.5px var(--ui); color: var(--changed-text); background: var(--changed-bar); color: var(--surface); border-radius: 8px; padding: 0 6px; line-height: 16px; justify-self: start; }
+.rrow .tag { grid-column: tag; display: none; font: 600 10.5px var(--ui); color: var(--changed-text); background: var(--changed-bar); color: var(--surface); border-radius: 8px; padding: 0 6px; line-height: 16px; justify-self: start; }
 .rrow.zero .hex, .rrow.zero .dec, .rrow.zero .bin, .rrow.zero .rn { color: var(--dim); }
 .rrow.chg { background: var(--changed); border-left-color: var(--changed-bar); }
 .rrow.chg .hex { color: var(--changed-text); font-weight: 700; text-shadow: 0 0 6px var(--changed-glow); }
 .rrow.chg .dec, .rrow.chg .bin { color: var(--changed-text); }
 .rrow.chg .tag { display: inline-block; }
-.regs.hide-tag .rrow .tag, .regs.hide-dec .dec, .regs.hide-bin .bin { display: none !important; }
+.regs.hide-tag .rrow .tag, .regs.hide-hex .hex, .regs.hide-dec .dec, .regs.hide-bin .bin { display: none !important; }
 .rrow.flash { animation: regflash .7s ease-out; }
 /* A flash over whatever the row's own colour is, fading to nothing. */
 @keyframes regflash { from { box-shadow: inset 0 0 0 999px rgba(var(--flash-rgb), .75); } to { box-shadow: inset 0 0 0 999px rgba(var(--flash-rgb), 0); } }
 .rgroup { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; padding: 5px 12px 4px; background: var(--bg);
   border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); font: 600 12px var(--ui); color: var(--strong); }
-.rhead + .rgroup { margin-top: 0; border-top: 0; }
+.rtop + .rgroup { margin-top: 0; border-top: 0; }
 .rgroup .gspan { font-size: 11px; font-weight: 400; color: var(--muted); }
 .regs-list .cp0 { display: none; }
 .regs-list.show-cp0 .rrow.cp0 { display: grid; }
 .regs-list.show-cp0 .rgroup.cp0 { display: flex; }
+
+/* The star in the row's left margin: faint until the row is pointed at,
+   white and lit once the register is pinned. */
+.rrow .star { position: absolute; left: -4px; top: 0; bottom: 0; width: calc(var(--rpad) + 2px); display: flex; align-items: center; justify-content: center;
+  padding: 0; border: 0; border-radius: 3px; background: none; color: var(--dim); opacity: 0; }
+.rrow:hover .star, .rrow .star:focus-visible { opacity: 1; }
+.rrow .star:hover { color: var(--text-2); }
+.rrow .star:focus-visible { outline: 1px solid var(--strong); outline-offset: -1px; }
+.rrow .star.on { opacity: 1; color: var(--strong); }
+.rrow .star.on:hover { color: var(--text-2); }
+.staricon { width: 9px; height: 9px; overflow: visible; }
+.staricon path { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; }
+.star.on .staricon path { fill: currentColor; }
+.star.on .staricon { filter: drop-shadow(0 0 3px var(--glow)); }
+
+/* The pinned registers, under the column head: a band and the copies of
+   their rows, a few of them before the block scrolls by itself. */
+.pinblock { background: var(--bg); border-bottom: 1px solid var(--border); box-shadow: 0 6px 8px -6px rgba(var(--shadow-rgb), .9); }
+.rgroup.pinband { margin-top: 0; border-top: 0; border-bottom-style: dashed; }
+.pinrows { max-height: var(--pinmax, 128px); padding-bottom: 2px; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+/* An alias beside the name: a muted chip in the pinned block (click to
+   rename; a pencil while there is none), quieter still in the row's group. */
+.rrow .alias { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; padding: 0 3px; border: 1px solid var(--border); border-radius: 4px;
+  font: 400 .85em/15px var(--code); color: var(--muted); background: none; }
+.rrow.pinned .alias { padding: 0 4px; background: var(--hover); color: var(--text-2); font-weight: 600; }
+.rrow.pinned .alias:hover { border-color: var(--muted); color: var(--strong); }
+.rrow.pinned .alias.empty { display: inline-flex; align-items: center; height: 15px; padding: 0 2px; border-color: transparent; background: none; color: var(--dim); overflow: hidden; }
+.rrow.pinned:not(:hover):not(:focus-within) .alias.empty { opacity: 0; }
+.rrow.pinned .alias.empty:hover { color: var(--text-2); }
+.rrow.pinned .alias:focus-visible { outline: 1px solid var(--strong); outline-offset: 0; }
+.rrow .alias .pencil { width: 10px; height: 10px; }
+.pencil path { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.rrow.zero .alias { color: var(--muted); }
+.rrow.chg .alias { color: var(--changed-text); border-color: var(--changed-bar); }
+/* Typing an alias: a box over the row, the register's name in front. */
+.rrow .aedit { position: absolute; z-index: 3; left: calc(var(--rpad) - 4px); top: 1px; bottom: 1px; width: min(calc(100% - var(--rpad)), 34ch);
+  display: flex; align-items: center; gap: 6px; padding: 0 6px 0 4px; background: var(--surface); border: 1px solid var(--accent); border-radius: 5px;
+  box-shadow: 0 2px 10px rgba(var(--shadow-rgb), .6); }
+.rrow .aedit .aname { flex: none; font-weight: 700; color: var(--strong); }
+.rrow .aedit input { flex: 1; min-width: 4ch; height: 100%; padding: 0; border: 0; outline: none; background: none; color: var(--text); font: 600 .92em var(--code); }
+.rrow .aedit input::placeholder { color: var(--dim); font-weight: 400; }
+.rrow .aedit .ahint { flex: none; font: 400 10.5px var(--ui); color: var(--muted); }
+
+/* Hex, Dec and Bin in the head: a box each, ticked while the column is on
+   screen; dashed where the width had no room for it. */
+.colboxes { display: inline-flex; align-items: center; gap: 4px; }
+.colbox { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 7px 0 6px; border: 1px solid var(--border); border-radius: 6px;
+  font: 500 11px var(--ui); color: var(--muted); cursor: pointer; user-select: none; white-space: nowrap; }
+.colbox:hover { background: var(--hover); color: var(--text); }
+.colbox.on { color: var(--strong); background: var(--accent-tint); border-color: var(--accent-tint2); }
+.colbox.noroom { border-style: dashed; border-color: var(--dim); }
+.colbox.locked { cursor: default; }
+.colbox.locked:hover { background: var(--accent-tint); color: var(--strong); }
+.colbox input { appearance: none; display: grid; place-content: center; width: 11px; height: 11px; margin: 0; border: 1px solid var(--muted); border-radius: 3px; background: none; cursor: inherit; }
+.colbox input::before { content: ''; width: 5px; height: 2.5px; border-left: 1.5px solid var(--surface); border-bottom: 1.5px solid var(--surface); transform: translateY(-.5px) rotate(-45deg); visibility: hidden; }
+.colbox input:checked { background: var(--strong); border-color: var(--strong); }
+.colbox input:checked::before { visibility: visible; }
+.colbox input:disabled { opacity: .6; }
+.colbox:has(input:focus-visible) { outline: 2px solid var(--strong); outline-offset: 1px; }
 
 /* ---- Inspector ---------------------------------------------------------- */
 /* panels/inspector.ts.  Top to bottom: the head (the instruction and its
