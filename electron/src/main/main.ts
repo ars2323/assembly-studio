@@ -36,7 +36,7 @@ import * as mips from './engine-mips.ts';
 import * as riscv from './engine-riscv.ts';
 import { answer, type Engine } from './ipc.ts';
 import { LICENSES, paths, version, type Isa } from './paths.ts';
-import { WINDOW_COLOURS } from './theme.ts';
+import { LIGHT_BACKGROUND, WINDOW_COLOURS } from './theme.ts';
 
 export type { ImageJob } from './engine-mips.ts';
 
@@ -206,6 +206,11 @@ async function main(): Promise<void> {
   // (src/renderer/app/logic/overlay.ts).  The buttons themselves keep
   // working.  Kept on the window for the tests to read (Electron has no
   // getter for it).
+  // The page's theme (renderer theme.ts): the window's own background follows,
+  // so a page loaded again does not flash the other theme's colour first.
+  ipcMain.handle('win:theme', (_e, theme: unknown) => {
+    try { win.setBackgroundColor(theme === 'light' ? LIGHT_BACKGROUND : WINDOW_COLOURS.background); } catch { /* closing */ }
+  });
   ipcMain.handle('win:overlay', (_e, patch: { color: string; symbolColor: string }) => {
     Object.assign(win, { overlayColor: patch.color, overlaySymbol: patch.symbolColor });
     try { win.setTitleBarOverlay({ color: patch.color, symbolColor: patch.symbolColor, height: TITLE_BAR_HEIGHT }); } catch { /* no title bar overlay on this platform */ }

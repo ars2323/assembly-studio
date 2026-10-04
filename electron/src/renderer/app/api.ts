@@ -31,6 +31,7 @@ export interface AppApi {
   getSettings(): Promise<Settings>;
   setSettings(s: Settings): Promise<Settings>;
   setOverlay(patch: { color: string; symbolColor: string }): Promise<void>;  // the caption buttons' patch and symbols (logic/overlay.ts)
+  setTheme(theme: 'dark' | 'light'): Promise<void>;  // the window's own background for the theme (theme.ts)
 }
 
 export interface AboutInfo {

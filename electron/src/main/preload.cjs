@@ -44,4 +44,5 @@ contextBridge.exposeInMainWorld('app', {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (s) => ipcRenderer.invoke('settings:set', s),
   setOverlay: (patch) => ipcRenderer.invoke('win:overlay', patch),
+  setTheme: (theme) => ipcRenderer.invoke('win:theme', theme),
 });

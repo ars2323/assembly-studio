@@ -8,3 +8,5 @@ export const WINDOW_COLOURS = {
   titlebar: '#141414',    // --surface
   symbol: '#e6e6e6',      // --caption-symbol
 };
+/** The light theme's --bg: the window's background once the page has chosen it. */
+export const LIGHT_BACKGROUND = '#f4f5f7';

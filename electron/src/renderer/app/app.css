@@ -88,10 +88,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
   /* --caption-extra: the tests make the room Windows' wider caption buttons take. */
   padding: 0 calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 8px + var(--caption-extra, 0px)) 0 12px;
   background: var(--surface); border-bottom: 1px solid var(--border);
-  -webkit-app-region: drag; user-select: none;
+  -webkit-app-region: drag; user-select: none; position: relative;
 }
 .titlebar button, .titlebar input, .titlebar select, .titlebar a { -webkit-app-region: no-drag; }
-.titlebar .brand { display: flex; align-items: center; gap: 8px; flex: none; }
+/* The mark and the program's name in the middle of the bar; the toolbar from the left. */
+.titlebar .brand { display: flex; align-items: center; gap: 8px; flex: none; position: absolute; left: 50%; top: 0; bottom: 0; transform: translateX(-50%); }
+.titlebar.nobrand .brand { display: none; }
 .titlebar .brand.home { -webkit-app-region: no-drag; cursor: pointer; border-radius: 6px; }
 .titlebar .brand.home:hover .appname { text-decoration: underline; }
 .titlebar .logo { height: 18px; width: auto; }
@@ -267,6 +269,8 @@ img.icon { filter: var(--icon-filter); }
 /* The line being executed: blue, with a bar -- never the error's pink. */
 .edhost .cm-pc-line { background: var(--accent-tint2); box-shadow: inset 3px 0 0 var(--accent), inset 6px 0 8px -4px var(--glow); }
 .edhost .cm-cursor { border-left-color: var(--caret); }
+/* The browser's own caret (CodeMirror's base theme makes it black): the theme's. */
+.edhost .cm-content { caret-color: var(--caret); }
 .edhost .cm-selectionBackground, .edhost .cm-focused .cm-selectionBackground { background: var(--selection) !important; }
 .edhost .cm-activeLine { background: transparent; }
 .cm-error-gutter { width: 18px; display: flex; align-items: center; }
@@ -754,6 +758,29 @@ body.first-screen .status { visibility: hidden; }
    caption buttons sit in it. */
 body.first-screen .titlebar .brand,
 body.first-screen .titlebar .tools { display: none; }
+
+/* ---- the light/dark switch (theme.ts) ---------------------------------- */
+/* A small pill, the sun at one end and the moon at the other, the knob under
+   the theme in use.  On the first screen's card (bottom centre) and at the
+   status line's right end. */
+.theme-switch { position: relative; display: inline-flex; align-items: center; justify-content: space-between; flex: none;
+  width: 52px; height: 24px; padding: 0 5px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg);
+  -webkit-app-region: no-drag; }
+.theme-switch .ts-knob { position: absolute; top: 2px; left: 2px; width: 24px; height: 18px; border-radius: 9px;
+  background: var(--hover); border: 1px solid var(--border); transition: transform .2s ease; }
+.theme-switch[aria-checked="true"] .ts-knob { transform: translateX(22px); }
+.theme-switch .ts-sun, .theme-switch .ts-moon { position: relative; z-index: 1; display: flex; width: 16px; justify-content: center; }
+.theme-switch img.icon { width: 13px; height: 13px; opacity: .45; transition: opacity .2s ease; }
+.theme-switch[aria-checked="false"] .ts-sun img, .theme-switch[aria-checked="true"] .ts-moon img { opacity: 1; }
+.theme-switch:hover { border-color: var(--strong); }
+.theme-switch:focus-visible { outline: 2px solid var(--strong); outline-offset: 2px; }
+.stheme { display: flex; align-items: center; margin-left: 10px; flex: none; }
+.status .theme-switch { width: 44px; height: 18px; padding: 0 4px; }
+.status .theme-switch .ts-knob { top: 1px; width: 20px; height: 14px; }
+.status .theme-switch[aria-checked="true"] .ts-knob { transform: translateX(18px); }
+.status .theme-switch img.icon { width: 11px; height: 11px; }
+/* On the card: bottom centre of the die frame, at every step and during the opening. */
+.wtheme { position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%); z-index: 1; }
 
 /* ---- dialogs ------------------------------------------------------------ */
 .modal { width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto; padding: 20px 22px; border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 16px 48px rgba(var(--shadow-rgb), .20); color: var(--text); }

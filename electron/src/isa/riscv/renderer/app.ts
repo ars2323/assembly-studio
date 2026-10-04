@@ -54,7 +54,8 @@ import type { EngineState } from '../sim/host.ts';
 import type { ErrorItem, RunReply } from '../sim/protocol.ts';
 import { api, type AboutInfo } from './api.ts';
 import { brand } from '../../../brand.ts';
-import { asset, character, code, codeText, h, icon, monoCh, withHex } from '../../../renderer/app/dom.ts';
+import { asset, character, code, codeText, h, icon, markImg, monoCh, withHex } from '../../../renderer/app/dom.ts';
+import { onTheme, themeSwitch } from '../../../renderer/app/theme.ts';
 import { captionPatch, palette } from '../../../renderer/app/logic/overlay.ts';
 import { WINDOW_COLOURS } from '../../../main/theme.ts';
 import { notice } from '../../../renderer/app/notice.ts';
@@ -180,9 +181,8 @@ viewRun.addEventListener('click', () => showView('run'));
 const viewSwitch = h('span', { class: 'seg viewswitch', role: 'tablist', hidden: true }, viewEditor, viewRun);
 const titlebar = h('header', { class: 'titlebar' },
   h('span', { class: 'brand home', title: 'Home (choose the ISA)', role: 'button', tabindex: '0' },
-    h('img', { class: 'logo', src: asset(brand.mark), alt: '' }),
+    markImg('logo'),
     h('span', { class: 'appname' }, APP_NAME)),
-  fileLabel,
   toolbar,
   viewSwitch,
   h('span', { class: 'drag' }),
@@ -195,6 +195,8 @@ const homeButton = titlebar.querySelector<HTMLElement>('.brand')!;
 homeButton.addEventListener('click', () => void goHome());
 homeButton.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void goHome(); } });
 const status = h('footer', { class: 'status' });
+// The light/dark switch at the status line's right end (theme.ts); kept across its re-renders.
+const statusTheme = h('span', { class: 'stheme' }, themeSwitch());
 
 // ---- the first screen ------------------------------------------------------------
 
@@ -602,36 +604,33 @@ const TITLE_LAST = ['iconsonly', 'smallicons'] as const;
 const tools = titlebar.querySelector('.tools') as HTMLElement;
 function fitTitlebar(): void {
   const end = () => titlebar.getBoundingClientRect().right - parseFloat(getComputedStyle(titlebar).paddingRight);
-  const fits = () => tools.getBoundingClientRect().right <= end() + 0.5;
-  titlebar.classList.remove('noapp', ...TITLE_LAST);
-  showFileName(FILE_MOST);
+  const brandEl = titlebar.querySelector('.brand') as HTMLElement;
+  /* It fits when the tools end before the caption buttons' room and the
+     centred mark and name sit clear of the toolbar on their left and of the
+     tools on their right. */
+  const fits = () => {
+    const t = tools.getBoundingClientRect();
+    if (t.right > end() + 0.5) return false;
+    if (titlebar.classList.contains('nobrand')) return true;
+    const b = brandEl.getBoundingClientRect();
+    const left = Math.max(toolbar.getBoundingClientRect().right, viewSwitch.hidden ? 0 : viewSwitch.getBoundingClientRect().right);
+    return left <= b.left - 12 && b.right <= t.left - 12;
+  };
+  titlebar.classList.remove('noapp', 'nobrand', ...TITLE_LAST);
   for (let level = 0; level <= TITLE_STEPS.length; level += 1) {
     TITLE_STEPS.forEach((step, k) => titlebar.classList.toggle(step, k < level));
     nameAssemble();
     if (fits()) return;
   }
-  // The longest name that fits, between FILE_LEAST and FILE_MOST columns.
-  const longest = (): boolean => {
-    let lo = FILE_LEAST;
-    let hi = FILE_MOST;
-    showFileName(lo);
-    if (!fits()) return false;
-    while (lo < hi) {
-      const mid = Math.ceil((lo + hi) / 2);
-      showFileName(mid);
-      if (fits()) lo = mid; else hi = mid - 1;
-    }
-    showFileName(lo);
-    return true;
-  };
-  if (longest()) return;
+  // Then the program's name (the mark stays), the buttons' names, their
+  // icons' size, and last the mark itself.
   titlebar.classList.add('noapp');
-  if (longest()) return;
+  if (fits()) return;
   for (let level = 1; level <= TITLE_LAST.length; level += 1) {
     TITLE_LAST.forEach((step, k) => titlebar.classList.toggle(step, k < level));
-    if (longest()) return;
+    if (fits()) return;
   }
-  showFileName(FILE_LEAST);
+  titlebar.classList.add('nobrand');
 }
 window.addEventListener('resize', () => fitTitlebar());
 // The room kept for the caption buttons (the padding's env(titlebar-area-*))
@@ -698,7 +697,7 @@ function renderStatus(): void {
   if (note) parts.push(cell('warn', note));
   else if (exportNote) parts.push(cell('ok', exportNote));
   if (open && hints.length) parts.push(keys(...hints));
-  status.replaceChildren(...parts);
+  status.replaceChildren(...parts, statusTheme);
 }
 
 // ---- files -------------------------------------------------------------------------
@@ -1374,7 +1373,7 @@ function showCongrats(): void {
 // covers it, the patch takes the colour the title bar has under the same
 // layers (logic/overlay.ts), or it would stand out at the top right; the
 // title bar's own again after.  The buttons keep working throughout.
-const colours = palette(getComputedStyle(document.documentElement));
+let colours = palette(getComputedStyle(document.documentElement));
 let overlayNow = `${WINDOW_COLOURS.titlebar} ${WINDOW_COLOURS.symbol}`; // the window's own at its start (src/main/main.ts)
 function updateOverlay(): void {
   const b = document.body.classList;
@@ -1383,6 +1382,7 @@ function updateOverlay(): void {
   overlayNow = `${p.color} ${p.symbolColor}`;
   void api.setOverlay(p);
 }
+onTheme(() => { colours = palette(getComputedStyle(document.documentElement)); overlayNow = ''; updateOverlay(); });
 new MutationObserver(updateOverlay).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'open'] });
 updateOverlay(); // the first screen is up before anything is watched
 
