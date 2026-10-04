@@ -42,8 +42,14 @@
   --primary-shadow: 0 0 10px rgba(255, 255, 255, .18); /* white light round the primary button */
   --caret: #ffffff; --selection: #3a3a3a;
   --switch-knob: #1f1f1f; --switch-knob-shadow: none; /* the light/dark switch's knob */
-  --tut-card-bg: #1b1b1b; --tut-card-border: rgba(255, 255, 255, .32); --tut-text: #f2f2f2; /* the tutorial's card, over the dimmed window */
-  --tut-card-shadow: 0 16px 48px rgba(var(--shadow-rgb), .65), 0 0 28px rgba(var(--accent-rgb), .07);
+  /* the tutorial: its card over the dimmed window, the rings, the chips on the card */
+  --tut-card-bg: #1c1c1c; --tut-card-border: rgba(255, 255, 255, .16); --tut-text: #e8e8e8; --tut-divider: rgba(255, 255, 255, .08);
+  --tut-card-shadow: 0 24px 56px rgba(0, 0, 0, .62), 0 2px 10px rgba(0, 0, 0, .4), inset 0 1px 0 rgba(255, 255, 255, .05);
+  --tut-ring: #ffffff; --tut-ring-glow: 0 0 0 4px rgba(255, 255, 255, .10), 0 0 22px rgba(255, 255, 255, .22);
+  --tut-track: rgba(255, 255, 255, .10); --tut-fill: #ffffff;
+  --tut-code-bg: rgba(255, 255, 255, .07); --tut-code-border: rgba(255, 255, 255, .10);
+  --tut-kbd-bg: #262626; --tut-kbd-border: #3a3a3a;
+  --tut-do-bg: rgba(255, 255, 255, .035); --tut-do-border: rgba(255, 255, 255, .09);
   --teal: #5fb8b0; --gray: #4a4a4a;
   --teal-tint: #12302d; --teal-text: #7fd1c9;
   --amber-tint: #2e2610; --amber-text: #e3c06b; --purple: #b6a2e0; --cp0-tint: #1c1c1c; --cp0-text: #9a9a9a;
@@ -89,8 +95,13 @@
   --primary-shadow: 0 1px 2px rgba(16, 24, 40, .14), 0 2px 6px rgba(16, 24, 40, .08);
   --caret: #111111; --selection: #ccd7e8;
   --switch-knob: #ffffff; --switch-knob-shadow: 0 1px 2px rgba(16, 24, 40, .16);
-  --tut-card-bg: #ffffff; --tut-card-border: rgba(16, 24, 40, .14); --tut-text: #1f2328;
-  --tut-card-shadow: 0 16px 40px rgba(16, 24, 40, .28), 0 2px 6px rgba(16, 24, 40, .10);
+  --tut-card-bg: #ffffff; --tut-card-border: rgba(16, 24, 40, .12); --tut-text: #2b3038; --tut-divider: #eceef1;
+  --tut-card-shadow: 0 24px 52px rgba(16, 24, 40, .24), 0 2px 8px rgba(16, 24, 40, .08);
+  --tut-ring: #111111; --tut-ring-glow: 0 0 0 4px rgba(17, 17, 17, .08), 0 0 18px rgba(17, 17, 17, .14);
+  --tut-track: rgba(16, 24, 40, .10); --tut-fill: #111111;
+  --tut-code-bg: #f2f3f5; --tut-code-border: #e2e5e9;
+  --tut-kbd-bg: #ffffff; --tut-kbd-border: #d5d9df;
+  --tut-do-bg: #f7f8fa; --tut-do-border: #e6e8ec;
   --teal: #0f766e; --gray: #a8adb5;
   --teal-tint: #e2f3f0; --teal-text: #0f766e;
   --amber-tint: #fdf2d8; --amber-text: #8a5a00; --purple: #6a48c0; --cp0-tint: #eff1f4; --cp0-text: #565e6b;
@@ -484,7 +495,7 @@ img.icon { filter: var(--icon-filter); }
 .trow .src { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; }
 .trow.band { box-shadow: inset 2px 0 0 var(--gray); }
 .trow.pc { background: var(--accent-tint2); border-left-color: var(--accent); box-shadow: inset 6px 0 8px -4px var(--glow); }
-.textpanel.quiet-pc .trow.pc:not(.sel) { background: none; border-left-color: transparent; } /* the tutorial's steps 8-9 */
+.textpanel.quiet-pc .trow.pc:not(.sel) { background: none; border-left-color: transparent; } /* the tutorial: a step about one instruction */
 .trow.sel { background: var(--amber-tint); }
 .trow.sel .dis { color: var(--strong); font-weight: 700; }
 .trow .bp { width: 12px; height: 12px; border-radius: 50%; cursor: pointer; }
@@ -1020,35 +1031,102 @@ html.theme-fade, html.theme-fade *:not(canvas), html.theme-fade *::before, html.
 .about .licenses details { border-bottom: 1px solid var(--border); padding: 6px 0; }
 .about .licenses pre { max-height: 240px; overflow: auto; white-space: pre-wrap; font-size: 11.5px; background: var(--bg); padding: 8px 10px; border-radius: 6px; }
 
-/* ---- the tutorial (tutorial.ts) ------------------------------------------------ */
-/* Lightly dimmed around what a step points at (the surroundings stay
-   readable), a ring on each target; the card beside them, Haram on its
-   white at the far end.  One Haram on screen: the others wait. */
+/* ---- the tutorial (tutorial/engine.ts) --------------------------------------- */
+/* The window dimmed around what a step is about (the panels it points into
+   stay lit, their corners round and the scrim's edge soft), one ring on
+   each target, and the card beside them with a small arrow toward the
+   first.  The card: the progress along its top edge, the chapter and the
+   step's number, the title, the words, what to do, the keys and buttons.
+   A new card and its rings come in once (a short fade); nothing moves on
+   its own after that. */
 .tut { position: fixed; inset: 0; z-index: 40; pointer-events: none; }
-.tut-dim { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.tut-dim { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; animation: tut-fade .2s ease-out; }
 /* Dark but for the lit panels (clicks go through it); a clear layer over
-   everything but the targets takes the clicks (tutorial.ts). */
-.tut-dim path.dim { fill: rgba(var(--scrim-rgb), .55); pointer-events: none; }
+   everything but the targets takes the clicks (tutorial/engine.ts). */
+.tut-dim path.dim { fill: rgba(var(--scrim-rgb), .6); pointer-events: none; }
 .tut-dim path.block { fill: transparent; pointer-events: visiblePainted; }
-.tut-ring { position: absolute; border: 2px solid var(--accent); border-radius: 6px; box-shadow: 0 0 0 1px rgba(var(--accent-rgb), .25), 0 0 16px var(--glow); pointer-events: none; }
-.tut-ring.tight { border-radius: 4px; box-shadow: none; }
-.tut-card { position: absolute; left: 0; top: 0; width: min(380px, calc(100vw - 32px)); display: flex; align-items: flex-end; gap: 12px;
-  padding: 18px 18px 16px 20px; background: var(--tut-card-bg); border: 1px solid var(--tut-card-border); border-radius: 12px;
-  box-shadow: var(--tut-card-shadow); pointer-events: auto; -webkit-app-region: no-drag; }
-.tut-card.haram-left { flex-direction: row-reverse; padding: 18px 20px 16px 18px; }
-.tut-card img.char { flex: none; }
-.tut-say { flex: 1; min-width: 0; }
-.tut-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--text-2); }
-.tut-count { font-weight: 600; color: var(--accent); }
-.tut-quit { border: 0; background: none; padding: 0; height: auto; color: var(--text-2); font-size: 13px; }
-.tut-quit:hover { color: var(--strong); text-decoration: underline; }
-.tut-say h3 { margin: 8px 0 8px; font-size: 18px; line-height: 1.35; color: var(--strong); }
-.tut-say p { margin: 0; color: var(--tut-text); font-size: 14.5px; line-height: 1.65; }
-.tut-buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
-.tut-buttons .btn { height: 32px; padding: 0 16px; font-size: 13.5px; }
-.tut-card.kind-end { width: min(460px, calc(100vw - 32px)); }
-/* The narrow window (Editor | Run as tabs): a slimmer card, so that it still finds a place beside the error list's words. */
-@media (max-width: 979px) { .tut-card { width: min(320px, calc(100vw - 32px)); } .tut-card.kind-end { width: min(420px, calc(100vw - 32px)); } }
-body.tutorial-on img.char:not(.tut-char):not(.modal img.char) { visibility: hidden; }
-/* A dialog over the tutorial: its Haram speaks; the card's gives way (one Haram). */
-body.dialog-open .tut-card img.char { visibility: hidden; }
+.tut-ring { position: absolute; border: 2px solid var(--tut-ring); border-radius: 8px; box-shadow: var(--tut-ring-glow); pointer-events: none; }
+.tut-ring.tight { border-width: 1.5px; border-radius: 5px; box-shadow: none; }
+.tut-rings.enter .tut-ring { animation: tut-fade .2s ease-out; }
+
+.tut-card { position: absolute; left: 0; top: 0; width: min(408px, calc(100vw - 32px)); padding: 20px 22px 14px;
+  background: var(--tut-card-bg); border: 1px solid var(--tut-card-border); border-radius: 12px; box-shadow: var(--tut-card-shadow);
+  color: var(--tut-text); pointer-events: auto; -webkit-app-region: no-drag; }
+.tut-card.enter { animation: tut-in .18s ease-out; }
+/* The arrow: a square turned 45°, its two outer sides bordered, over the card's edge. */
+.tut-arrow { position: absolute; width: 14px; height: 14px; background: var(--tut-card-bg); border: 1px solid transparent; transform: rotate(45deg);
+  pointer-events: none; z-index: 1; }
+.tut-arrow[data-side=below] { border-top-color: var(--tut-card-border); border-left-color: var(--tut-card-border); border-top-left-radius: 3px; }
+.tut-arrow[data-side=above] { border-bottom-color: var(--tut-card-border); border-right-color: var(--tut-card-border); border-bottom-right-radius: 3px; }
+.tut-arrow[data-side=right] { border-bottom-color: var(--tut-card-border); border-left-color: var(--tut-card-border); border-bottom-left-radius: 3px; }
+.tut-arrow[data-side=left] { border-top-color: var(--tut-card-border); border-right-color: var(--tut-card-border); border-top-right-radius: 3px; }
+.tut-arrow.enter { animation: tut-fade .18s ease-out; }
+@keyframes tut-in { from { opacity: 0; transform: translateY(6px); } }
+@keyframes tut-fade { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .tut-card.enter, .tut-arrow.enter, .tut-rings.enter .tut-ring, .tut-dim { animation: none; } }
+
+/* The progress: a piece for each chapter, as long as its steps, filled to this step. */
+.tut-progress { display: flex; gap: 3px; height: 3px; margin: 0 0 16px; }
+.tut-seg { flex-basis: 0; min-width: 0; overflow: hidden; border-radius: 2px; background: var(--tut-track); }
+.tut-fill { display: block; height: 100%; background: var(--tut-fill); }
+.tut-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px;
+  font: 600 12px/1.2 var(--ui); letter-spacing: .02em; color: var(--muted); }
+.tut-count { flex: none; font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.tut-card h3 { margin: 0 0 8px; font-size: 18px; font-weight: 700; line-height: 1.38; letter-spacing: -.01em; color: var(--strong); }
+.tut-card p { margin: 0; font-size: 14.5px; line-height: 1.68; color: var(--tut-text); }
+/* `code` in the words: a quiet chip in the code font. */
+.tut-card p .mono { padding: 1px 5px; margin: 0 1px; border: 1px solid var(--tut-code-border); border-radius: 5px; background: var(--tut-code-bg);
+  font-size: .92em; color: var(--strong); white-space: nowrap; }
+.tut-card kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px;
+  border: 1px solid var(--tut-kbd-border); border-bottom-width: 2px; border-radius: 5px; background: var(--tut-kbd-bg);
+  font: 600 11.5px/1 var(--code); color: var(--strong); }
+
+/* A practice step: what it waits for, in short; once done, "완료". */
+.tut-do { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin-top: 14px; padding: 9px 12px;
+  border: 1px solid var(--tut-do-border); border-radius: 8px; background: var(--tut-do-bg); font-size: 13px; color: var(--text-2); }
+.tut-do-label { font-weight: 600; color: var(--strong); }
+.tut-do-what { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 5px; }
+.tut-do-click { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border: 1px solid var(--tut-kbd-border); border-radius: 5px;
+  background: var(--surface); font-weight: 600; color: var(--strong); white-space: nowrap; }
+.tut-do.done { display: inline-flex; gap: 6px; margin-top: 12px; padding: 4px 11px 4px 8px; border-color: transparent; border-radius: 999px;
+  background: var(--teal-tint); color: var(--teal-text); font-size: 12.5px; }
+.tut-do.done .tut-do-label { color: var(--teal-text); }
+.tut-glyph { width: 16px; height: 16px; flex: none; color: var(--strong); }
+.tut-glyph path { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tut-do.done .tut-glyph { color: var(--teal-text); }
+
+/* The foot: the keys on the left, the buttons on the right. */
+.tut-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 18px; padding-top: 12px;
+  border-top: 1px solid var(--tut-divider); }
+.tut-hints { display: flex; align-items: center; gap: 10px; min-width: 0; font-size: 12px; color: var(--muted); }
+.tut-hints kbd { min-width: 20px; height: 20px; padding: 0 5px; font-size: 11px; font-weight: 500; color: var(--text-2); }
+.tut-keys { display: inline-flex; gap: 3px; }
+.tut-quit { display: inline-flex; align-items: center; gap: 6px; padding: 2px 4px; margin-left: -2px; border: 0; border-radius: 6px; background: none;
+  color: var(--muted); font-size: 12px; white-space: nowrap; }
+.tut-quit:hover { color: var(--strong); background: var(--hover); }
+.tut-buttons { display: flex; align-items: center; gap: 6px; flex: none; }
+.tut-buttons .btn { height: 32px; padding: 0 14px; font-size: 13.5px; }
+.tut-buttons .btn.primary { min-width: 72px; justify-content: center; font-weight: 600; }
+.tut-buttons .tut-back { border-color: transparent; background: none; color: var(--text-2); }
+.tut-buttons .tut-back:hover:not(:disabled) { background: var(--hover); color: var(--strong); }
+.tut-buttons .tut-skip { padding: 0 8px; border-color: transparent; background: none; color: var(--text-2); text-decoration: underline;
+  text-decoration-color: transparent; text-underline-offset: 3px; }
+.tut-buttons .tut-skip:hover:not(:disabled) { background: none; color: var(--strong); text-decoration-color: currentColor; }
+
+/* The last card: the chapters done, in two columns. */
+.tut-card.kind-end { width: min(452px, calc(100vw - 32px)); }
+.tut-card.kind-end .tut-foot { justify-content: flex-end; }
+.tut-recap { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; margin: 14px 0 0; padding: 12px 14px; list-style: none;
+  border: 1px solid var(--tut-do-border); border-radius: 8px; background: var(--tut-do-bg); font-size: 13px; color: var(--text); }
+.tut-recap li { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.tut-recap li b { font-weight: 600; color: var(--muted); }
+.tut-recap .tut-glyph { width: 14px; height: 14px; color: var(--teal-text); }
+
+/* The narrow window (Editor | Run as tabs): a slimmer card. */
+@media (max-width: 979px) {
+  .tut-card { width: min(352px, calc(100vw - 32px)); padding: 18px 20px 12px; }
+  .tut-card.kind-end { width: min(420px, calc(100vw - 32px)); }
+}
+/* Drawn only on hover (a register's star, the alias chip): shown while a step is about it. */
+.tut-show { opacity: 1 !important; }
+.rrow .star.tut-show { color: var(--strong); }

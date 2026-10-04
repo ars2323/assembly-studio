@@ -74,7 +74,8 @@ import { settingsDialog } from './panels/settings.ts';
 import { TextPanel } from '../../../renderer/app/panels/text.ts';
 import { welcome } from '../../../renderer/app/panels/welcome.ts';
 import { ask } from '../../../renderer/app/panels/ask.ts';
-import { Tutorial, type Example, type Signal } from './tutorial.ts';
+import { Tutorial, type Example, type Signal } from '../../../renderer/app/tutorial/engine.ts';
+import { CHAPTERS } from './tutorial-steps.ts';
 import type { DataSection } from '../../../renderer/app/panels/data.ts';
 import { panelHead } from '../../../renderer/app/ui.ts';
 import { ago, cell, clock, count, keys, lead, lines as lineList, plural } from '../../../renderer/app/cells.ts';
@@ -388,6 +389,7 @@ function measure(): void {
 function buildRegisters(): void {
   registers = new RegisterPanel(lastRegs ?? ZERO_REGS);
   regsHost.replaceChildren(registers.root);
+  registers.onMark = (m) => emit(m); // a star, an alias: the tutorial waits for them
 }
 
 // The Run side shows the machine from the first assemble on; the Editor's
@@ -898,6 +900,8 @@ const tutorial = new Tutorial({
   revealAddr: (addr) => text.revealAddr(addr),
   showColumn: (panel, key) => (panel === 'regs' ? registers?.showColumn(key as 'dec' | 'bin') ?? 'already' : text.showColumn(key as 'word')),
   releaseColumn: (panel, key) => { if (panel === 'regs') registers?.releaseColumn(key as 'dec' | 'bin'); else text.releaseColumn(key as 'word'); },
+  marks: () => registers?.marks() ?? { pins: [], aliases: [] },
+  setMarks: (m) => registers?.setMarks(m),
   on: (l) => { listeners.push(l); },
   close: async () => {
     await forgetMachine();
@@ -921,7 +925,7 @@ const tutorial = new Tutorial({
     }
     renderChrome();
   },
-});
+}, CHAPTERS);
 (window as unknown as { __tutorial: Tutorial }).__tutorial = tutorial; // for the tests
 
 // The machine no longer matches what is on screen: a new file.
