@@ -3,6 +3,7 @@
 
 import rars.*;
 import rars.riscv.hardware.*;
+import rars.simulator.BackStepper;
 import rars.simulator.Simulator;
 import rars.simulator.SimulatorNotice;
 import rars.util.SystemIO;
@@ -254,13 +255,7 @@ public class RarsProbe {
                 resolveBreakpoints();
                 return "\"ok\":true,\"breakpoints\":" + breakpointsJson();
             }
-            case "backstep": {
-                if (Globals.program == null || Globals.program.getBackStepper() == null || Globals.program.getBackStepper().empty())
-                    return err("nothing_to_undo", "no recorded step to undo");
-                Globals.program.getBackStepper().backStep();
-                terminated = false;
-                return "\"ok\":true," + regsJson();
-            }
+            case "backstep": return backstep();
             case "step": case "run": {
                 // RARS records undo entries for every instruction while the back-stepper is engaged.
                 if (Globals.program != null && Globals.program.getBackStepper() != null)
@@ -282,6 +277,8 @@ public class RarsProbe {
         RISCVprogram p = new RISCVprogram();
         Globals.program = p;
         terminated = true;
+        undo = 0;
+        exitedAt = null;
         StringBuilder sb = new StringBuilder();
         try {
             p.fromString(source);
@@ -373,14 +370,16 @@ public class RarsProbe {
         }
         if (Globals.program != null && Globals.program.getBackStepper() != null)
             Globals.program.getBackStepper().setEnabled(pd.backstep);
+        long retired = ControlAndStatusRegisterFile.getValueNoNotify("instret") - pd.instret0;
+        count(pd, r, retired);
         if (e != null) {
             ErrorMessage m = e.error();
             sb.append(",\"cause\":").append(e.cause())
               .append(",\"message\":").append(Json.str(m == null ? String.valueOf(e) : m.getMessage()))
               .append(",\"line\":").append(m == null ? 0 : m.getLine());
         }
-        long steps = ControlAndStatusRegisterFile.getValueNoNotify("instret") - pd.instret0;
-        sb.append(",\"steps\":").append(steps).append(",\"ns\":").append(System.nanoTime() - pd.t0);
+        sb.append(",\"steps\":").append(retired).append(",\"ns\":").append(System.nanoTime() - pd.t0);
+        sb.append(",\"undo\":").append(undo);
         if (pd.isStep) {
             try {
                 ProgramStatement s = Globals.memory.getStatementNoNotify(pd.pcBefore);
@@ -392,6 +391,53 @@ public class RarsProbe {
         sb.append(',').append(regsJson()).append('}');
         busy = false;
         send(sb.toString());
+    }
+
+    // ---- step back: how far RARS's back-stepper can go ----
+    // RARS keeps its undo records as changes (a register, a word of memory, PC), at most
+    // Globals.maximumBacksteps (2000 by default) of them, not as instructions.  The engine counts
+    // the instructions they belong to, at most UNDO_LIMIT, so that `backstep` undoes one
+    // instruction at a time and says how many more it can (`undo`).
+    static final int UNDO_LIMIT = 1000;
+    static int undo = 0;
+    // The ecall that ended the program (Exit, Exit2).  RARS records nothing for it: undoing it
+    // is PC back on it, and the program no longer finished.
+    static Integer exitedAt = null;
+
+    static void count(Pending pd, Simulator.Reason r, long retired) {
+        if (!pd.backstep) {
+            // Instructions ran without records: what is recorded no longer leads up to here.
+            if (retired > 0 || r == Simulator.Reason.NORMAL_TERMINATION || r == Simulator.Reason.EXCEPTION) undo = 0;
+        } else {
+            undo += (int) Math.min(retired, UNDO_LIMIT);
+            // The instruction that raised an exception is not retired, but RARS records what it
+            // wrote (ucause, uepc, utval); undoing that puts PC back on it.
+            if (r == Simulator.Reason.EXCEPTION) undo += 1;
+        }
+        exitedAt = null;
+        if (r == Simulator.Reason.NORMAL_TERMINATION && pd.backstep) {
+            exitedAt = RegisterFile.getProgramCounter() - rars.riscv.Instruction.INSTRUCTION_LENGTH;
+            undo += 1;
+        }
+        undo = Math.max(0, Math.min(undo, UNDO_LIMIT));
+    }
+
+    static String backstep() {
+        BackStepper bs = Globals.program == null ? null : Globals.program.getBackStepper();
+        if (bs == null || undo <= 0) return err("nothing_to_undo", "no recorded step to undo");
+        if (exitedAt != null && terminated) {
+            RegisterFile.initializeProgramCounter(exitedAt);  // not recorded: nothing to undo later
+        } else {
+            if (bs.empty()) { undo = 0; return err("nothing_to_undo", "no recorded step to undo"); }
+            // backStep() acts only while the back-stepper is engaged.
+            bs.setEnabled(true);
+            bs.backStep();
+        }
+        exitedAt = null;
+        undo -= 1;
+        if (bs.empty()) undo = Math.min(undo, 0);
+        terminated = false;
+        return "\"ok\":true,\"undo\":" + undo + "," + regsJson();
     }
 
     static String regsJson() {

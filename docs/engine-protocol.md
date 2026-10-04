@@ -176,6 +176,7 @@ The response comes when execution finishes (if it waits for input, it is held un
 | `f[32]` | **Single-precision view** of f0–f31: the low 32 bits if the value is NaN-boxed, otherwise `0x7fc00000` (NaN). Same as RARS's display rule |
 | `fbits[32]` | Raw 64 bits of f0–f31 (hex). Doubles are visible only here |
 | `exit` | Only when the program ended. The value passed to Exit2 (93), otherwise 0 |
+| `undo` | How many instructions `backstep` can undo now (§5.7) |
 | `cause`, `message`, `line` | Only when it ended with an exception (§6.2) |
 
 ### 5.4 `run`
@@ -185,7 +186,9 @@ The response comes when execution finishes (if it waits for input, it is held un
 ```
 
 Runs until it stops. With `max`, it runs that many instructions and stops with `MAX_STEPS` (batched execution of
-the "Instant" kind). The response is like `step`'s, without `executed`.
+the "Instant" kind). The response is like `step`'s, without `executed`. `backstep` (default true) works as in
+`step`; recording costs a run about a third more time (RARS's back-stepper; measured on a 13.8 M-instruction loop:
+9.1 s without, 12.2 s with). The app records runs too, so that Step back works after Run.
 
 | reason | Next state | Meaning |
 |---|---|---|
@@ -233,12 +236,25 @@ line executes that instruction and goes on (like "continue" in a GUI).
 ### 5.7 `backstep`
 
 ```json
-{"id":6,"cmd":"backstep"}  →  {"id":6,"ok":true,"pc":...,"x":[...],"f":[...],"fbits":[...]}
+{"id":6,"cmd":"backstep"}  →  {"id":6,"ok":true,"undo":41,"pc":...,"x":[...],"f":[...],"fbits":[...]}
 ```
 
-Undoes the last instruction (registers, memory, PC) with RARS's back-stepper. History exists only for instructions
-executed with `backstep:true`. The limit is RARS's setting (default 2000). It works in `finished` too, and undoing
-returns to `ready`. With no history: `nothing_to_undo`.
+Undoes the last instruction executed (registers, floating-point registers, CSRs, memory, PC) with RARS's
+back-stepper, one instruction per request. The response has `undo`, how many more instructions can be undone.
+With none: `nothing_to_undo`.
+
+- History exists only for instructions executed with `backstep:true` (step and run). A step or run with
+  `backstep:false` that executes anything leaves none (`undo` 0): what was recorded before it no longer leads up to
+  the machine as it is.
+- The engine counts at most the last **1000** instructions. RARS itself keeps its records as changes (a register, a
+  word of memory, PC), at most 2000 of them (its `BackstepLimit`); an instruction makes one or two, so 1000
+  instructions fit, but instructions that make many (ReadString writes one per byte) can make the history shorter.
+  `undo` then reaches 0 early. RARS undoes consecutive executions of one same instruction (a one-instruction
+  loop) together.
+- It works in `finished` too, and undoing returns to `ready`. After the Exit or Exit2 `ecall` the first `backstep`
+  puts PC back on that `ecall` (RARS records nothing for it). After an `EXCEPTION`, the first `backstep` undoes what
+  the faulting instruction wrote (`ucause`, `uepc`, `utval`) and puts PC back on it.
+- Console output already sent and input already read are not undone.
 
 ### 5.8 `regs`
 
@@ -435,6 +451,9 @@ Found while writing the specification. Fixed ones are in the change log; the res
     `assemble` response would not raise the version.
 
 ## Change log
+
+- Additions in version 2 (no version change): `undo` in the `step`, `run` and `backstep` responses; `backstep`
+  undoes exactly one instruction, also the Exit `ecall` and a faulting instruction, counting at most 1000.
 
 - **2**. Raised while the app did not yet use version 1 (nothing depended on it). There is no negotiation path.
   Two items left as "the app's duty" became the engine's responsibility. Both are the kind that goes silently wrong
