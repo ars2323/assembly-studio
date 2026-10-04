@@ -1013,6 +1013,11 @@ html.theme-fade, html.theme-fade *:not(canvas), html.theme-fade *::before, html.
 .modal .radios { display: flex; flex-direction: column; gap: 4px; }
 .modal .radio { display: flex; gap: 8px; align-items: center; }
 .modal input.text { flex: 1; height: 28px; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; font-size: var(--fs); }
+/* Its first lines: the mark, the name and the version. */
+.about-id { display: flex; align-items: center; gap: 14px; margin: 4px 0 14px; }
+.about-mark { width: 44px; height: 44px; flex: none; }
+.about-name { font-size: 17px; font-weight: 700; color: var(--strong); }
+.about-ver { margin-top: 2px; color: var(--text-2); font-size: 12.5px; }
 .about .tabs { display: flex; gap: 2px; height: 34px; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
 .about .tab { display: flex; align-items: center; padding: 0 12px; border: 0; background: none; color: var(--text-2); font-weight: 500; border-bottom: 2px solid transparent; }
 .about .tab.on { color: var(--strong); border-bottom-color: var(--accent); font-weight: 600; }
