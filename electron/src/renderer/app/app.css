@@ -56,14 +56,19 @@
   --blue-tint: #1a2638; --blue-text: #8fb6ec; --blue-pale: #c9d7ec; /* the R format, rs */
   --error: #ff6b5b; --error-hover: #e05a4b; --error-rgb: 255, 107, 91; --error-tint: #2b1614; --error-text: #ff8f83;
   --changed: #2e2610; --changed-bar: #e3c06b; --changed-text: #f2d48a; --flash-rgb: 227, 192, 107;
-  --changed-glow: rgba(227, 192, 107, .55);
   --stack-tint: #1a1a1a; --stack-text: #bdbdbd; --stack-line: #333333;
   --bit-bg: rgba(255, 255, 255, .06);
-  --f-opcode-bg: #1c2433; --f-shamt-bg: #241f33; --f-imm-bg: #12302d; --f-imm-text: #7fd1c9;
+  --f-shamt-bg: #241f33;
   /* RISC-V: the immediate's scattered pieces (isa/riscv/renderer/riscv.css) */
-  --piece1-bg: #12302d; --piece1-text: #7fd1c9; --piece2-bg: #2e2610; --piece2-text: #e3c06b;
-  --piece3-bg: #241f33; --piece3-text: #c3b2ea; --piece4-bg: #1a2638; --piece4-text: #8fb6ec;
-  --ibox-bg: #161c1c;
+  /* The Inspector's fields: greys by role -- what the instruction is (opcode,
+     funct), the registers, the immediate -- bits always bright. */
+  --field-op-bg: #171717; --field-op-text: #c8c8c8;
+  --field-reg-bg: #222222; --field-reg-text: #f5f5f5;
+  --field-imm-bg: #2c2c2c; --field-imm-text: #ffffff;
+  /* RISC-V's split immediate: its pieces four steps apart, each outlined. */
+  --piece1-bg: #5c5c5c; --piece2-bg: #474747; --piece3-bg: #343434; --piece4-bg: #1e1e1e;
+  --piece-text: #ffffff; --piece-edge: rgba(255, 255, 255, .16);
+  --ibox-bg: #1c1c1c;
   --shadow-rgb: 0, 0, 0;    /* shadows */
   --scrim-rgb: 0, 0, 0;     /* the tutorial's dimming and a dialog's backdrop */
   /* The title bar's minimise / maximise / close buttons (panels/caption.ts),
@@ -111,13 +116,15 @@
   --blue-tint: #e5eefb; --blue-text: #1b5fbf; --blue-pale: #34507a;
   --error: #c4312a; --error-hover: #a8281f; --error-rgb: 196, 49, 42; --error-tint: #fdecea; --error-text: #b3261e;
   --changed: #fff1cc; --changed-bar: #b06a00; --changed-text: #7a4b00; --flash-rgb: 245, 190, 70;
-  --changed-glow: transparent;
   --stack-tint: #f7f7f9; --stack-text: #3f4652; --stack-line: #d5d8de;
   --bit-bg: rgba(255, 255, 255, .6);
-  --f-opcode-bg: #e8edf5; --f-shamt-bg: #eeeafa; --f-imm-bg: #e2f3f0; --f-imm-text: #0f766e;
-  --piece1-bg: #e2f3f0; --piece1-text: #0f766e; --piece2-bg: #fdf2d8; --piece2-text: #8a5a00;
-  --piece3-bg: #eeeafa; --piece3-text: #5c40b4; --piece4-bg: #e5eefb; --piece4-text: #1b5fbf;
-  --ibox-bg: #edf6f4;
+  --f-shamt-bg: #eeeafa;
+  --field-op-bg: #eceef1; --field-op-text: #3d434c;
+  --field-reg-bg: #e2e5e9; --field-reg-text: #0f1115;
+  --field-imm-bg: #d6dae0; --field-imm-text: #0f1115;
+  --piece1-bg: #aeb5bf; --piece2-bg: #c6ccd4; --piece3-bg: #dce0e5; --piece4-bg: #f3f4f6;
+  --piece-text: #0f1115; --piece-edge: rgba(15, 17, 21, .18);
+  --ibox-bg: #eef0f3;
   --shadow-rgb: 16, 24, 40;
   --scrim-rgb: 52, 58, 70;
   --caption-hover: rgba(0, 0, 0, .06); --caption-press: rgba(0, 0, 0, .1);
@@ -607,8 +614,7 @@ img.icon { filter: var(--icon-filter); }
 .rrow .tag { grid-column: tag; display: none; font: 600 10.5px var(--ui); color: var(--changed-text); background: var(--changed-bar); color: var(--surface); border-radius: 8px; padding: 0 6px; line-height: 16px; justify-self: start; }
 .rrow.zero .hex, .rrow.zero .dec, .rrow.zero .bin, .rrow.zero .rn { color: var(--dim); }
 .rrow.chg { background: var(--changed); border-left-color: var(--changed-bar); }
-.rrow.chg .hex { color: var(--changed-text); font-weight: 700; text-shadow: 0 0 6px var(--changed-glow); }
-.rrow.chg .dec, .rrow.chg .bin { color: var(--changed-text); }
+.rrow.chg .hex, .rrow.chg .dec, .rrow.chg .bin { color: var(--changed-text); }
 .rrow.chg .tag { display: inline-block; }
 .regs.hide-tag .rrow .tag, .regs.hide-hex .hex, .regs.hide-dec .dec, .regs.hide-bin .bin { display: none !important; }
 .rrow.flash { animation: regflash .7s ease-out; }
@@ -712,13 +718,10 @@ img.icon { filter: var(--icon-filter); }
 .fbits .bit { text-align: center; font-weight: 700; font-size: calc(var(--fs) + 2px); line-height: 26px; background: var(--bit-bg); border-radius: 3px; margin: 0 1px; }
 .fname { font: 700 12px var(--ui); text-align: center; margin-top: 4px; }
 .fmean { font-size: 11.5px; text-align: center; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 3px; }
-.f-opcode, .f-fmt { background: var(--f-opcode-bg); color: var(--blue-pale); }
-.f-rs { background: var(--blue-tint); color: var(--blue-text); }
-.f-rt, .f-ft { background: var(--teal-tint); color: var(--teal-text); }
-.f-rd, .f-fs { background: var(--amber-tint); color: var(--amber-text); }
-.f-shamt, .f-fd { background: var(--f-shamt-bg); color: var(--purple); }
-.f-funct { background: var(--cp0-tint); color: var(--cp0-text); }
-.f-immediate, .f-target, .f-offset { background: var(--f-imm-bg); color: var(--f-imm-text); }
+/* Greys by role (the tokens above), the same in the word and in the table's chips. */
+.f-opcode, .f-fmt, .f-funct { background: var(--field-op-bg); color: var(--field-op-text); }
+.f-rs, .f-rt, .f-rd, .f-ft, .f-fs, .f-fd, .f-shamt { background: var(--field-reg-bg); color: var(--field-reg-text); }
+.f-immediate, .f-target, .f-offset { background: var(--field-imm-bg); color: var(--field-imm-text); }
 /* What it does: a card, the name and what it stands for over the sentence;
    a note and a branch's or jump's destination at its foot. */
 .explain { margin: 12px var(--ipad) 0; padding: 10px 14px 11px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); line-height: 1.6; }
