@@ -37,9 +37,12 @@
   --accent-tint: #1f1f1f; --accent-tint2: #262626;
   --glow: rgba(255, 255, 255, .35); /* the light a white mark gives off */
   --icon-filter: invert(1); /* the icons are black line drawings */
-  --primary-bg: #1a1a1a; --primary-border: #ffffff; --primary-text: #ffffff; --primary-glow: rgba(255, 255, 255, .18);
+  --primary-bg: #1a1a1a; --primary-border: #ffffff; --primary-text: #ffffff;
+  --primary-shadow: 0 0 10px rgba(255, 255, 255, .18); /* white light round the primary button */
   --caret: #ffffff; --selection: #3a3a3a;
+  --switch-knob: #1f1f1f; --switch-knob-shadow: none; /* the light/dark switch's knob */
   --tut-card-bg: #1b1b1b; --tut-card-border: rgba(255, 255, 255, .32); --tut-text: #f2f2f2; /* the tutorial's card, over the dimmed window */
+  --tut-card-shadow: 0 16px 48px rgba(var(--shadow-rgb), .65), 0 0 28px rgba(var(--accent-rgb), .07);
   --teal: #5fb8b0; --gray: #4a4a4a;
   --teal-tint: #12302d; --teal-text: #7fd1c9;
   --amber-tint: #2e2610; --amber-text: #e3c06b; --purple: #b6a2e0; --cp0-tint: #1c1c1c; --cp0-text: #9a9a9a;
@@ -60,6 +63,48 @@
   --ui: Pretendard, sans-serif; --code: D2Coding, monospace;
   --fs: 13px; --row: 22px; --rrow: 21px;
   --titlebar: 40px; --head: 34px;
+}
+
+/* The light theme (theme.ts): the same board by day.  Off-white grounds,
+   near-black type; black where the dark has white (the primary button, the
+   PC line, the active tab), a soft shadow where it has light.  The colours
+   that mean something keep their meaning, darkened to read on white (every
+   text on its tint at least 4.5:1).  Every token above has its value here;
+   src/main/theme.ts LIGHT_BACKGROUND repeats --bg. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --border: #e1e4e8; --hover: #f3f4f6;
+  --text: #1f2328; --text-2: #4b5563; --muted: #626a76; --dim: #9aa0aa;
+  --text-2-glass: #4b5563;
+  --strong: #0f1115;
+  --accent: #111111; --accent-hover: #f0f1f3; --accent-rgb: 17, 17, 17;
+  --accent-tint: #f0f1f3; --accent-tint2: #e6e8ec;
+  --glow: rgba(16, 24, 40, .10); /* a shade where the dark has light */
+  --icon-filter: none;
+  --primary-bg: #ffffff; --primary-border: #111111; --primary-text: #111111;
+  --primary-shadow: 0 1px 2px rgba(16, 24, 40, .14), 0 2px 6px rgba(16, 24, 40, .08);
+  --caret: #111111; --selection: #ccd7e8;
+  --switch-knob: #ffffff; --switch-knob-shadow: 0 1px 2px rgba(16, 24, 40, .16);
+  --tut-card-bg: #ffffff; --tut-card-border: rgba(16, 24, 40, .14); --tut-text: #1f2328;
+  --tut-card-shadow: 0 16px 40px rgba(16, 24, 40, .28), 0 2px 6px rgba(16, 24, 40, .10);
+  --teal: #0f766e; --gray: #a8adb5;
+  --teal-tint: #e2f3f0; --teal-text: #0f766e;
+  --amber-tint: #fdf2d8; --amber-text: #8a5a00; --purple: #6a48c0; --cp0-tint: #eff1f4; --cp0-text: #565e6b;
+  --blue-tint: #e5eefb; --blue-text: #1b5fbf; --blue-pale: #34507a;
+  --error: #c4312a; --error-hover: #a8281f; --error-rgb: 196, 49, 42; --error-tint: #fdecea; --error-text: #b3261e;
+  --changed: #fff1cc; --changed-bar: #b06a00; --changed-text: #7a4b00; --flash-rgb: 245, 190, 70;
+  --changed-glow: transparent;
+  --stack-tint: #f7f7f9; --stack-text: #3f4652; --stack-line: #d5d8de;
+  --bit-bg: rgba(255, 255, 255, .6);
+  --f-opcode-bg: #e8edf5; --f-shamt-bg: #eeeafa; --f-imm-bg: #e2f3f0; --f-imm-text: #0f766e;
+  --piece1-bg: #e2f3f0; --piece1-text: #0f766e; --piece2-bg: #fdf2d8; --piece2-text: #8a5a00;
+  --piece3-bg: #eeeafa; --piece3-text: #5c40b4; --piece4-bg: #e5eefb; --piece4-text: #1b5fbf;
+  --ibox-bg: #edf6f4;
+  --shadow-rgb: 16, 24, 40;
+  --scrim-rgb: 52, 58, 70;
+  --caption-symbol: #1f2328;
 }
 
 * { box-sizing: border-box; }
@@ -119,7 +164,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .btn:hover:not(:disabled) { background: var(--hover); }
 .btn img { width: 16px; height: 16px; opacity: .85; }
 img.icon { filter: var(--icon-filter); }
-.btn.primary { background: var(--primary-bg); border-color: var(--primary-border); color: var(--primary-text); box-shadow: 0 0 10px var(--primary-glow); }
+.btn.primary { background: var(--primary-bg); border-color: var(--primary-border); color: var(--primary-text); box-shadow: var(--primary-shadow); }
 .btn.primary:hover:not(:disabled) { background: var(--accent-hover); }
 .btn.primary img { opacity: 1; }
 .btn:disabled { color: var(--gray); cursor: default; }
@@ -275,6 +320,9 @@ img.icon { filter: var(--icon-filter); }
 /* The browser's own caret (CodeMirror's base theme makes it black): the theme's. */
 .edhost .cm-content { caret-color: var(--caret); }
 .edhost .cm-selectionBackground, .edhost .cm-focused .cm-selectionBackground { background: var(--selection) !important; }
+/* The Editor draws no selection layer of its own (no drawSelection): the
+   browser's selection is the one seen, so it takes the theme's colour too. */
+.edhost .cm-content::selection, .edhost .cm-content ::selection { background: var(--selection); }
 .edhost .cm-activeLine { background: transparent; }
 .cm-error-gutter { width: 18px; display: flex; align-items: center; }
 /* Breakpoints: a red dot in their own gutter, the leftmost; clicking sets or clears. */
@@ -824,7 +872,7 @@ body.first-screen .titlebar .tools { display: none; }
   width: 52px; height: 24px; padding: 0 5px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg);
   -webkit-app-region: no-drag; }
 .theme-switch .ts-knob { position: absolute; top: 2px; left: 2px; width: 24px; height: 18px; border-radius: 9px;
-  background: var(--hover); border: 1px solid var(--border); transition: transform .2s ease; }
+  background: var(--switch-knob); border: 1px solid var(--border); box-shadow: var(--switch-knob-shadow); transition: transform .2s ease; }
 .theme-switch[aria-checked="true"] .ts-knob { transform: translateX(22px); }
 .theme-switch .ts-sun, .theme-switch .ts-moon { position: relative; z-index: 1; display: flex; width: 16px; justify-content: center; }
 .theme-switch img.icon { width: 13px; height: 13px; opacity: .45; transition: opacity .2s ease; }
@@ -898,7 +946,7 @@ html.theme-fade, html.theme-fade *:not(canvas), html.theme-fade *::before, html.
 .tut-ring.tight { border-radius: 4px; box-shadow: none; }
 .tut-card { position: absolute; left: 0; top: 0; width: min(380px, calc(100vw - 32px)); display: flex; align-items: flex-end; gap: 12px;
   padding: 18px 18px 16px 20px; background: var(--tut-card-bg); border: 1px solid var(--tut-card-border); border-radius: 12px;
-  box-shadow: 0 16px 48px rgba(var(--shadow-rgb), .65), 0 0 28px rgba(var(--accent-rgb), .07); pointer-events: auto; -webkit-app-region: no-drag; }
+  box-shadow: var(--tut-card-shadow); pointer-events: auto; -webkit-app-region: no-drag; }
 .tut-card.haram-left { flex-direction: row-reverse; padding: 18px 20px 16px 18px; }
 .tut-card img.char { flex: none; }
 .tut-say { flex: 1; min-width: 0; }
