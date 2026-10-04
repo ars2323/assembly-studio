@@ -4,15 +4,14 @@
    its assets are copied to src/renderer/assets/brand/. */
 
 export interface Brand {
-  id: 'generic' | 'hallym';
+  id: 'generic';
   name: string;          // window, title bar, About, Start menu, install folder
   exe: string;           // executable, temp folder (no blanks)
   appId: string;         // Windows AppUserModelId, electron-builder appId
   wordmark: string;      // under the mark on the first screen
   about: string;         // About's one line about the program
-  author: string;
+  author: string;        // who made it: About ("Made by …"), the package's author
   mark: string;          // under src/renderer/assets/ (asset()): on the dark theme
   markOnLight: string;   // the same, on the light theme
   characters: boolean;   // brand/characters/<pose>.png exist (tutorial, notices)
-  hmx: boolean;          // Export executable image (.hmx, for Hallym Circuit Studio)
 }

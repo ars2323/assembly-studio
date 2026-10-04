@@ -1,4 +1,4 @@
-/* The executable image (src/core/hmx.ts) of a program, read from a
+/* The executable image (src/core/asx.ts) of a MIPS program, read from a
    simulator right after assembling it: every value is the core's, nothing
    is assumed.
 
@@ -24,14 +24,13 @@
    process (src/main/main.ts), never the machine on screen. */
 
 import { parseSymbolListing } from '../core/symbols.ts';
-import type { MachineImage } from '../core/hmx.ts';
+import { ImageError, type MachineImage } from '../core/asx.ts';
 import type { CallName, Calls } from './protocol.ts';
 
 export type Call = <M extends CallName>(method: M, ...args: Calls[M][0]) => Promise<Calls[M][1]>;
 type AssembleOptions = Calls['assemble'][0][1];
 
-// Why there is no image; the message is for the student.
-export class ImageError extends Error {}
+export { ImageError };
 
 export async function readImage(call: Call, source: string, options: AssembleOptions): Promise<MachineImage> {
   // The handler alone (a program of one empty line: the scanner needs a byte).
@@ -78,6 +77,7 @@ export async function readImage(call: Call, source: string, options: AssembleOpt
   if (!main) throw new ImageError('No executable image: the program has no main label');
 
   return {
+    isa: 'mips',
     endian: little ? 'little' : 'big',
     entry: main.address >>> 0,
     regs: [{ name: '$sp', value: sp }, { name: '$gp', value: regs.general[28] }],

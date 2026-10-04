@@ -2,7 +2,7 @@
    window.  (The preload serves both windows; src/renderer/app/api.ts is the
    MIPS window's view and the one declared on Window.) */
 
-import type { OpenedFile, Settings } from '../../../main/main.ts';
+import type { ImageJob, ImageReply, OpenedFile, Settings } from '../../../main/main.ts';
 import type { EngineState } from '../sim/host.ts';
 import type { TextFileFormat } from '../../../node/text-file.ts';
 import type { CallName, Calls } from '../sim/protocol.ts';
@@ -28,6 +28,9 @@ export interface AppApi {
   openFile(): Promise<OpenedFile | null>;
   saveFile(file: { path: string | null; name: string; text: string; format: TextFileFormat | null }):
     Promise<{ path: string; name: string } | null>;
+  // The last assembled program as an executable image (.asx): the save
+  // dialog, then the file.  null: cancelled; { error }: no image (why, for the student).
+  exportImage(job: ImageJob): Promise<ImageReply>;
   about(): Promise<AboutInfo>;
   license(index: number): Promise<string>;  // LICENSES[index]; one past the end: Electron's
   openCredits(): Promise<void>;             // LICENSES.chromium.html, in the browser

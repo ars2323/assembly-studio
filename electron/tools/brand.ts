@@ -1,11 +1,11 @@
 /* Puts a brand in place (electron/brands/<id>/):
 
-     node tools/brand.ts [generic|hallym]     default: $STUDIO_BRAND, else generic
+     node tools/brand.ts [generic]     default: $STUDIO_BRAND, else generic
 
    - src/brand.ts re-exports brands/<id>/brand.ts (the only import of a brand,
      so a bundle carries that one only);
    - brands/<id>/assets/ is copied to src/renderer/assets/brand/ (emptied
-     first: a generic build carries no Hallym file).
+     first: nothing of an earlier brand is left).
    Both are generated (.gitignore).  tools/build-ui.ts and tools/package.ts
    call this first. */
 
@@ -13,7 +13,7 @@ import { cpSync, existsSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 const root = path.join(import.meta.dirname, '..');
-export const BRANDS = ['generic', 'hallym'] as const;
+export const BRANDS = ['generic'] as const;
 export type BrandId = typeof BRANDS[number];
 
 export function brandId(arg?: string): BrandId {

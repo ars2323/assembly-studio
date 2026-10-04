@@ -18,8 +18,7 @@ export interface Running {
 }
 
 // STUDIO_E2E_EXE: run the tests against a packaged app (its executable)
-// instead of the source tree -- the Windows CI job does, with the installed
-// HallymMIPS.exe.
+// instead of the source tree (an installed AssemblyStudio.exe, say).
 // STUDIO_E2E_SIZE=<width>x<height>: the window of every test that does not
 // size its own (default 1280x800) -- tools/e2e-widths.ts runs them all at
 // 1280, 1093, 1024 and 910.

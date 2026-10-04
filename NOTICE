@@ -11,7 +11,7 @@ keep their own licenses.
   5. Pretendard, D2Coding              fonts (SIL Open Font License 1.1)
   6. Lucide                            icons (ISC / MIT)
   7. Other components                  build tools, npm packages
-  8. Brand assets                      marks that only some builds carry
+  8. Mark and icon                     this project's own
   9. Trademarks
 
 
@@ -179,23 +179,14 @@ addon), all under the MIT License. Their list and license texts are generated
 at build time (electron/tools/licenses.ts) and shown in About > Licenses.
 
 
-8. Brand assets
----------------
+8. Mark and icon
+----------------
 
-The program is built for one brand at a time (electron/brands/<id>/). Only
-that brand's assets go into the build.
-
-  generic   this project's own mark and icon, under this project's license.
-  hallym    the Hallym University symbol, logotype, emblem and signature, and
-            the university's characters Haram (하람) and Hari (하리), which
-            belong to Hallym University. They are not covered by this
-            project's license or by any license in this file, and may not be
-            taken from this repository or from the programs and used
-            separately (electron/brands/hallym/assets/README.md). Anyone who
-            forks or redistributes this project must leave them out (build
-            the generic brand), unless Hallym University has given its own
-            permission. This software is not an official product of Hallym
-            University.
+The program's mark and icon (electron/brands/generic/) are this project's
+own, under this project's license. Earlier revisions in this repository's
+history also held Hallym University marks and characters; those belong to
+Hallym University, are not covered by this project's license or by any
+license in this file, and are not part of any current build.
 
 
 9. Trademarks

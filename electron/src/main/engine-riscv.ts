@@ -1,8 +1,9 @@
 /* The RISC-V engine in the main process: RARS in a JVM (RarsProbe,
    docs/engine-protocol.md), two of them -- `main`, the machine on screen,
-   and `checker`, for assembling a program first.  Registers the sim:*
-   handlers the RISC-V window (src/isa/riscv/renderer/app.ts) calls, and
-   tells it the engine's state (starting / ready / restarting / dead).
+   and `checker`, for assembling a program first and for the .asx export.
+   Registers the sim:* handlers the RISC-V window (src/isa/riscv/renderer/
+   app.ts) calls and file:exportImage (export-image.ts), and tells it the
+   engine's state (starting / ready / restarting / dead).
 
    Each engine gets its own RARS settings folder (java.util.prefs) and its
    own stderr log in this run's folder, never in the Console.
@@ -16,9 +17,11 @@ import type { BrowserWindow } from 'electron';
 import path from 'node:path';
 
 import { EngineCrashed, Simulator } from '../isa/riscv/sim/host.ts';
+import { readImage } from '../isa/riscv/sim/image.ts';
 import type { CallName } from '../isa/riscv/sim/protocol.ts';
 import { engineTransport } from '../isa/riscv/sim/transport.ts';
-import { handlers, type Engine } from './ipc.ts';
+import { exportImage, type ImageJob } from './export-image.ts';
+import { answer, handlers, type Engine } from './ipc.ts';
 import { engine } from './paths.ts';
 
 export function start(win: BrowserWindow, runDir: string): Engine {
@@ -73,6 +76,11 @@ export function start(win: BrowserWindow, runDir: string): Engine {
       throw e;
     }
   }));
+  // The executable image (.asx) of the program last assembled -- not of the
+  // Editor's text if it changed since: the source and its file as they were
+  // then.  Read in the checker, one job at a time there.
+  ipc.handle('file:exportImage', (_e, job: ImageJob) => answer(() => exportImage(win,
+    job, () => onChecker((c) => readImage((cmd, params) => c.call(cmd, params), job.source)), EngineCrashed)));
   const toWindow = (channel: string, ...args: unknown[]) => { if (!win.isDestroyed()) win.webContents.send(channel, ...args); };
   sim.on('console', (text) => toWindow('sim:console', text));
   sim.on('input', (pc) => toWindow('sim:input', pc));

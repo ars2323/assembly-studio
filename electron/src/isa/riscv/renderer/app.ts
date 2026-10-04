@@ -27,7 +27,7 @@
    instead of the machine.
 
    This is the RISC-V window (src/renderer/app/app.ts is the MIPS one).  No
-   .hmx export and no Advanced settings here: those are SPIM's.  While the
+   Advanced settings here: those are SPIM's.  While the
    Editor holds the program in the machine, it
    marks the line being executed (the Text panel's line column: the core's
    own PC -> source mapping); once the code has changed it marks none (its
@@ -183,6 +183,8 @@ const speedBox = h('span', { class: 'speedbox' }, h('span', { class: 'speedlabel
 const divider = (cls = ''): HTMLElement => h('span', { class: `tsep${cls ? ` ${cls}` : ''}`, 'aria-hidden': 'true' });
 const runctl = h('span', { class: 'runctl' }, bAssemble, divider(), bRun, speedBox, bStep, divider(), bRestart);
 const bSettings = iconButton('Settings', 'settings', () => settingsBox.open());
+// The assembled program as an executable image (.asx, docs/asx-format.md).
+const bExport = iconButton('Export executable image (.asx)', 'file-output', () => void exportImage());
 const viewEditor = h('button', { type: 'button', role: 'tab' }, 'Editor');
 const viewRun = h('button', { type: 'button', role: 'tab' }, 'Run');
 viewEditor.addEventListener('click', () => showView('editor'));
@@ -199,6 +201,7 @@ const tools = h('span', { class: 'tools' },
   divider(),
   iconButton('New file', 'file-plus', () => void newFile()),
   iconButton('Open file (Ctrl+O)', 'folder-open', () => void openFile()),
+  bExport,
   divider(),
   bSettings);
 const toolbar = h('div', { class: 'toolbar', role: 'toolbar', 'aria-label': 'Toolbar' },
@@ -594,6 +597,8 @@ function renderChrome(): void {
   setBtn(bRun, open && (running || runState === 'input' || runState !== 'finished'), running || runState === 'input');
   setBtn(bStep, open && !stoppable && runState !== 'finished', current() && !stoppable);
   setBtn(bRestart, lastGood !== null && !busy, false);
+  bExport.hidden = !open;
+  bExport.disabled = lastGood === null || busy;
   speedFast.classList.toggle('on', speed === 'fast');
   speedSlow.classList.toggle('on', speed === 'slow');
   speedFast.setAttribute('aria-checked', String(speed === 'fast'));
@@ -738,6 +743,21 @@ function renderStatus(): void {
 }
 
 // ---- files -------------------------------------------------------------------------
+
+// The program on the machine -- the last assembled, which Run and Step go
+// on with -- as an executable image, even when the Editor has changed since
+// (then the note says so).  Its source-sha256 is of that program's source.
+async function exportImage(): Promise<void> {
+  if (lastGood === null || busy) return;
+  const good = lastGood;
+  const changed = editor.text() !== good.source;
+  const r = await api.exportImage({ source: good.source, name: good.name, path: good.path, format: good.format,
+                                    assembled: (lastAssembly?.at ?? new Date()).getTime() }).catch((e: Error) => ({ error: e.message }));
+  if (r === null) return;
+  if ('error' in r) note = r.error;
+  else { note = ''; exportNote = `Saved ${changed ? 'the last assembled code ' : ''}as an executable image · ${r.name}`; }
+  renderStatus();
+}
 
 // Before another file takes the Editor's place.  Unsaved changes are always
 // asked about; a new file is asked about even when everything is saved --

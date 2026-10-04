@@ -164,8 +164,8 @@ const speedBox = h('span', { class: 'speedbox' }, h('span', { class: 'speedlabel
 const divider = (cls = ''): HTMLElement => h('span', { class: `tsep${cls ? ` ${cls}` : ''}`, 'aria-hidden': 'true' });
 const runctl = h('span', { class: 'runctl' }, bAssemble, divider(), bRun, speedBox, bStep, divider(), bRestart);
 const bSettings = iconButton('Settings', 'settings', () => settingsBox.open());
-// The assembled program as an executable image (.hmx): only a brand with brand.hmx shows it.
-const bExport = iconButton('Export executable image (.hmx)', 'file-output', () => void exportImage());
+// The assembled program as an executable image (.asx, docs/asx-format.md).
+const bExport = iconButton('Export executable image (.asx)', 'file-output', () => void exportImage());
 const viewEditor = h('button', { type: 'button', role: 'tab' }, 'Editor');
 const viewRun = h('button', { type: 'button', role: 'tab' }, 'Run');
 viewEditor.addEventListener('click', () => showView('editor'));
@@ -599,7 +599,7 @@ function renderChrome(): void {
   setBtn(bRun, open && (running || (runState !== 'finished' && runState !== 'input')), running);
   setBtn(bStep, open && !running && runState !== 'finished', current() && !running);
   setBtn(bRestart, lastGood !== null && !busy, false);
-  bExport.hidden = !open || !brand.hmx;
+  bExport.hidden = !open;
   bExport.disabled = lastGood === null || busy;
   speedFast.classList.toggle('on', speed === 'fast');
   speedSlow.classList.toggle('on', speed === 'slow');

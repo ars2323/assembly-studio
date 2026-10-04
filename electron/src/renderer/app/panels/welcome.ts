@@ -56,8 +56,9 @@ const picked = then !== null;
 // ?home: back from the work screen (the title bar's mark): the ISA step at once, the board grown, no opening.
 const home = query.has('home');
 
-function action(label: string, ic: string, onClick: () => void, main = false): HTMLElement {
-  const b = h('button', { class: `action${main ? ' main' : ''}`, type: 'button' }, icon(ic), h('b', {}, label));
+// `ic` null: the words alone (the ISA step: a name is all an ISA button needs).
+function action(label: string, ic: string | null, onClick: () => void, main = false): HTMLElement {
+  const b = h('button', { class: `action${main ? ' main' : ''}`, type: 'button' }, ic ? icon(ic) : null, h('b', {}, label));
   b.addEventListener('click', onClick);
   return b;
 }
@@ -75,6 +76,9 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
   // The way back: an arrow in the die frame's top-left corner, on the steps after the first.
   // In the opposite corner, the ISA chosen, quietly.
   const isaTag = h('span', { class: 'wisa' });
+  // The version, quietly, in the bottom-right corner: there from the first frame, no About needed.
+  const version = h('span', { class: 'wver' });
+  void window.app?.about().then((info) => { version.textContent = `v${info.version}`; }, () => {});
   const back = h('button', { class: 'wback', type: 'button', title: '뒤로', 'aria-label': '뒤로' }, icon('arrow-left'));
   const corner = h('div', { class: 'wcorner' }, back);
   let chosen: Isa = pageIsa;
@@ -105,8 +109,8 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
   const build = (step: 0 | 1 | 2) => {
     if (step === 0) {
       actions.replaceChildren(
-        action('MIPS', 'cpu', () => void choose('mips'), true),
-        action('RISC-V', 'cpu', () => void choose('riscv'), true));
+        action('MIPS', null, () => void choose('mips'), true),
+        action('RISC-V', null, () => void choose('riscv'), true));
       backTo = () => {};
     } else if (step === 1) {
       actions.replaceChildren(
@@ -159,7 +163,7 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
       markImg('wlogo'),
       title,
       h('div', { class: 'wbody' }, actions)),
-    corner, isaTag, h('div', { class: 'wtheme' }, themeSwitch()));
+    corner, isaTag, h('div', { class: 'wtheme' }, themeSwitch()), version);
   // A switch of theme: the board cross-fades to the other look (start.setTheme),
   // over the same time the page's colours take (theme.ts).
   onTheme((t) => start.setTheme(t));
