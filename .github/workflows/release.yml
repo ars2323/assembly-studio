@@ -1,0 +1,74 @@
+# A tag v<version>: the installer, published.  The engines are not built here:
+# engines/fetch.mjs downloads the zip engines.yml made for this tree's inputs
+# (release engines-<hash>; if it is missing, run engines.yml and tag again, or
+# re-run this workflow).  No tests (PLAN.md §6).
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+    working-directory: electron
+
+jobs:
+  release:
+    name: Package and publish
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # no code signing
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: electron/package-lock.json
+
+      - name: The tag is electron/package.json's version
+        run: |
+          version=$(node -p "require('./package.json').version")
+          [ "v$version" = "$GITHUB_REF_NAME" ] || { echo "::error::the tag is $GITHUB_REF_NAME but electron/package.json says $version"; exit 1; }
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: npm ci
+        run: npm ci --ignore-scripts
+
+      - name: The engines (engines-<hash>.zip from engines.yml)
+        run: node ../engines/fetch.mjs
+
+      - name: Package (NSIS installer)
+        run: node tools/package.ts
+
+      - name: Publish (not a pre-release; Latest)
+        run: |
+          shopt -s nullglob
+          files=(dist/*.exe)
+          [ ${#files[@]} -gt 0 ] || { echo "::error::no installer in electron/dist"; ls -la dist || true; exit 1; }
+          notes="docs/releases/$VERSION.md"
+          {
+            if [ -f "$notes" ]; then cat "$notes"; else echo "Assembly Studio $VERSION"; fi
+            echo
+            echo '## SHA-256'
+            echo
+            echo '```'
+            for f in "${files[@]}"; do echo "$(sha256sum "$f" | cut -d' ' -f1)  $(basename "$f")"; done
+            echo '```'
+          } > ../release-notes.md
+          cat ../release-notes.md
+          gh release create "$GITHUB_REF_NAME" "${files[@]}" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "Assembly Studio $VERSION" --notes-file ../release-notes.md --latest
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json url,isDraft,isPrerelease,assets \
+            --jq '"\(.url)  draft=\(.isDraft) prerelease=\(.isPrerelease)  " + ([.assets[].name] | join(", "))'
