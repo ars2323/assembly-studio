@@ -128,7 +128,7 @@ export const regHex = (page: Page, name: string) => page.locator(`.rrow[data-reg
 
 // Waits until the window has taken in the last stop (no call in flight).
 export async function settled(page: Page): Promise<void> {
-  await page.waitForFunction(() => !document.querySelector('.status .run')?.textContent?.startsWith('실행 중'));
+  await page.waitForFunction(() => !document.querySelector('.status .run')?.textContent?.startsWith('Running'));
   await page.waitForTimeout(50);
 }
 

@@ -118,3 +118,23 @@ export function nearMiss(sourceLine: string): NearMiss | null {
   }
   return null;
 }
+
+/* What to do about an assembler message, shown under it in the Assemble
+   panel.  For a syntax error, first the slip the line shows when there is
+   one to name (nearMiss above); then what the message's kind usually
+   needs.  `code` in backticks (the window sets it in the code font).
+   Nothing useful to add: ''. */
+export function assemblerHint(message: string, source: string): string {
+  if (/syntax error/i.test(message)) {
+    const near = nearMiss(source);
+    if (near?.why === 'spelling') return `No ${near.kind} \`${near.token}\`. Did you mean \`${near.meant}\`?`;
+    if (near?.why === 'no-such-register') return `No register \`${near.token}\`. The \`${near.family}\` registers are \`${near.range}\`.`;
+    if (near?.why === 'missing-dollar') return `Register names start with \`$\`: \`${near.token}\` → \`${near.meant}\`.`;
+    return 'Check the instruction name, the register names (like `$t0`) and the commas.';
+  }
+  if (/defined for the second time|already defined/i.test(message)) return 'Two labels have this name. Rename one of them.';
+  if (/shift distance/i.test(message)) return 'A shift amount is 0 to 31.';
+  if (/too large|out of range|immediate/i.test(message)) return 'The value is too big for this instruction. Put it in a register with `li` first.';
+  if (/undefined|unknown/i.test(message)) return 'This name is used but never defined. Check its spelling and `.globl`.';
+  return '';
+}
