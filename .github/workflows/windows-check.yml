@@ -1,0 +1,65 @@
+# By hand only: a release's installer on a Windows runner, installed silently,
+# then the installed program driven and the desktop captured
+# (electron/tests/e2e/windows-check.ts), and the .asx export checked
+# against the screen in both ISAs (electron/tests/e2e/asx-export.ts).
+# What Windows itself draws -- the caption buttons over the title bar, the
+# taskbar icon, the installer -- can only be seen this way.  The captures
+# are the run's artifact.
+name: windows-check
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release to check (e.g. 1.0.0)'
+        required: true
+        default: '1.0.0'
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+    working-directory: electron
+
+jobs:
+  check:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: electron/package-lock.json
+
+      - name: npm ci (no addon build; the installed program is what runs)
+        run: npm ci --ignore-scripts
+
+      - name: Install the release's installer, silently, for this user
+        shell: pwsh
+        run: |
+          gh release download "v${{ inputs.version }}" --repo "$env:GITHUB_REPOSITORY" --pattern '*-setup.exe' --dir "$env:RUNNER_TEMP"
+          $setup = Get-ChildItem "$env:RUNNER_TEMP\*-setup.exe" | Select-Object -First 1
+          Start-Process -FilePath $setup.FullName -ArgumentList '/S' -Wait
+          $exe = Join-Path $env:LOCALAPPDATA 'Programs\Assembly Studio\AssemblyStudio.exe'
+          if (-not (Test-Path $exe)) { Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter *.exe | Select-Object FullName; throw "not installed at $exe" }
+          "STUDIO_E2E_EXE=$exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Get-Item $exe | Select-Object FullName, Length, LastWriteTime
+
+      - name: The installed program, as a user sees it
+        run: node tests/e2e/windows-check.ts ../windows-check
+
+      - name: The .asx export, both ISAs, on Windows
+        run: node tests/e2e/asx-export.ts ../windows-check/asx
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-check-${{ inputs.version }}
+          path: windows-check
