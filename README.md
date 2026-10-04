@@ -32,7 +32,7 @@ Requirements: Windows 10 or 11, 64-bit (x64).
 
 1. Download `AssemblyStudio-<version>-win-x64-setup.exe` from [Releases](../../releases).
 2. Run it. It installs for the current user only, without administrator rights, into
-   `%LOCALAPPDATA%\Programs\Assembly Studio`, and adds a Start menu shortcut. The installer's screens are in Korean.
+   `%LOCALAPPDATA%\Programs\Assembly Studio`, and adds a Start menu shortcut. The installer is in English.
 3. The program includes its own Java runtime (Eclipse Temurin 21) for the RISC-V engine. You do not need to
    install Java.
 
@@ -175,8 +175,11 @@ Releases are published on the [Releases](../../releases) page, one installer per
 
 After 1.0.0, every change ships under a new version:
 
-- **1.0.x**: fixes.
+- **1.x.y**: fixes (the last number).
 - **1.x.0**: new features.
+
+Each version is developed on its own branch, `release/<version>`; the branch of the latest version is the default
+branch.
 
 Earlier releases are not deleted. If a release has a problem, you can install the previous one until a fix is out.
 
