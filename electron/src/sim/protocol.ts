@@ -21,6 +21,17 @@ export interface RunResult {
   reason: StopReason;
   pc: number;
   errors: string[]; // the core's run-time messages during this run
+  undo: number;     // how many instructions Step back can undo now
+}
+
+/* backstep: one instruction undone (registers and memory as before it), or
+   none (`undone` false: no history).  `io`: it was a syscall that printed
+   or read; its output and the input it took stay. */
+export interface BackstepResult {
+  undone: boolean;
+  io: boolean;
+  pc: number;
+  undo: number;     // how many more can be undone
 }
 
 /* The simulator's calls: name -> [arguments, result].  run and step answer
@@ -32,6 +43,7 @@ export interface Calls {
              { ok: boolean; errors: string[]; symbols: string; format: unknown; data: import('../../native/index.ts').DataRange }];
   run: [[], RunResult];
   step: [[count?: number], RunResult];
+  backstep: [[], BackstepResult];
   stop: [[], { wasRunning: boolean }];
   provideInput: [[text: string], void];
   setBreakpoint: [[addr: number], boolean];

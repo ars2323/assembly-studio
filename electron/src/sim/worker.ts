@@ -38,7 +38,7 @@ let stopRequested = false;
 const yieldToEvents = () => new Promise<void>((resolve) => setImmediate(resolve));
 
 function result(reason: StopReason, errors: string[]): RunResult {
-  return { reason, pc: spim.registers().pc, errors };
+  return { reason, pc: spim.registers().pc, errors, undo: spim.history().depth };
 }
 
 async function run(): Promise<RunResult> {
@@ -49,8 +49,13 @@ async function run(): Promise<RunResult> {
   let lastProgress = Date.now();
   try {
     for (;;) {
-      if (stopRequested) return result('stopped', errors);
-      const stop = spim.run(SLICE);
+      if (stopRequested) {
+        spim.settleHistory(); // the run's last instructions, for Step back
+        return result('stopped', errors);
+      }
+      // Each slice keeps what Step back needs after the run stops
+      // (native/src/addon.cc, "step back").
+      const stop = spim.run(SLICE, 'slice');
       errors.push(...spim.errors());
       flushConsole();
       if (stop !== 'limit') return result(stop, errors);
@@ -67,7 +72,7 @@ async function run(): Promise<RunResult> {
 }
 
 function step(count = 1): RunResult {
-  const stop = spim.run(count);
+  const stop = spim.run(count, 'each'); // every instruction recorded for Step back
   const errors = spim.errors();
   flushConsole();
   return result(stop, errors);
@@ -78,6 +83,10 @@ const handlers: { [M in CallName]: Handler } = {
   assemble: (source: Uint8Array | string, options?: spim.AssembleOptions) => spim.assemble(source, options),
   run,
   step,
+  backstep: () => {
+    const { undone, io } = spim.backstep();
+    return { undone, io, pc: spim.registers().pc, undo: spim.history().depth };
+  },
   stop: () => {
     const wasRunning = running;
     if (running) stopRequested = true;

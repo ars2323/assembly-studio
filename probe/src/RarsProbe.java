@@ -3,6 +3,7 @@
 
 import rars.*;
 import rars.riscv.hardware.*;
+import rars.simulator.BackStepper;
 import rars.simulator.Simulator;
 import rars.simulator.SimulatorNotice;
 import rars.util.SystemIO;
@@ -254,13 +255,7 @@ public class RarsProbe {
                 resolveBreakpoints();
                 return "\"ok\":true,\"breakpoints\":" + breakpointsJson();
             }
-            case "backstep": {
-                if (Globals.program == null || Globals.program.getBackStepper() == null || Globals.program.getBackStepper().empty())
-                    return err("nothing_to_undo", "no recorded step to undo");
-                Globals.program.getBackStepper().backStep();
-                terminated = false;
-                return "\"ok\":true," + regsJson();
-            }
+            case "backstep": return backstep();
             case "step": case "run": {
                 // RARS records undo entries for every instruction while the back-stepper is engaged.
                 if (Globals.program != null && Globals.program.getBackStepper() != null)
@@ -282,6 +277,8 @@ public class RarsProbe {
         RISCVprogram p = new RISCVprogram();
         Globals.program = p;
         terminated = true;
+        undo = 0;
+        exitedAt = null;
         StringBuilder sb = new StringBuilder();
         try {
             p.fromString(source);
@@ -289,6 +286,7 @@ public class RarsProbe {
             ArrayList<RISCVprogram> list = new ArrayList<>();
             list.add(p);
             ErrorList warnings = p.assemble(list, true, false);
+            History.enlarge();
             RegisterFile.resetRegisters();
             FloatingPointRegisterFile.resetRegisters();
             ControlAndStatusRegisterFile.resetRegisters();
@@ -366,21 +364,22 @@ public class RarsProbe {
             boolean undone = false;
             if (!V1_STOP_INPUT && r == Simulator.Reason.STOP && Globals.program.getBackStepper() != null
                     && !Globals.program.getBackStepper().empty()) {
-                Globals.program.getBackStepper().backStep();
-                undone = true;
+                undone = History.undoLast();
             }
             sb.append(",\"input_cancelled\":true,\"undone\":").append(undone);
         }
         if (Globals.program != null && Globals.program.getBackStepper() != null)
             Globals.program.getBackStepper().setEnabled(pd.backstep);
+        long retired = ControlAndStatusRegisterFile.getValueNoNotify("instret") - pd.instret0;
+        count(pd, r, retired);
         if (e != null) {
             ErrorMessage m = e.error();
             sb.append(",\"cause\":").append(e.cause())
               .append(",\"message\":").append(Json.str(m == null ? String.valueOf(e) : m.getMessage()))
               .append(",\"line\":").append(m == null ? 0 : m.getLine());
         }
-        long steps = ControlAndStatusRegisterFile.getValueNoNotify("instret") - pd.instret0;
-        sb.append(",\"steps\":").append(steps).append(",\"ns\":").append(System.nanoTime() - pd.t0);
+        sb.append(",\"steps\":").append(retired).append(",\"ns\":").append(System.nanoTime() - pd.t0);
+        sb.append(",\"undo\":").append(undo);
         if (pd.isStep) {
             try {
                 ProgramStatement s = Globals.memory.getStatementNoNotify(pd.pcBefore);
@@ -392,6 +391,206 @@ public class RarsProbe {
         sb.append(',').append(regsJson()).append('}');
         busy = false;
         send(sb.toString());
+    }
+
+    // ---- step back: RARS's back-stepper, one instruction at a time ----
+    // RARS keeps its undo records as changes (a register, a word of memory, PC, a CSR), not as
+    // instructions, in a ring of Globals.maximumBacksteps (2000).  Its backStep() pops the records of
+    // one ProgramStatement; that goes wrong in two ways (RARS 1.6, measured):
+    //   - every instruction ends with three records of the cycle, instret and time CSRs, filed under
+    //     the instruction before the new PC.  After a taken branch or a jump that is not the branch,
+    //     so undoing it takes two backStep()s, the first of which leaves PC on the target's
+    //     predecessor;
+    //   - four or more records an instruction leave room for about 500 instructions.
+    // So the engine undoes the records itself (History, by reflection into the back-stepper: RARS
+    // is not changed), one instruction per `backstep`: the CSR trio, then the instruction's own
+    // records down to the trio of the instruction before it.  It gives the back-stepper room for
+    // HISTORY_RECORDS records, and counts the instructions recorded, at most UNDO_LIMIT.
+    // If reflection fails (another RARS), RARS's own backStep() is used, as before.
+    static final int UNDO_LIMIT = 1000;
+    static final int HISTORY_RECORDS = 16384;
+    static int undo = 0;
+    // The ecall that ended the program (Exit, Exit2).  RARS records nothing for it: undoing it
+    // is PC back on it, and the program no longer finished.
+    static Integer exitedAt = null;
+
+    static final class History {
+        static java.lang.reflect.Field backSteps, size, top, capacity, array, action, pc, param1, param2;
+        static java.lang.reflect.Constructor<?> make;
+        static boolean ok;
+        static {
+            try {
+                backSteps = BackStepper.class.getDeclaredField("backSteps");
+                Class<?> stack = backSteps.getType();
+                size = stack.getDeclaredField("size");
+                top = stack.getDeclaredField("top");
+                capacity = stack.getDeclaredField("capacity");
+                array = stack.getDeclaredField("stack");
+                make = stack.getDeclaredConstructor(BackStepper.class, int.class);
+                Class<?> step = array.getType().getComponentType();
+                action = step.getDeclaredField("action");
+                pc = step.getDeclaredField("pc");
+                param1 = step.getDeclaredField("param1");
+                param2 = step.getDeclaredField("param2");
+                for (java.lang.reflect.AccessibleObject a : new java.lang.reflect.AccessibleObject[]{
+                        backSteps, size, top, capacity, array, make, action, pc, param1, param2}) a.setAccessible(true);
+                ok = true;
+            } catch (ReflectiveOperationException | RuntimeException e) {
+                System.err.println("RarsProbe: step back falls back to RARS's backStep(): " + e);
+                ok = false;
+            }
+        }
+
+        static BackStepper stepper() { return Globals.program == null ? null : Globals.program.getBackStepper(); }
+
+        // A new program's back-stepper, with room for HISTORY_RECORDS records.
+        static void enlarge() {
+            BackStepper bs = stepper();
+            if (!ok || bs == null) return;
+            try { backSteps.set(bs, make.newInstance(bs, HISTORY_RECORDS)); }
+            catch (ReflectiveOperationException | RuntimeException e) { System.err.println("RarsProbe: " + e); }
+        }
+
+        static void clear() {
+            BackStepper bs = stepper();
+            if (!ok || bs == null) return;
+            try { Object s = backSteps.get(bs); size.setInt(s, 0); top.setInt(s, -1); }
+            catch (ReflectiveOperationException e) { System.err.println("RarsProbe: " + e); }
+        }
+
+        // The record I below the top (0: the top).
+        static Object at(Object s, int i) throws ReflectiveOperationException {
+            int cap = capacity.getInt(s);
+            return java.lang.reflect.Array.get(array.get(s), ((top.getInt(s) - i) % cap + cap) % cap);
+        }
+
+        static boolean trio(Object step) throws ReflectiveOperationException {
+            return "CONTROL_AND_STATUS_REGISTER_BACKDOOR".equals(String.valueOf(action.get(step)));
+        }
+
+        // How many instructions the records hold whole: each is its own records (one at least)
+        // and, if it retired, the trio after them.  The oldest may have lost records to the ring.
+        static int instructions() {
+            BackStepper bs = stepper();
+            if (bs == null) return 0;
+            if (!ok) return bs.empty() ? 0 : UNDO_LIMIT;
+            try {
+                Object s = backSteps.get(bs);
+                int n = size.getInt(s), i = 0, count = 0;
+                while (i < n) {
+                    for (int k = 0; k < 3 && i < n && trio(at(s, i)); k++) i++;
+                    if (i >= n) break;
+                    while (i < n && !trio(at(s, i))) i++;
+                    count++;
+                }
+                if (n == capacity.getInt(s) && count > 0) count--;
+                return count;
+            } catch (ReflectiveOperationException e) {
+                return 0;
+            }
+        }
+
+        // Undoes the last instruction's records; false if there are none.
+        static boolean undoLast() {
+            BackStepper bs = stepper();
+            if (bs == null || bs.empty()) return false;
+            if (!ok) {
+                bs.setEnabled(true);
+                bs.backStep();
+                return true;
+            }
+            boolean engaged = bs.enabled();
+            bs.setEnabled(false);  // the restores below must not be recorded
+            try {
+                Object s = backSteps.get(bs);
+                for (int k = 0; k < 3 && size.getInt(s) > 0 && trio(at(s, 0)); k++) apply(pop(s));
+                int at = -1;
+                while (size.getInt(s) > 0 && !trio(at(s, 0))) {
+                    Object step = pop(s);
+                    at = pc.getInt(step);
+                    apply(step);
+                }
+                if (at != -1) RegisterFile.initializeProgramCounter(at);
+                return true;
+            } catch (ReflectiveOperationException e) {
+                System.err.println("RarsProbe: " + e);
+                return false;
+            } finally {
+                bs.setEnabled(engaged);
+            }
+        }
+
+        static Object pop(Object s) throws ReflectiveOperationException {
+            Object step = at(s, 0);
+            int n = size.getInt(s), cap = capacity.getInt(s);
+            size.setInt(s, n - 1);
+            top.setInt(s, n == 1 ? -1 : (top.getInt(s) + cap - 1) % cap);
+            return step;
+        }
+
+        // What RARS's BackStepper.backStep() does with one record.
+        static void apply(Object step) throws ReflectiveOperationException {
+            int p1 = param1.getInt(step);
+            long p2 = param2.getLong(step);
+            try {
+                switch (String.valueOf(action.get(step))) {
+                    case "MEMORY_RESTORE_RAW_WORD": Globals.memory.setRawWord(p1, (int) p2); break;
+                    case "MEMORY_RESTORE_DOUBLE_WORD": Globals.memory.setDoubleWord(p1, p2); break;
+                    case "MEMORY_RESTORE_WORD": Globals.memory.setWord(p1, (int) p2); break;
+                    case "MEMORY_RESTORE_HALF": Globals.memory.setHalf(p1, (int) p2); break;
+                    case "MEMORY_RESTORE_BYTE": Globals.memory.setByte(p1, (int) p2); break;
+                    case "REGISTER_RESTORE": RegisterFile.updateRegister(p1, p2); break;
+                    case "FLOATING_POINT_REGISTER_RESTORE": FloatingPointRegisterFile.updateRegisterLong(p1, p2); break;
+                    case "CONTROL_AND_STATUS_REGISTER_RESTORE": ControlAndStatusRegisterFile.updateRegister(p1, p2); break;
+                    case "CONTROL_AND_STATUS_REGISTER_BACKDOOR": ControlAndStatusRegisterFile.updateRegisterBackdoor(p1, p2); break;
+                    case "PC_RESTORE": RegisterFile.initializeProgramCounter(p1); break;
+                    default: break;  // DO_NOTHING
+                }
+            } catch (AddressErrorException e) {
+                // the original write did not fail, so neither does putting the old value back
+            }
+        }
+    }
+
+    static void count(Pending pd, Simulator.Reason r, long retired) {
+        if (!pd.backstep) {
+            // Instructions ran without records: what is recorded no longer leads up to here.
+            if (retired > 0 || r == Simulator.Reason.NORMAL_TERMINATION || r == Simulator.Reason.EXCEPTION) {
+                undo = 0;
+                History.clear();
+            }
+        } else {
+            undo += (int) Math.min(retired, UNDO_LIMIT);
+            // The instruction that raised an exception is not retired, but RARS records what it
+            // wrote (ucause, uepc, utval); undoing that puts PC back on it.
+            if (r == Simulator.Reason.EXCEPTION) undo += 1;
+        }
+        exitedAt = null;
+        if (r == Simulator.Reason.NORMAL_TERMINATION && pd.backstep) {
+            exitedAt = RegisterFile.getProgramCounter() - rars.riscv.Instruction.INSTRUCTION_LENGTH;
+            undo += 1;
+        }
+        undo = undoable();
+    }
+
+    // At most UNDO_LIMIT, at most what the records hold.
+    static int undoable() {
+        return Math.max(0, Math.min(Math.min(undo, UNDO_LIMIT), History.instructions() + (exitedAt != null ? 1 : 0)));
+    }
+
+    static String backstep() {
+        if (Globals.program == null || undoable() <= 0) return err("nothing_to_undo", "no recorded step to undo");
+        if (exitedAt != null && terminated) {
+            RegisterFile.initializeProgramCounter(exitedAt);  // not recorded: nothing to undo later
+        } else if (!History.undoLast()) {
+            undo = 0;
+            return err("nothing_to_undo", "no recorded step to undo");
+        }
+        exitedAt = null;
+        undo -= 1;
+        undo = undoable();
+        terminated = false;
+        return "\"ok\":true,\"undo\":" + undo + "," + regsJson();
     }
 
     static String regsJson() {
