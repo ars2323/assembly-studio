@@ -42,7 +42,7 @@ if (which === 'start') {
     const p = r.page;
     await p.locator('.wcard').click(); await p.waitForTimeout(800);
     await p.locator('.action').first().click(); await p.waitForTimeout(500);
-    await p.getByRole('button', { name: /튜토리얼/ }).click(); await p.waitForTimeout(3000);
+    await p.getByRole('button', { name: /튜토리얼|tutorial/i }).click(); await p.waitForTimeout(3000);
     for (let i = 0; i < 2; i += 1) { await p.keyboard.press('ArrowRight'); await p.waitForTimeout(1500); }
     await p.waitForTimeout(1500);
     await p.screenshot({ path: `${out}/tutorial.png` });
