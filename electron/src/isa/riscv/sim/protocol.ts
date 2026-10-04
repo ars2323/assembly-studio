@@ -51,6 +51,7 @@ export type AssembleReply =
 
 export type RunReply = (Registers & {
   ok: true; reason: Reason; steps: number; ns: number;
+  undo?: number;   // how many instructions backstep can undo now (5.7)
   executed?: TextWord | null;
   exit?: number;
   cause?: number; message?: string; line?: number;
@@ -64,7 +65,7 @@ export interface Calls {
   run: [{ max?: number; backstep?: boolean }, RunReply];
   stop: [{}, { ok: true; was_running: boolean } | Failure];
   bp: [{ lines: number[] }, { ok: true; breakpoints: Breakpoint[] } | Failure];
-  backstep: [{}, (Registers & { ok: true }) | Failure];
+  backstep: [{}, (Registers & { ok: true; undo?: number }) | Failure];
   regs: [{}, (Registers & { ok: true }) | Failure];
   mem: [{ addr: number; len: number }, { ok: true; addr: number; hex: string } | (Failure & { partial?: string })];
   input: [{ text: string }, { ok: true; waiting: boolean } | Failure];
