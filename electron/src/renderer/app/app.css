@@ -121,6 +121,11 @@
 }
 
 * { box-sizing: border-box; }
+/* No browser focus ring anywhere: Chromium draws it in the system's accent
+   colour (on Windows often yellow), on whatever a dialog or the tutorial
+   focuses by itself.  The few rings the app draws itself (first screen,
+   switches) are its own rules, below, and stay. */
+:focus, :focus-visible { outline: none; }
 [hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; overflow: hidden; }
 body {
