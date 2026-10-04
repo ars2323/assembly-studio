@@ -105,11 +105,26 @@ void run_error(char *fmt, ...) {
 // abort() leaves a core dump (apport on Ubuntu, Windows Error Reporting)
 // every time a student's program reaches, say, an .err directive.
 const int FATAL_EXIT_CODE = 70;  // EX_SOFTWARE; src/sim/host.ts knows it
+
+// The line the scanner is on while the student's program is read, said on
+// stderr when the process ends in the middle of reading it: fatal_error()
+// below, or flex's own exit() inside the scanner (YY_FATAL_ERROR, exit code
+// 2), which runs the atexit() handlers.  The host shows the line
+// (src/sim/host.ts, "was reading line").
+static bool readingProgram = false;
+static void sayWhereReading() {
+  if (!readingProgram) return;
+  readingProgram = false;
+  fprintf(stderr, "SPIM core was reading line %d\n", line_no);
+  fflush(stderr);
+}
+
 void fatal_error(char *fmt, ...) {
   va_list args;
   va_start(args, fmt);
   fprintf(stderr, "SPIM core fatal error: %s", formatted(fmt, args).c_str());
   va_end(args);
+  sayWhereReading();
   fflush(stderr);
   _exit(FATAL_EXIT_CODE);
 }
@@ -349,7 +364,9 @@ static Napi::Value Assemble(const Napi::CallbackInfo &info) {
   size_t handler_errors = errors.size();
   initializeStack();
   std::string symbols;
+  readingProgram = true;
   readAssemblyBytes(bytesOf(info[0]), bytesOf(info[4]), &symbols);
+  readingProgram = false;
   // The next datum's address in the user segment.  current_data_pc() answers
   // for the segment the last .data / .kdata chose (the handler ends in
   // .kdata), so choose the user's; nothing reads the choice after the file
@@ -646,6 +663,7 @@ static Napi::Value Disassemble(const Napi::CallbackInfo &info) {
 }
 
 static Napi::Object Init(Napi::Env env, Napi::Object exports) {
+  atexit(sayWhereReading);
   message_out.i = 1;  // as QtSpim/main.cpp; write_output tells them apart
   console_out.i = 2;
   exports["assemble"] = Napi::Function::New(env, Assemble);
