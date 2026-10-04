@@ -6,7 +6,9 @@ import type { AboutInfo } from '../api.ts';
 import { brand } from '../../../brand.ts';
 import { code, h } from '../dom.ts';
 
-export function aboutDialog(): { root: HTMLDialogElement; open(): Promise<void> } {
+// `engine`: what the simulator is built on, in About's first tab (the ISA's engine).
+export function aboutDialog(engine: (info: AboutInfo) => (string | Node)[] = () => ['Based on SPIM 9.1.24 by James R. Larus (BSD)']):
+    { root: HTMLDialogElement; open(): Promise<void> } {
   const dialog = h('dialog', { class: 'modal about', 'aria-label': 'About' });
 
   const open = async () => {
@@ -18,7 +20,7 @@ export function aboutDialog(): { root: HTMLDialogElement; open(): Promise<void> 
       if (i === 0) {
         body.replaceChildren(
           h('p', {}, h('b', {}, brand.name), ' ', code(info.version)),
-          h('p', {}, 'Based on SPIM 9.1.24 by James R. Larus (BSD)'),
+          h('p', {}, ...engine(info)),
           h('p', { class: 'hint' }, brand.about),
           h('p', { class: 'hint' }, 'Electron ', code(info.electron), ' · Chromium ', code(info.chrome), ' · Node.js ', code(info.node)));
       } else {

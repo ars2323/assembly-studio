@@ -1,8 +1,12 @@
-/* Bundles the window's script: src/renderer/app/app.ts and what it imports
-   (CodeMirror, src/core) into build/renderer/app.js, which
-   src/renderer/app/index.html loads.  Also writes
+/* Bundles the window's scripts, one per ISA, each with what it imports
+   (CodeMirror, the core modules):
+
+     build/renderer/app-mips.js    src/renderer/app/app.ts
+     build/renderer/app-riscv.js   src/isa/riscv/renderer/app.ts
+
+   src/renderer/app/index.html loads the one for its ?isa= (isa.js).  Also writes
    build/licenses/third-party.txt: the licenses of every npm package the
-   app bundles -- the window's, and the main process's and the simulator
+   app bundles -- the windows', and the main process's and the simulator
    process's (analysed here, bundled only by tools/package.ts).
 
      node tools/build-ui.ts [--watch]
@@ -17,8 +21,11 @@ import { thirdPartyText } from './licenses.ts';
 
 const root = path.join(import.meta.dirname, '..');
 export const rendererOptions: esbuild.BuildOptions = {
-  entryPoints: [path.join(root, 'src/renderer/app/app.ts')],
-  outfile: path.join(root, 'build/renderer/app.js'),
+  entryPoints: {
+    'app-mips': path.join(root, 'src/renderer/app/app.ts'),
+    'app-riscv': path.join(root, 'src/isa/riscv/renderer/app.ts'),
+  },
+  outdir: path.join(root, 'build/renderer'),
   bundle: true,
   format: 'iife',
   target: 'chrome140',

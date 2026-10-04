@@ -1,5 +1,7 @@
-/* The code editor: CodeMirror 6, coloured by src/core/mips-syntax.ts (the
-   core's own keyword table), with the assembler's error lines marked.
+/* The code editor: CodeMirror 6, coloured by the ISA's tokenizer (the
+   assembler's own keyword table: src/core/mips-syntax.ts for MIPS,
+   src/isa/riscv/core/riscv-syntax.ts for RISC-V), with the assembler's
+   error lines marked.
 
    Korean input: CodeMirror leaves composition to the browser's IME handling
    (contenteditable), so a syllable being composed is not split or doubled.
@@ -33,18 +35,20 @@ import {
   ViewPlugin, type ViewUpdate,
 } from '@codemirror/view';
 
-import { tokenizeMipsLine } from '../../core/mips-syntax.ts';
 import { userScrolls } from './dom.ts';
 
 const tokenMarks = Object.fromEntries(['Comment', 'String', 'Directive', 'Instruction', 'Register',
   'LabelDefinition', 'Identifier', 'Number'].map((k) => [k, Decoration.mark({ class: `k-${k}` })]));
 
-function colour(view: EditorView): DecorationSet {
+// One line's tokens: where each starts, how long it is, and its kind (a k-<kind> class).
+export type Tokenize = (line: string) => { start: number; length: number; kind: string }[];
+
+function colour(view: EditorView, tokenize: Tokenize): DecorationSet {
   const b = new RangeSetBuilder<Decoration>();
   for (const { from, to } of view.visibleRanges) {
     for (let pos = from; pos <= to;) {
       const line = view.state.doc.lineAt(pos);
-      for (const t of tokenizeMipsLine(line.text)) {
+      for (const t of tokenize(line.text)) {
         b.add(line.from + t.start, line.from + t.start + t.length, tokenMarks[t.kind]);
       }
       pos = line.to + 1;
@@ -53,10 +57,10 @@ function colour(view: EditorView): DecorationSet {
   return b.finish();
 }
 
-const highlighter = ViewPlugin.fromClass(class {
+const highlighter = (tokenize: Tokenize) => ViewPlugin.fromClass(class {
   decorations: DecorationSet;
-  constructor(view: EditorView) { this.decorations = colour(view); }
-  update(u: ViewUpdate) { if (u.docChanged || u.viewportChanged) this.decorations = colour(u.view); }
+  constructor(view: EditorView) { this.decorations = colour(view, tokenize); }
+  update(u: ViewUpdate) { if (u.docChanged || u.viewportChanged) this.decorations = colour(u.view, tokenize); }
 }, { decorations: (v) => v.decorations });
 
 // ---- error lines -------------------------------------------------------------
@@ -209,7 +213,7 @@ export interface Editor {
   gutterRect(n: number): DOMRect | null;
 }
 
-export function createEditor(parent: HTMLElement, onSave: () => void, onChange: () => void,
+export function createEditor(parent: HTMLElement, tokenize: Tokenize, onSave: () => void, onChange: () => void,
                              onBreakpoint: (line: number, on: boolean) => void = () => {}): Editor {
   // Ctrl+S: save now, or right after the composition in progress ends.
   let saveAfterComposition = false;
@@ -224,7 +228,7 @@ export function createEditor(parent: HTMLElement, onSave: () => void, onChange: 
       doc: '',
       extensions: [
         breakpointField, breakpointGutter(onBreakpoint),
-        lineNumbers(), errorGutter, history(), highlighter, errorField, errorDecorations,
+        lineNumbers(), errorGutter, history(), highlighter(tokenize), errorField, errorDecorations,
         pcField, pcDecorations, indentUnit.of('    '),
         keymap.of([{ key: 'Tab', run: tab, shift: indentLess }, { key: 'Enter', run: insertNewline },
           ...historyKeymap, ...defaultKeymap]),
