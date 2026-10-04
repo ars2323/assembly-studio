@@ -138,7 +138,9 @@ async function main(): Promise<void> {
   const startEngine = (which: Isa): Engine => (which === 'mips' ? mips.start(win) : riscv.start(win, runDir));
   let engine = startEngine(isa);
   let switching: Promise<unknown> = Promise.resolve();
-  const loadPage = () => win.loadFile(paths.page, { query: { isa } });
+  // ?picked: loaded again because the ISA was just chosen on the first
+  // screen, which goes on from there (panels/welcome.ts).
+  const loadPage = (picked = false) => win.loadFile(paths.page, { query: picked ? { isa, picked: '1' } : { isa } });
   ipcMain.handle('isa:select', (_e, which: unknown) => answer(() => {
     if (which !== 'mips' && which !== 'riscv') throw new Error(`no ISA ${String(which)}`);
     const turn = switching.then(async () => {
@@ -147,7 +149,7 @@ async function main(): Promise<void> {
       isa = which;
       engine = startEngine(isa);
       // After this answer has gone back: the page that asked is replaced.
-      setImmediate(() => { if (!win.isDestroyed()) void loadPage(); });
+      setImmediate(() => { if (!win.isDestroyed()) void loadPage(true); });
       return isa;
     });
     switching = turn.catch(() => {});
