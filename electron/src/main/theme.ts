@@ -4,7 +4,7 @@
    (the page sends the patch again once it is up, logic/overlay.ts). */
 
 export const WINDOW_COLOURS = {
-  background: '#f5f7fa',  // --bg
-  titlebar: '#ffffff',    // --surface
-  symbol: '#00205b',      // --caption-symbol
+  background: '#0d0d0d',  // --bg
+  titlebar: '#141414',    // --surface
+  symbol: '#e6e6e6',      // --caption-symbol
 };

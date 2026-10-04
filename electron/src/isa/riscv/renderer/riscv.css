@@ -26,7 +26,7 @@
 
 /* RISC-V's fields (panels/inspector.ts fieldClass): sources blue and teal,
    destination amber, functs grey, the immediate green. */
-.f-rs1 { background: var(--accent-tint); color: var(--accent); }
+.f-rs1 { background: var(--blue-tint); color: var(--blue-text); }
 .f-rs2 { background: var(--teal-tint); color: var(--teal-text); }
 .f-funct3, .f-funct7 { background: var(--cp0-tint); color: var(--cp0-text); }
 .f-imm { background: var(--f-imm-bg); color: var(--f-imm-text); }
@@ -34,13 +34,13 @@
 /* ---- Inspector: the immediate, put together ------------------------------- */
 
 /* The immediate's pieces: one colour each, in the word and in the row that puts them together. */
-.fbits .bit.p1, .ibox.p1 .bit { background: #bfe3dc; color: #124a44; }
-.fbits .bit.p2, .ibox.p2 .bit { background: #f5dca8; color: #6b4300; }
-.fbits .bit.p3, .ibox.p3 .bit { background: #dccff2; color: #4a2c80; }
-.fbits .bit.p4, .ibox.p4 .bit { background: #c9ddf6; color: #1b3f73; }
+.fbits .bit.p1, .ibox.p1 .bit { background: var(--piece1-bg); color: var(--piece1-text); }
+.fbits .bit.p2, .ibox.p2 .bit { background: var(--piece2-bg); color: var(--piece2-text); }
+.fbits .bit.p3, .ibox.p3 .bit { background: var(--piece3-bg); color: var(--piece3-text); }
+.fbits .bit.p4, .ibox.p4 .bit { background: var(--piece4-bg); color: var(--piece4-text); }
 .immrow { margin: 8px 0 0; }
 .imm-cap { margin: 0 16px 2px; font-size: 11.5px; color: var(--text-2); }
-.immgrid .ibox { display: flex; flex-direction: column; min-width: 0; border-radius: 6px; padding: 2px 0 4px; background: #eef4f5; color: var(--f-imm-text); }
+.immgrid .ibox { display: flex; flex-direction: column; min-width: 0; border-radius: 6px; padding: 2px 0 4px; background: var(--ibox-bg); color: var(--f-imm-text); }
 .immgrid .ifrom, .immgrid .iname { font-size: 10.5px; text-align: center; line-height: 14px; min-height: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .immgrid .ifrom { opacity: .8; }
 .immgrid .iname { font-weight: 700; margin-top: 2px; }
