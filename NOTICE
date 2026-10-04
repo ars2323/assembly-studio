@@ -36,7 +36,7 @@ Summary
 
   Component                       Version         License
   ------------------------------  --------------  ---------------------------
-  Assembly Studio (this program)  1.0.0           BSD-3-Clause
+  Assembly Studio (this program)  1.6.1           BSD-3-Clause
   SPIM                            9.1.24 (r764)   BSD-3-Clause (SPIM license)
   RARS                            1.6 (7acf3254)  MIT
     jEdit syntax package          in RARS 1.6     permissive notice (sec. 2)
@@ -52,6 +52,8 @@ Summary
   CodeMirror and dependencies     see section 9   MIT
   iconv-lite                      0.7.3           MIT
   safer-buffer                    2.1.2           MIT
+  electron-updater and its        6.8.9; see      MIT; semver and graceful-fs
+    dependencies                  section 9       ISC; sax BlueOak-1.0.0
   node-addon-api                  8.9.2           MIT
   flex (generated scanner)        2.6             BSD-style (acknowledgement)
   GNU Bison (generated parser)    -               GPL-3.0-or-later WITH
@@ -60,7 +62,7 @@ Summary
   electron-builder (installer     -               MIT
     scripts)
 
-Versions are those of the 1.0.0 build. Electron's is pinned in
+Versions are those of the 1.6.1 build. Electron's is pinned in
 electron/package-lock.json, and Chromium's and Node.js's are the ones that
 Electron release ships; About shows the versions actually installed. The npm
 package versions come from the same lock file, and third-party.txt is
@@ -332,7 +334,8 @@ Full text:  electron/src/renderer/assets/icons/lucide/LICENSE.txt;
 
 The packages below are bundled into the program's JavaScript by esbuild,
 except node-addon-api, whose C++ headers are compiled into the native addon.
-All are under the MIT License.
+All are under the MIT License, except semver and graceful-fs (ISC) and sax
+(Blue Oak Model License 1.0.0), all three permissive.
 
   Package                      Version  Copyright
   ---------------------------  -------  -------------------------------------
@@ -353,12 +356,35 @@ All are under the MIT License.
   iconv-lite                   0.7.3    (c) 2011 Alexander Shtuchkin
   safer-buffer                 2.1.2    (c) 2018 Nikita Skovoroda
   node-addon-api               8.9.2    (c) 2017 Node.js API collaborators
+  electron-updater             6.8.9    (c) 2015 Loopline Systems
+  builder-util-runtime         9.7.0    (c) 2015 Loopline Systems
+  debug                        4.4.3    (c) 2014-2017 TJ Holowaychuk;
+                                        (c) 2018-2021 Josh Junon
+  ms                           2.1.3    (c) 2020 Vercel, Inc.
+  supports-color               7.2.0    (c) Sindre Sorhus
+  has-flag                     4.0.0    (c) Sindre Sorhus
+  fs-extra                     10.1.0   (c) 2011-2017 JP Richardson
+  jsonfile                     6.2.1    (c) 2012-2015 JP Richardson
+  universalify                 2.0.1    (c) 2017 Ryan Zimmerman
+  graceful-fs (ISC)            4.2.11   (c) 2011-2022 Isaac Z. Schlueter,
+                                        Ben Noordhuis, and Contributors
+  semver (ISC)                 7.7.4    (c) Isaac Z. Schlueter and
+                                        Contributors
+  js-yaml                      4.3.2    (c) 2011-2015 Vitaly Puzrin
+  lazy-val                     1.0.5    (c) Vladimir Krivosheev
+  lodash.escaperegexp          4.1.2    (c) jQuery Foundation and other
+                                        contributors
+  lodash.isequal               4.5.0    (c) JS Foundation and other
+                                        contributors
+  sax (BlueOak-1.0.0)          1.6.1    Isaac Z. Schlueter
 
 Used for:   CodeMirror and its dependencies (@lezer/*, @marijn/*, crelt,
             style-mod, w3c-keyname): the code editor. iconv-lite and
             safer-buffer: reading and writing source files in the legacy
             Korean encoding CP949. node-addon-api: the C++ binding of the
-            SPIM addon.
+            SPIM addon. electron-updater and the packages after it: the
+            updates at launch (finding, downloading and installing a new
+            version).
 Full text:  Collected from each package at build time by
             electron/tools/licenses.ts into third-party.txt (in the
             repository: electron/build/licenses/third-party.txt after a
