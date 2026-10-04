@@ -124,6 +124,7 @@ function realSource(): Source {
   // against the two releases' .blockmap files.  Without that copy, or on any
   // failure, electron-updater downloads the whole installer instead.
   u.disableDifferentialDownload = false;
+  u.disableWebInstaller = true;          // the full NSIS installer only, never a web installer
   // Every failure is also an 'error' event, and an EventEmitter with no
   // listener for it throws: this one only logs (the calls report their own).
   let onInstallError: ((m: string) => void) | null = null;
