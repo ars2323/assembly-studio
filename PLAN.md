@@ -1,136 +1,147 @@
-# Assembly Studio — 계획
+# Assembly Studio — plan
 
-MIPS 와 RISC-V 를 한 앱에서. 실행하면 ISA 를 고르고, 고른 ISA 의 엔진을 띄운다.
-색은 시작 화면(회로판)의 느낌으로 바꾸고, 화면 구성(버튼 위치, 패널, 크기, 동작)은 검토에서 요청받은 것만 바꾼다.
-판은 하나(범용판)뿐이다. 학교에는 따로 판을 만들지 않고 안내 영상으로 배포한다.
+MIPS and RISC-V in one app. On launch the user chooses the ISA, and the app starts that ISA's engine.
+The colours follow the start screen (the circuit board). The screen layout (button positions, panels, sizes,
+behaviour) changes only where a review asks for it.
+There is one edition, the generic one.
 
-## 1. 구성 요소
+Status: **1.0.0 is released.** Stages S0–S6 are done; later work follows §9.
 
-| 무엇 | 어디 |
+## 1. Components
+
+| What | Where |
 |---|---|
-| 앱(Electron UI) | `electron/src` |
-| SPIM 코어와 그 애드온 | `CPU/`, `electron/native/` |
-| RARS 래퍼 | `probe/` (RARS 1.6 은 고정 커밋에서 빌드, 저장소에 넣지 않음) |
-| 엔진 빌드·배포 | `engines/`, `.github/workflows/` |
+| App (Electron UI) | `electron/src` |
+| SPIM core and its addon | `CPU/`, `electron/native/` |
+| RARS wrapper | `probe/` (RARS 1.6 is built from a pinned commit and not kept in the repository) |
+| Engine build and release | `engines/`, `.github/workflows/` |
 
-## 2. 확정된 결정
+## 2. Decisions
 
-| 항목 | 결정 |
+| Topic | Decision |
 |---|---|
-| 엔진 | MIPS = SPIM(`CPU/` + N-API 애드온, `utilityProcess` 워커). RISC-V = RARS 1.6(JVM, `RarsProbe` stdio JSON). 둘 다 고치지 않는다 |
-| ISA 선택 | 첫 화면 카드의 0단계 "MIPS / RISC-V". 실행할 때마다 고르고 기억하지 않는다. 고른 ISA 의 엔진만 띄우고, "처음으로" 가면 끄고 다시 고른다. 개발·테스트용 `--isa=mips\|riscv` |
-| 판 | 범용판 하나. 브랜드 계층(`electron/brands/generic`)은 이름·마크·아이콘을 한곳에 두는 데만 쓴다 |
-| 범용판 이름 | `Assembly Studio`, 실행 파일 `AssemblyStudio` |
-| UI 언어 | 작업 화면의 상태와 이름은 영어 (Assemble 패널, 상태 표시줄, 패널의 라벨). 한국어는 명령 설명(Inspector), 튜토리얼, 첫 화면, 대화상자 |
-| 범용판 로고 | 시안 2~3개 중에서 고른다 |
-| 화면 | 버튼 위치, 패널 배치, 크기, 동작은 지금 그대로. 색만 바꾼다 (§4) |
-| 테마 | 다크와 라이트, 해·달 스위치로 언제든 바꾼다 |
-| 색 정책 | 구조는 흑백. 오류, 방금 바뀐 값, 형식 배지처럼 뜻이 있는 곳만 채도 낮춘 색. 최종은 S2 시안에서 |
-| 버전, 릴리스 | 1.0.0 부터. 태그 하나에 설치본 하나 |
-| 검증, CI | 최소 검증, 자동 CI 없음, 검토 세 번 (§5, §6) |
+| Engines | MIPS = SPIM (`CPU/` + N-API addon, in a `utilityProcess` worker). RISC-V = RARS 1.6 (JVM, `RarsProbe` over stdio JSON). Neither is modified |
+| Choosing the ISA | Step 0 of the first screen's card: "MIPS / RISC-V". Chosen on every launch, never remembered. Only the chosen ISA's engine runs; going back home stops it and the user chooses again. `--isa=mips\|riscv` for development and tests |
+| Editions | One generic edition. The brand layer (`electron/brands/generic`) only keeps the name, mark and icons in one place |
+| Name | `Assembly Studio`; executable `AssemblyStudio` |
+| UI language | The work screen's states and names are in English (Assemble panel, status line, panel labels). Korean is used for instruction explanations (Inspector), the tutorial, the first screen and dialogs |
+| Logo | Chosen from two or three drafts |
+| Screen | Button positions, panel arrangement, sizes and behaviour stay as they are. Only the colours change (§4) |
+| Themes | Dark and light, switched at any time with the sun/moon switch |
+| Colour policy | Structure in black and white. Muted colour only where it carries meaning: errors, values that just changed, format badges. Final colours were set from the S2 drafts |
+| Versions and releases | From 1.0.0. One installer per tag |
+| Verification and CI | Minimal verification, no automatic CI, three reviews (§5, §6) |
 
-## 3. 구조
+## 3. Structure
 
 ```
-CPU/                    SPIM 코어 — 수정 금지
-probe/                  RarsProbe.java 와 setup.sh — RARS 는 고정 커밋에서 빌드, 저장소에 넣지 않음
+CPU/                    SPIM core — do not modify
+probe/                  RarsProbe.java and setup.sh — RARS is built from a pinned commit, not kept in the repository
 electron/brands/
-  generic/              brand.ts (이름, appId, 워드마크, About 문구), 로고, 아이콘, 설치 관리자 그림
+  generic/              brand.ts (name, appId, wordmark, About text), logo, icons, installer pictures
 electron/
-  native/               SPIM N-API 애드온
+  native/               SPIM N-API addon
   src/
-    engine/mips/        SPIM 엔진 경계 (worker, host, transport, protocol)
-    engine/riscv/       RARS 엔진 경계 (JVM transport, host, protocol)
-    isa/mips/           decoder, op-table, registers, syntax, explain, near-miss, machine 묶음, 튜토리얼, 예제
-    isa/riscv/          같은 구성
-    main/ renderer/     공통: 첫 화면, 패널, 편집기, 레이아웃. ISA·브랜드는 모듈로 받는다
+    engine/mips/        SPIM engine boundary (worker, host, transport, protocol)
+    engine/riscv/       RARS engine boundary (JVM transport, host, protocol)
+    isa/mips/           decoder, op table, registers, syntax, explanations, near-miss hints, machine bundle, tutorial, examples
+    isa/riscv/          the same parts
+    main/ renderer/     shared: first screen, panels, editor, layout. The ISA and the brand come in as modules
 ```
 
-- main 의 `sim:*` IPC 는 활성 엔진으로 넘기기만 한다. 두 엔진의 메시지 형식은 바꾸지 않는다.
-- `app.ts` 는 처음에는 ISA 마다 하나씩 둔다. 겹치는 부분은 실제로 손볼 일이 생길 때만 공통으로 뺀다.
-- UI 코드는 이름과 마크를 `brand.*` 로만 본다.
+- The main process's `sim:*` IPC only forwards to the active engine. The two engines' message formats do not change.
+- `app.ts` exists once per ISA at first. Shared parts are pulled out only when there is a real reason to touch them.
+- UI code reads the name and the mark only through `brand.*`.
 
-## 4. 색 — Circuit Dark
+## 4. Colour — Circuit Dark
 
-시작 화면(`startfield/render.ts`: `#0d0d0d` `#181818` `#1c1c1c` `#282828`, 흰 선과 빛)에서 출발한다. 아래는 초안이고 S2 시안에서 확정한다.
+The starting point is the start screen (`startfield/render.ts`: `#0d0d0d` `#181818` `#1c1c1c` `#282828`, white lines and glow).
+The table below was the draft; the final values were set at S2 and live as tokens in `app.css`.
 
-| 역할 | 지금 | 초안 |
+| Role | Before | Draft |
 |---|---|---|
-| 창 배경 | `#f5f7fa` | `#0d0d0d` |
-| 패널 면 / 제목줄 | `#ffffff` | `#141414` / `#101010` |
-| 경계선 | `#e1e5ea` | `#2a2a2a` |
-| hover / 선택 | `#f3f6f9` / 파란 틴트 | `#1f1f1f` / `#262626` |
-| 본문 / 보조 / 흐림 | 짙은 회색들 | `#e6e6e6` / `#a3a3a3` / `#5c5c5c` |
-| 강조 (제목, 링크, 활성 탭) | 남색, 파랑 | 흰색 |
-| 주 버튼 (Step) | 파란 채움 | 흰 테두리 + 은은한 빛 (시작 화면 버튼과 같은 결) |
-| 방금 바뀐 레지스터·메모리 | 노란 줄 | 흰 빛 번짐 + 왼쪽 흰 막대 |
-| 현재 PC 줄 | 파란 틴트 | `#262626` + 흰 막대 |
-| 오류 | 빨강 | 어두운 바탕에 맞춘 빨강 (`#ff6b5b` 계열) |
-| 형식 배지, 문법 강조 | 색 틴트 | 채도 낮춘 색 또는 회색 단계 — 시안 두 안 |
+| Window background | `#f5f7fa` | `#0d0d0d` |
+| Panel surface / title bar | `#ffffff` | `#141414` / `#101010` |
+| Borders | `#e1e5ea` | `#2a2a2a` |
+| Hover / selection | `#f3f6f9` / blue tint | `#1f1f1f` / `#262626` |
+| Text / secondary / dim | dark greys | `#e6e6e6` / `#a3a3a3` / `#5c5c5c` |
+| Emphasis (titles, links, active tab) | navy, blue | white |
+| Primary button (Step) | blue fill | white outline + soft glow (like the start screen's buttons) |
+| Register or memory that just changed | yellow row | white glow + white bar on the left |
+| Current PC row | blue tint | `#262626` + white bar |
+| Error | red | red tuned for a dark background (around `#ff6b5b`) |
+| Format badges, syntax highlighting | colour tints | muted colours or grey steps — two drafts |
 
-- 같이 바꿀 곳: Windows 캡션 버튼과 창 배경(`main.ts` 의 `titleBarOverlay`, `backgroundColor` — 안 바꾸면 뜰 때 흰 화면이 번쩍인다), 스크롤바, 선택색, 포커스 링, 대화상자, 편집기 문법 강조.
-- 바꾸지 않을 곳: 시작 화면, 로고의 색, 인쇄(밝게 유지).
-- 대비: 본문 4.5:1, 큰 글자 3:1 — 토큰 쌍마다 계산하는 단위 테스트로 지킨다.
-- 색은 토큰으로만 쓴다. 지금 `app.css` 에 토큰 밖의 색 값이 84곳 있다 — S1 에서 모두 토큰으로 옮긴다.
-  토큰 이름은 뜻으로 바꾼다(`--white` → `--surface` 처럼).
+- Change together: the Windows caption buttons and the window background (`titleBarOverlay` and `backgroundColor` in
+  `main.ts`; otherwise a white flash shows at startup), scrollbars, selection colour, focus ring, dialogs, editor syntax colours.
+- Do not change: the start screen, the logo's colours, printing (stays light).
+- Contrast: 4.5:1 for body text, 3:1 for large text.
+- Colours are used only through tokens. At the start, `app.css` had 84 colour values outside the tokens; S1 moved them all
+  into tokens. Token names describe meaning (`--white` → `--surface`, for example).
 
-## 5. 단계
+## 5. Stages
 
-검토는 세 번만 받는다: **①S2 색 시안, ②S4 끝(두 ISA 가 도는 설치본을 Windows 에서 직접 써 보기), ③S6 발행 전.**
-그 밖의 단계는 멈추지 않고 이어 간다.
+There are only three reviews: **① S2 colour drafts, ② end of S4 (using an installer with both ISAs on Windows), ③ S6 before publishing.**
+The other stages run on without stopping.
 
-### 범용판
+| Stage | Content | Check | Status |
+|---|---|---|---|
+| **S0 Import** | Bring in the app, `CPU/`, the addon and packaging. Rename to Assembly Studio and split out the brand layer. `CLAUDE.md`, `engines.yml` | It runs | Done |
+| **S1 Tokens** | The 84 colour values and the colours in `main.ts` become tokens. Token names describe meaning | One screenshot | Done |
+| **S2 Dark theme** | Two drafts (format badges, emphasis) → **review ①** → apply | One screenshot at 1280, one at 910 | Done |
+| **S3 RISC-V engine** | `probe/`, the RARS engine boundary, the RISC-V ISA module. The RISC-V CSS is brought in on the new tokens. `--isa` | Imported core unit tests; it runs | Done |
+| **S4 Choosing the ISA** | Step 0 of the first screen, starting the engine after the choice, switching from home. Title, About and file filters follow the ISA. A trial installer (pre-release) | **Review ②** | Done |
+| **S5 Finishing the edition** | Name, logo, icon, About, a new tutorial (both ISAs, no characters), usage guide, `.asx` export (both ISAs) | Screenshots | Done |
+| **S6 1.0.0** | Publish the installer | **Review ③** | Done |
 
-| 단계 | 내용 | 확인 |
+S2 (colour) came before S3 (RISC-V): changing colours while there was only MIPS meant doing it once, and the RISC-V CSS
+could use the new tokens as it came in.
+
+## 6. Verification, CI, release
+
+The engines (SPIM, RARS) are already proven and are used without changes, so verification is kept minimal.
+
+**Tests kept:** only the ISA core unit tests (decoder, format, registers and so on — fast, and they catch imports broken while moving files).
+**Not kept:** end-to-end suites, golden files, mutants, per-width measurements, installer/IME/upgrade checks, probe checks, and their tools.
+**Not added:** new end-to-end tests, contrast unit tests (contrast was computed once when the drafts were made), screenshot comparison tools.
+**Screen check:** one screenshot script; take one or two shots of the changed screen and look at them.
+**Windows check:** a person uses the trial installer at review ② (no automatic Windows checks).
+
+| Workflow | When | What it does |
 |---|---|---|
-| **S0 가져오기** | 앱, `CPU/`, 애드온, 패키징을 들인다. 이름을 Assembly Studio 로, 브랜드 계층을 나눈다. `CLAUDE.md`, `engines.yml` | 실행되는지 |
-| **S1 토큰 정리** | 색 값 84곳과 `main.ts` 의 색을 토큰으로. 토큰 이름을 뜻으로 | 캡처 한 장 |
-| **S2 다크 테마** | 시안 두 안(형식 배지·강조) → **검토 ①** → 적용 | 1280 캡처 한 장, 910 한 장 |
-| **S3 RISC-V 엔진** | `probe/`, RARS 엔진 경계, RISC-V ISA 모듈. RISC-V 쪽 CSS 는 새 토큰으로 옮겨 넣는다. `--isa` | 가져온 core 단위 테스트, 실행되는지 |
-| **S4 ISA 선택** | 첫 화면 0단계, 고른 뒤 엔진 시작, "처음으로" 에서 전환. 제목, About, 파일 필터가 ISA 를 따른다. 시험용 설치본(pre-release) | **검토 ②** |
-| **S5 범용판 마무리** | 이름, 로고, 아이콘, About, 튜토리얼 새로 쓰기(두 ISA, 캐릭터 없이), 사용 안내, `.asx` 내보내기(두 ISA) | 캡처 |
-| **S6 범용판 1.0.0** | 설치본 발행 | **검토 ③** |
+| `engines.yml` | When an engine input changes (`CPU/`, `native/`, `probe/`, the RARS commit, the Temurin version), or by hand | Builds `spim.node`, the RARS jar, the `RarsProbe` classes and the jlink runtime, and uploads them as `engines-<input hash>.zip`, a Release asset. In practice, once |
+| `release.yml` | A `v*` tag, or by hand | Downloads the engine zip → UI bundle → installer → publish. No tests |
 
-S2(색)를 S3(RISC-V)보다 먼저 한다: MIPS 하나일 때 바꾸면 한 번에 끝나고, RISC-V 쪽 CSS 는 들여올 때 새 토큰으로 쓰면 된다.
+- There is no automatic CI.
+- The engine zip is kept as a Release asset, not in the Actions cache (the cache is deleted after 7 days without use).
+- Earlier releases are never deleted. A problem is fixed with a patch release; until then users can go back to the previous installer.
 
-## 6. 검증, CI, 배포
+## 7. Rules
 
-엔진(SPIM, RARS)은 이미 검증된 것을 고치지 않고 쓴다. 그래서 검증은 최소로 한다.
+- Do not modify `CPU/` or RARS. If a task cannot be done without modifying them, stop and report.
+- Change the screen layout (button positions, panels, sizes, behaviour) only as requested.
+- Colours only through tokens.
+- Keep commits small, one purpose each. Push at the end of each stage.
 
-**가져오는 테스트:** ISA core 의 단위 테스트(decoder, format, registers 등 — 빠르고, 파일을 옮기다 깨진 import 를 잡는다)만.
-**가져오지 않는 것:** e2e 스위트, Qt 골든, 뮤턴트, 폭별 측정, 설치 관리자·IME·업그레이드 검사, 탐침 검사, 그 도구들.
-**새로 만들지 않는 것:** 새 e2e, 대비 단위 테스트(대비는 시안을 만들 때 한 번 계산), 캡처 비교 도구.
-**화면 확인:** 캡처 스크립트 하나로 바뀐 화면만 한두 장 찍어 직접 본다.
-**Windows 확인:** 검토 ② 의 시험용 설치본을 사람이 직접 써 본다(자동 Windows 검사 없음).
+## 8. Risks
 
-| 워크플로 | 언제 | 하는 일 |
-|---|---|---|
-| `engines.yml` | 엔진 입력(`CPU/`, `native/`, `probe/`, RARS 커밋, Temurin 버전)이 바뀔 때, 또는 수동 | `spim.node`, RARS jar, `RarsProbe` 클래스, jlink 런타임을 빌드해 `engines-<입력 해시>.zip` 으로 Release 자산에 올린다. 사실상 한 번 |
-| `release.yml` | 태그 `v*` | 엔진 zip 내려받기 → UI 번들 → 설치본 → 발행. 테스트 없음 |
-
-- 자동 CI 는 없다.
-- 엔진 zip 은 Actions 캐시가 아니라 Release 자산에 둔다(캐시는 7일 쓰지 않으면 지워진다).
-- 이전 릴리스는 지우지 않는다. 문제가 나오면 패치 릴리스로 고치고, 그동안은 이전 설치본으로 돌아간다.
-
-## 7. 지킬 것
-
-- `CPU/` 와 RARS 는 고치지 않는다. 고쳐야만 되는 일이 나오면 멈추고 보고한다.
-- 화면 구성(버튼 위치, 패널, 크기, 동작)은 요청받은 것만 바꾼다.
-- 색은 토큰으로만.
-- 커밋은 작게, 한 목적씩. 단계마다 push 한다.
-
-## 8. 위험
-
-| 위험 | 대응 |
+| Risk | Response |
 |---|---|
-| 설치본 크기 — JVM 런타임 때문에 140MB 안팎 | 감수. jlink 모듈은 최소 구성(java.base, java.prefs, java.desktop) |
-| RISC-V 를 고르면 JVM 콜드 스타트 | 고른 직후 엔진을 띄우고 첫 화면 다음 단계를 보이는 동안 기다린다 |
-| 두 엔진의 동작 차이(중단점: 주소 vs 줄, 입력: 재실행 vs 이벤트, 실행 중 읽기·진행 표시) | 엔진 경계는 각자 그대로 두고 ISA 별 `app.ts` 가 흡수. 실행 중 진행 표시는 MIPS 만 |
-| 검증을 줄여 문제를 늦게 발견 | 검토 ② 에서 Windows 실물로 확인. 이전 릴리스로 되돌릴 수 있음 |
-| 이전에 쓰인 `SPIM_*` 환경변수 이름 | S0 에서 `STUDIO_*` 로 바꾼다 |
+| Installer size — around 140 MB because of the JVM runtime | Accepted. The jlink runtime has the minimum modules (java.base, java.prefs, java.desktop) |
+| JVM cold start when RISC-V is chosen | Start the engine right after the choice and wait while the first screen's next step is shown |
+| Behaviour differences between the engines (breakpoints: address vs line; input: re-run vs event; reading while running; progress) | Each engine boundary stays as it is and the per-ISA `app.ts` absorbs the difference. Progress while running is MIPS only |
+| Problems found late because verification is minimal | Checked on real Windows at review ②. Users can go back to an earlier release |
+| Old `SPIM_*` environment variable names | Renamed to `STUDIO_*` in S0 |
 
-## 9. 1.0.0 이후
+## 9. After 1.0.0 — versioning
 
-1.0.0 을 발행했다. 이후의 변경은 버전을 올려 낸다: 고침은 1.0.x, 기능 추가는 1.x.0.
-`electron/package.json` 의 version 과 `docs/releases/<버전>.md` 를 함께 쓰고, 태그 `v<버전>` 을 올리거나 release.yml 을 손으로 실행(`release` 체크)해 발행한다.
+1.0.0 is published. Every later change ships under a new version:
 
+- **1.0.x** — fixes only.
+- **1.x.0** — new features.
+
+For each release:
+
+1. Set `version` in `electron/package.json`.
+2. Write `docs/releases/<version>.md` (it becomes the release notes).
+3. Push the tag `v<version>`, or run `release.yml` by hand with `release` ticked, to publish `v<version>`.
