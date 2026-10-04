@@ -2,6 +2,9 @@
 # then the installed program driven and the desktop captured
 # (electron/tests/e2e/windows-check.ts), and the .asx export checked
 # against the screen in both ISAs (electron/tests/e2e/asx-export.ts).
+# With update_from, that older release is installed instead and left to
+# update itself to this one at launch (electron/tests/e2e/update-check.ps1)
+# before the rest runs on the updated program.
 # What Windows itself draws -- the caption buttons over the title bar, the
 # taskbar icon, the installer -- can only be seen this way.  The captures
 # are the run's artifact, and are also pushed (alone, one commit) to the
@@ -15,6 +18,10 @@ on:
         description: 'Release to check (e.g. 1.0.0)'
         required: true
         default: '1.0.0'
+      update_from:
+        description: 'Install this older release instead, and let it update itself to the one above (e.g. 1.2.0)'
+        required: false
+        default: ''
 
 permissions:
   contents: write   # the captures go to the branch windows-check-captures as well
@@ -42,10 +49,12 @@ jobs:
       - name: npm ci (no addon build; the installed program is what runs)
         run: npm ci --ignore-scripts
 
-      - name: Install the release's installer, silently, for this user
+      - name: Install the release's installer (or update_from's), silently, for this user
         shell: pwsh
+        env:
+          INSTALL: ${{ inputs.update_from || inputs.version }}
         run: |
-          gh release download "v${{ inputs.version }}" --repo "$env:GITHUB_REPOSITORY" --pattern '*-setup.exe' --dir "$env:RUNNER_TEMP"
+          gh release download "v$env:INSTALL" --repo "$env:GITHUB_REPOSITORY" --pattern '*-setup.exe' --dir "$env:RUNNER_TEMP"
           $setup = Get-ChildItem "$env:RUNNER_TEMP\*-setup.exe" | Select-Object -First 1
           Start-Process -FilePath $setup.FullName -ArgumentList '/S' -Wait
           $exe = Join-Path $env:LOCALAPPDATA 'Programs\Assembly Studio\AssemblyStudio.exe'
@@ -61,6 +70,11 @@ jobs:
           Add-Type -AssemblyName System.Windows.Forms
           [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
 
+      - name: The update at launch, from update_from to this release
+        if: inputs.update_from != ''
+        shell: pwsh
+        run: pwsh -NoProfile -File tests/e2e/update-check.ps1 "$env:STUDIO_E2E_EXE" "${{ inputs.version }}" ../windows-check/update
+
       - name: The installed program, as a user sees it
         run: node tests/e2e/windows-check.ts ../windows-check
 
@@ -70,7 +84,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: windows-check-${{ inputs.version }}
+          name: windows-check-${{ inputs.update_from && format('{0}-to-', inputs.update_from) || '' }}${{ inputs.version }}
           path: windows-check
 
       - name: The captures to the branch windows-check-captures
