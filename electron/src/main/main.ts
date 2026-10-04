@@ -26,6 +26,7 @@ import path from 'node:path';
 import { decodeTextFile, encodeTextFile, NEW_FILE_FORMAT, type TextFileFormat } from '../node/text-file.ts';
 import { brand } from '../brand.ts';
 import { LICENSES, paths, version } from './paths.ts';
+import { WINDOW_COLOURS } from './theme.ts';
 import { formatHmx, hmxTime } from '../core/hmx.ts';
 import { Simulator, SimulatorCrashed } from '../sim/host.ts';
 import { ImageError, readImage } from '../sim/image.ts';
@@ -147,14 +148,14 @@ async function main(): Promise<void> {
     minHeight: 480,
     show: false,
     title: brand.name,
-    backgroundColor: '#f5f7fa',
+    backgroundColor: WINDOW_COLOURS.background,
     // No system title bar: the window's own top bar carries the logo, the
     // file and the toolbar.  The caption buttons stay the system's own
     // (titleBarOverlay), so Windows 11's snap layouts -- the flyout on the
     // maximise button -- keep working, as do double-click to maximise and
     // dragging to the top edge on the bar's drag region.
     titleBarStyle: 'hidden',
-    titleBarOverlay: { color: '#ffffff', symbolColor: '#00205b', height: TITLE_BAR_HEIGHT },
+    titleBarOverlay: { color: WINDOW_COLOURS.titlebar, symbolColor: WINDOW_COLOURS.symbol, height: TITLE_BAR_HEIGHT },
     webPreferences: {
       preload: paths.preload,
       contextIsolation: true,
