@@ -1067,7 +1067,7 @@ html.theme-fade, html.theme-fade *:not(canvas), html.theme-fade *::before, html.
 .tut-dim { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; animation: tut-fade .2s ease-out; }
 /* Dark but for the lit panels (clicks go through it); a clear layer over
    everything but the targets takes the clicks (tutorial/engine.ts). */
-.tut-dim path.dim { fill: rgba(var(--scrim-rgb), .6); pointer-events: none; }
+.tut-dim path.dim { fill: rgba(var(--scrim-rgb), .6); pointer-events: none; } /* logic/overlay.ts TUTORIAL_ALPHA: the caption buttons' patch matches */
 .tut-dim path.block { fill: transparent; pointer-events: visiblePainted; }
 .tut-ring { position: absolute; border: 2px solid var(--tut-ring); border-radius: 8px; box-shadow: var(--tut-ring-glow); pointer-events: none; }
 .tut-ring.tight { border-width: 1.5px; border-radius: 5px; box-shadow: none; }
