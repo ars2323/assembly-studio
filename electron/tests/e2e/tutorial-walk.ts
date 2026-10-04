@@ -55,7 +55,9 @@ async function moved(s: State, timeout = 10_000): Promise<State> {
 const intersects = (a: Rect, b: Rect) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 async function capture(suffix = ''): Promise<State> {
   await settle();
-  const s = await state();
+  let s = await state();
+  // A target not reachable yet may only be settling (the engine tests it again after 600 ms).
+  if (s.shown.hits.some((hit) => !hit)) { await page.waitForTimeout(900); s = await state(); }
   const name = `${isa}-${theme}-${width}-${lang}-${String(s.index + 1).padStart(2, '0')}-${s.id}${suffix}`;
   await page.screenshot({ path: path.join(out, `${name}.png`) });
   const where = `${name}`;
