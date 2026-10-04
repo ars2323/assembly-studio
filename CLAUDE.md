@@ -1,0 +1,36 @@
+# Assembly Studio — 작업 규칙
+
+MIPS(SPIM)와 RISC-V(RARS) 어셈블리 시뮬레이터. 실행하면 ISA 를 고르고, 고른 ISA 의 엔진을 띄운다.
+계획과 단계는 `PLAN.md`.
+
+## 구조
+
+| 경로 | 무엇 |
+|---|---|
+| `CPU/` | SPIM 코어. **고치지 않는다** |
+| `probe/` | RARS 래퍼(`RarsProbe.java`). RARS 자체는 고정 커밋에서 빌드하고 **고치지 않는다** |
+| `electron/src` | 앱 (main, renderer, core, sim) |
+| `electron/native` | SPIM N-API 애드온 |
+| `electron/brands/<id>` | 브랜드(`generic`, `hallym`): 이름, appId, 마크, 아이콘, 설치 관리자 그림 |
+| `engines/`, `.github/workflows/` | 엔진 빌드(`engines.yml`)와 배포(`release.yml`) |
+
+## 명령 (electron/)
+
+    npm ci && npm run build      # 의존성, 애드온 (Linux: bison, flex, g++)
+    npm run brand [generic|hallym]   # 브랜드 배치 (src/brand.ts, src/renderer/assets/brand/ 생성)
+    npm run typecheck
+    npm test                     # core 단위 테스트
+    npm run electron             # 앱 실행
+    xvfb-run -a -s '-screen 0 2400x1400x24' npm run shot -- <out-dir> [width]   # 화면 캡처
+
+## 지킬 것
+
+- `CPU/` 와 RARS 는 고치지 않는다. 고쳐야만 되는 일이 나오면 멈추고 보고한다.
+- 화면 구성(버튼 위치, 패널, 크기, 동작)은 바꾸지 않는다. 바꾸는 것은 색뿐이다.
+- 색은 `app.css` 의 토큰으로만 쓴다.
+- UI 코드는 한림을 직접 가리키지 않는다. 이름·마크·캐릭터는 `brand` (`src/brand.ts`) 로만.
+  범용판(generic) 산출물에 한림 이름이나 자산이 들어가면 안 된다.
+- UI 를 바꾸면 캡처를 찍어 직접 본다.
+- 문서(README, 릴리스 노트 등)는 이 프로젝트에 대해서만 쓴다. 다른 저장소나 이전 제품을 언급하지 않는다.
+- 자동 CI 는 없다. 검증은 최소로: core 단위 테스트, 캡처, 검토 시점의 사람 확인.
+- 커밋은 작게, 한 목적씩. 단계마다 push 한다.

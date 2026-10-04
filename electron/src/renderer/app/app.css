@@ -1,0 +1,672 @@
+/* The window.  Tokens are the Qt build's (QtSpim/edu/theme/tokens.h); sizes
+   that follow the font size are variables set by app.ts (--fs, --row,
+   --rrow).
+
+   Every place a hexadecimal literal or an identifier with the digit 0 can
+   appear is set in D2Coding (.mono and the code panels): Pretendard draws
+   0x1 as 0×1, and its 0 next to letters reads as O.  tests/e2e checks the
+   rendered page for it.
+
+   Every panel's head is .phead (src/renderer/app/ui.ts): one height, one
+   font, one set of margins, controls on the right. */
+
+@font-face { font-family: Pretendard; font-weight: 400; src: url(../assets/fonts/Pretendard-Regular.subset.woff2) format('woff2'); }
+@font-face { font-family: Pretendard; font-weight: 500; src: url(../assets/fonts/Pretendard-Medium.subset.woff2) format('woff2'); }
+@font-face { font-family: Pretendard; font-weight: 600; src: url(../assets/fonts/Pretendard-SemiBold.subset.woff2) format('woff2'); }
+@font-face { font-family: Pretendard; font-weight: 700; src: url(../assets/fonts/Pretendard-Bold.subset.woff2) format('woff2'); }
+@font-face { font-family: D2Coding; src: url(../assets/fonts/D2Coding.woff2) format('woff2'); }
+
+:root {
+  --navy: #00205b; --blue: #0055a5; --teal: #00a9a5; --gray: #bcbec0;
+  --white: #ffffff; --window: #f5f7fa; --border: #e1e5ea; --hover: #f3f6f9;
+  --text: #1f2933; --text-2: #5a6472; --muted: #65707e; --dim: #a9b1bb;
+  --text-2-glass: #4b5563; /* --text-2 on the first screen's glass card: 4.5:1 over every frame (docs/PORTING.md 29) */
+  --blue-tint: #e8f0f9; --blue-tint2: #d3e2f3; --teal-tint: #e6f6f5; --teal-text: #00736f;
+  --amber-tint: #fdf3e1; --amber-text: #8a5a00; --purple: #6b4c9a; --cp0-tint: #eef0f2; --cp0-text: #4a5560;
+  --error: #c0392b; --error-tint: #fbeae8; --error-text: #8e2a1f;
+  --changed: #fff1b8; --changed-bar: #e0a100; --changed-text: #6b4a00;
+  --ui: Pretendard, sans-serif; --code: D2Coding, monospace;
+  --fs: 13px; --row: 22px; --rrow: 21px;
+  --titlebar: 40px; --head: 34px;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; overflow: hidden; }
+body {
+  font: var(--fs)/1.45 var(--ui); color: var(--text); background: var(--window);
+  font-feature-settings: 'calt' 0;
+  /* Korean sentences break between words (어절), never inside one; only a
+     piece of code too long for a whole line breaks anywhere. */
+  word-break: keep-all;
+}
+.mono { overflow-wrap: anywhere; }
+button { font: inherit; color: inherit; cursor: pointer; }
+.mono { font-family: var(--code); }
+.app { display: grid; height: 100vh; grid-template-rows: var(--titlebar) minmax(0, 1fr) 24px; }
+.linkbtn { border: 0; background: none; padding: 0; color: var(--blue); font-weight: 500; }
+.linkbtn:hover { text-decoration: underline; }
+
+/* ---- title bar: the window's own ---------------------------------------- */
+/* The whole bar moves the window (and double-click maximises); everything
+   that is pressed opts out.  The system's caption buttons sit over the
+   right end (titleBarOverlay): keep clear of them. */
+.titlebar {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  /* --caption-extra: the tests make the room Windows' wider caption buttons take. */
+  padding: 0 calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 8px + var(--caption-extra, 0px)) 0 12px;
+  background: var(--white); border-bottom: 1px solid var(--border);
+  -webkit-app-region: drag; user-select: none;
+}
+.titlebar button, .titlebar input, .titlebar select, .titlebar a { -webkit-app-region: no-drag; }
+.titlebar .brand { display: flex; align-items: center; gap: 8px; flex: none; }
+.titlebar .logo { height: 18px; width: auto; }
+.titlebar .appname { font-weight: 700; color: var(--navy); white-space: nowrap; letter-spacing: .1px; }
+.titlebar .file { color: var(--text-2); white-space: nowrap; overflow: hidden; flex: none;
+  padding-left: 10px; border-left: 1px solid var(--border); }
+.titlebar .file:empty { display: none; }
+.titlebar .file b { color: var(--text); font-weight: 400; }
+.titlebar .dirty { color: var(--amber-text); }
+.titlebar .toolbar { display: flex; align-items: center; gap: 6px; flex: none; margin-left: 6px; }
+.titlebar .drag { flex: 1; min-width: 12px; align-self: stretch; }
+.titlebar .tools { display: flex; align-items: center; gap: 2px; flex: none; }
+/* One rule for every control in the bar, whatever the font: centred on the
+   bar's middle line, as tall as the font needs but inside the bar (40 px,
+   fixed by the system's caption buttons), the words in it one line tall.
+   (Before 2.7.0 the speed switch took its height from its words: at 24 px
+   it grew past the bar and pushed the buttons up.) */
+.titlebar { --ctl: clamp(28px, calc(var(--fs) + 12px), 34px); }
+.titlebar .btn, .titlebar .seg { height: var(--ctl); line-height: 1; }
+.titlebar .seg { align-items: stretch; }
+.titlebar .seg button { display: inline-flex; align-items: center; padding-top: 0; padding-bottom: 0; line-height: 1; }
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--white); color: var(--navy); font-weight: 500; white-space: nowrap; flex: none; }
+.btn:hover:not(:disabled) { background: var(--hover); }
+.btn img { width: 16px; height: 16px; opacity: .85; }
+.btn.primary { background: var(--blue); border-color: var(--blue); color: var(--white); }
+.btn.primary:hover:not(:disabled) { background: #004a90; }
+.btn.primary img { filter: invert(1); opacity: 1; }
+.btn:disabled { color: var(--gray); cursor: default; }
+.btn:disabled img { opacity: .35; }
+.btn kbd { font: 11px var(--code); color: inherit; opacity: .7; } /* F10 */
+.btn.small { height: 26px; padding: 0 8px; }
+.iconbtn { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; border: 0; background: none; color: var(--text-2); flex: none; }
+.iconbtn:hover { background: var(--hover); }
+.iconbtn img { width: 18px; height: 18px; opacity: .7; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; padding: 2px; background: var(--window); flex: none; }
+.seg button { padding: 2px 12px; border: 0; border-radius: 6px; background: none; color: var(--text-2); font-weight: 500; white-space: nowrap; }
+.seg button.on { background: var(--white); color: var(--navy); font-weight: 600; box-shadow: 0 1px 2px rgba(0,32,91,.12); }
+.seg button:disabled { color: var(--gray); cursor: default; }
+/* Run speed: named, next to Run.  One button in a narrow title bar. */
+.speedbox { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.speedlabel { font-size: 12px; color: var(--text-2); white-space: nowrap; }
+.titlebar .speedone { display: none; }
+/* A narrow title bar gives way in steps (app.ts fitTitlebar), by the room
+   it measures -- a bigger font takes more of it at the same width: key
+   hints, the buttons' icons, Save & Assemble's "Save &" (app.ts, the text),
+   the speed as one button, tighter spacing, the file's name (app.ts, down
+   to ten columns), the program's name; then, a big font in a narrow window,
+   the buttons' names (their icons back, the names in their tooltips) and
+   last their icons' size.  Every button keeps its border throughout. */
+.titlebar.nokeys .btn kbd { display: none; }
+.titlebar.noicons .toolbar .btn img { display: none; }
+.titlebar.noicons .toolbar .btn { padding: 0 9px; }
+.titlebar.noicons .toolbar { gap: 4px; }
+.titlebar.onespeed .speedlabel, .titlebar.onespeed .speed { display: none; }
+.titlebar.onespeed .speedone { display: inline-flex; }
+.titlebar.tighter { gap: 3px; }
+.titlebar.tighter .viewswitch button { padding: 2px 6px; }
+.titlebar.tighter .iconbtn { width: 20px; } /* 18 px icons: five of them since the export (2.4.0) */
+.titlebar.tighter .tools { gap: 0; }
+.titlebar.tighter .toolbar .btn { padding: 0 7px; }
+.titlebar.tighter .drag { min-width: 4px; }
+.titlebar.noapp .appname { display: none; }
+.titlebar.iconsonly .toolbar .btn img { display: inline; }
+.titlebar.iconsonly .toolbar .btn .label { display: none; }
+.titlebar.iconsonly .toolbar .btn { padding: 0 7px; }
+.titlebar.iconsonly .toolbar .btn.speedone .label { display: inline; } /* no icon: its value alone */
+.titlebar.iconsonly .speedone .pre { display: none; }
+.titlebar.iconsonly .viewswitch button { padding: 0 5px; }
+.titlebar.smallicons .toolbar .btn img, .titlebar.smallicons .iconbtn img { width: 14px; height: 14px; }
+.titlebar.smallicons .toolbar .btn { padding: 0 5px; }
+.titlebar.smallicons .iconbtn { width: 18px; }
+
+/* ---- status bar --------------------------------------------------------- */
+.status { display: flex; align-items: center; gap: 16px; padding: 0 12px; font-size: 12px; color: var(--text-2); background: var(--white); border-top: 1px solid var(--border); white-space: nowrap; overflow: hidden; }
+.status .err { color: var(--error-text); font-weight: 600; }
+.status .run { color: var(--blue); font-weight: 600; }
+.status .ok { color: var(--teal-text); font-weight: 600; }
+.status .warn { color: var(--amber-text); }
+/* "방금 바뀜: $t1" in the yellow row's own colours: what a yellow row is,
+   where the Registers panel has no room for its "Changed" tag. */
+.status .changed { color: var(--changed-text); background: var(--changed); box-shadow: inset 3px 0 0 var(--changed-bar);
+  padding: 1px 7px 1px 9px; border-radius: 3px; line-height: 16px; }
+.status .changed .mono { font-weight: 700; }
+
+/* ---- the one panel and its head ----------------------------------------- */
+.panel { background: var(--white); border: 1px solid var(--border); border-radius: 8px; display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
+.phead { display: flex; align-items: center; gap: 10px; height: var(--head); padding: 0 8px 0 12px; border-bottom: 1px solid var(--border); flex: none; min-width: 0; }
+.ptitle { font-weight: 600; color: var(--navy); white-space: nowrap; }
+.ptabs { display: flex; height: 100%; margin-left: -4px; }
+.ptab { display: flex; align-items: center; height: 100%; padding: 0 10px; border: 0; background: none; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.ptab.on { color: var(--navy); border-bottom-color: var(--blue); }
+.ptab:hover:not(.on) { color: var(--text); }
+.pgrow { flex: 1; min-width: 0; }
+.pmeta { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.paside { display: flex; align-items: center; gap: 6px; flex: none; }
+.paside:empty { display: none; }
+.pmeta:not([hidden]) + .paside { padding-left: 10px; border-left: 1px solid var(--border); }
+.hbtn { height: 24px; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--white); color: var(--text-2); font-size: 12px; white-space: nowrap; }
+.hbtn:hover { background: var(--hover); color: var(--navy); }
+.hbtn.on { background: var(--blue-tint); border-color: var(--blue-tint2); color: var(--navy); font-weight: 600; }
+.hbtn.colbtn { height: 22px; padding: 0 6px; font-size: 11px; }
+.paside:has(.colbtn) { gap: 4px; }
+.pbody { flex: 1; min-height: 0; position: relative; }
+/* One line: the words give way (…) before the Show button does. */
+.fold .foldtext { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fold .linkbtn { flex: none; }
+.fold { display: flex; align-items: center; gap: 0 8px; min-height: 30px; padding: 4px 14px; flex-wrap: nowrap; color: var(--text-2); font-family: var(--ui); font-size: 12px; border-top: 1px dashed var(--border); flex: none; }
+
+/* ---- the work area ------------------------------------------------------ */
+.work { min-height: 0; min-width: 0; display: grid; }
+.stage-welcome { display: flex; align-items: center; justify-content: center; padding: 24px; overflow: auto; position: relative; isolation: isolate; }
+.split { display: grid; min-height: 0; min-width: 0; padding: 8px; gap: 0;
+  grid-template-columns: var(--editor-w, clamp(300px, 40%, 590px)) 8px minmax(0, 1fr); } /* --editor-w: app.ts layout(): what 72 columns need, no more */
+.pane { display: grid; min-height: 0; min-width: 0; }
+.splitter { cursor: col-resize; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+.foldbtn { width: 8px; height: 22px; padding: 0; border: 0; border-radius: 3px; background: none; color: var(--muted); font-size: 12px; line-height: 22px; cursor: pointer; }
+.foldbtn:hover { background: var(--blue-tint2); color: var(--navy); }
+.splitter .grip { width: 3px; height: 36px; border-radius: 2px; background: var(--border); }
+.splitter:hover .grip { background: var(--blue-tint2); }
+.rail { display: none; border: 1px solid var(--border); border-radius: 8px; background: var(--white); color: var(--navy); font-weight: 600; padding: 0; }
+.rail span { writing-mode: vertical-rl; display: inline-block; padding: 12px 0; }
+.rail:hover { background: var(--hover); }
+.split[data-folded=editor] { grid-template-columns: 32px 8px minmax(0, 1fr); }
+.split[data-folded=editor] .pane-editor > .panel { display: none; }
+.split[data-folded=editor] .pane-editor > .rail { display: block; }
+.split[data-folded=run] { grid-template-columns: minmax(0, 1fr) 8px 32px; }
+.split[data-folded=run] .pane-run > .run-side { display: none; }
+.split[data-folded=run] .pane-run > .rail { display: block; }
+.split[data-folded=editor] .splitter, .split[data-folded=run] .splitter { cursor: default; pointer-events: none; }
+/* Narrow: one side at a time (Editor / Run in the title bar). */
+.split.narrow { grid-template-columns: minmax(0, 1fr); }
+.split.narrow .splitter { display: none; }
+.split.narrow[data-view=editor] .pane-run, .split.narrow[data-view=run] .pane-editor { display: none; }
+
+/* ---- the Editor --------------------------------------------------------- */
+.edhost { display: flex; }
+.edhost .cm-editor { flex: 1; min-width: 0; height: 100%; font-size: calc(var(--fs) + .5px); }
+.edhost .cm-editor.cm-focused { outline: none; }
+.edhost .cm-scroller { font-family: var(--code); line-height: var(--row); }
+.edhost .cm-gutters { background: var(--white); border-right: 0; color: var(--muted); }
+.edhost .cm-lineNumbers .cm-gutterElement { min-width: 40px; padding-right: 10px; }
+.edhost .cm-error-line { background: var(--error-tint); }
+/* The line being executed: blue, with a bar -- never the error's pink. */
+.edhost .cm-pc-line { background: var(--blue-tint2); box-shadow: inset 3px 0 0 var(--blue); }
+.cm-error-gutter { width: 18px; display: flex; align-items: center; }
+/* Breakpoints: a red dot in their own gutter, the leftmost; clicking sets or clears. */
+.cm-bp-gutter { width: 18px; cursor: pointer; }
+.cm-bp-gutter .cm-gutterElement { display: flex; align-items: center; justify-content: center; }
+.cm-bp-dot, .cm-bp-space { display: inline-block; width: 11px; height: 11px; border-radius: 50%; }
+.cm-bp-dot { background: var(--error); }
+.cm-bp-gutter .cm-gutterElement:hover::after { content: ''; width: 11px; height: 11px; border-radius: 50%; background: rgba(192,57,43,.2); }
+.cm-bp-gutter .cm-gutterElement:has(.cm-bp-dot):hover::after { display: none; }
+.k-Comment { color: var(--muted); }
+.k-String { color: var(--amber-text); }
+.k-Directive { color: var(--purple); }
+.k-Instruction { color: var(--blue); font-weight: 700; }
+.k-Register { color: var(--teal-text); }
+.k-LabelDefinition { color: var(--navy); font-weight: 700; }
+.k-Number { color: var(--purple); }
+
+/* ---- the Assemble panel, under the Editor ------------------------------- */
+/* As tall as its words (a line after a clean assemble, the list after one
+   with errors), at most what leaves the Editor its least (--asm-max, app.ts
+   layout()); the grip over it sets a height of its own (--asm-h). */
+.pane-editor { grid-template-rows: minmax(0, 1fr) 8px auto; }
+.split[data-folded=editor] .pane-editor { grid-template-rows: minmax(0, 1fr); }
+.split[data-folded=editor] .pane-editor > .vgrip { display: none; }
+.asm { height: var(--asm-h, auto); max-height: var(--asm-max, 45%); }
+.asm .abody { display: flex; flex-direction: column; overflow: auto; }
+.asm .asm-state { padding: 8px 14px; font-size: 13px; line-height: 1.5; color: var(--text-2); }
+.asm .asm-state p { margin: 0; }
+.asm .asm-state .ok { color: var(--teal-text); font-weight: 600; }
+.asm .asm-state .warn { color: var(--amber-text); margin-top: 2px; }
+/* The error list: the words alone, from the left, at the panel's own height. */
+.asm .notice-host { container-type: normal; justify-content: flex-start; align-items: flex-start; overflow: visible; flex: none; }
+.asm .notice { margin: 0; padding: 10px 14px 12px; max-width: none; }
+.asm .notice img.char { display: none; }
+.asm .notice .say h3 { font-size: 15px; margin-bottom: 2px; }
+.asm .notice .say > p { margin-bottom: 6px; }
+.asm .notice .row { margin-top: 10px; }
+.asm .item { display: grid; grid-template-columns: 18px 44px minmax(0, 1fr); align-items: baseline; gap: 8px; padding: 6px 0; border-top: 1px solid var(--border); font-size: 14px; }
+.asm .mark, .cm-error-mark { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 3px;
+  border: 1.5px solid var(--error); color: var(--error); background: var(--white); font: 800 10px/1 var(--ui); }
+.asm .line { font-weight: 700; color: var(--error-text); white-space: nowrap; text-align: left; }
+.asm .msg { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.asm .msg .what { color: var(--text); }
+.asm .msg .src { color: var(--text-2); }
+.asm .msg .hint { color: var(--teal-text); font-size: 13px; }
+
+/* ---- the Run side -------------------------------------------------------- */
+.run-side { display: grid; min-height: 0; min-width: 0; container-type: inline-size; container-name: run;
+  grid-template-rows: auto minmax(0, 1fr); }
+.run-placeholder, .run-grid { grid-row: 2; }
+.run-placeholder { background: var(--white); border: 1px dashed var(--border); border-radius: 8px; }
+.run-placeholder .notice .row { margin-top: 14px; }
+.run-placeholder[data-kind=failed] h3, .run-placeholder[data-kind=crashed] h3 { color: var(--error-text); }
+/* The Editor's code is not the machine's program: one line, covering nothing. */
+.run-band { grid-row: 1; margin-bottom: 6px; padding: 3px 10px; border-radius: 6px; background: var(--amber-tint); color: var(--amber-text);
+  box-shadow: inset 3px 0 0 var(--amber-text); font-size: 12px; line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.run-grid { display: grid; min-height: 0; gap: 8px;
+  grid-template-columns: clamp(var(--regs-least, 417px), 46%, var(--regs-most, 505px)) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.run-grid .leftcol { grid-row: 1; grid-column: 1; display: grid; min-height: 0; gap: 0; grid-template-rows: minmax(0, 1fr) 8px auto; }
+/* The grip between Registers and the Console (app.ts): drag to share the height, double-click for the default. */
+.vgrip { display: flex; align-items: center; justify-content: center; cursor: row-resize; touch-action: none; }
+.vgrip .grip { width: 36px; height: 3px; border-radius: 2px; background: var(--border); }
+.vgrip:hover .grip { background: var(--muted); }
+.leftcol:has(> .console:not(.open)) .vgrip { cursor: default; }
+.leftcol:has(> .console:not(.open)) .vgrip .grip { visibility: hidden; }
+.run-grid .regshost { display: grid; min-height: 0; }
+.run-grid .centre { grid-row: 1; grid-column: 2; display: grid; min-height: 0; gap: 8px; position: relative;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
+/* A narrow Run side: Text/Inspector on top, Registers and Console under. */
+@container run (max-width: 560px) {
+  .run-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1.2fr) minmax(0, 1fr); }
+  .run-grid .centre { grid-row: 1; grid-column: 1; }
+  .run-grid .leftcol { grid-row: 2; grid-column: 1; }
+}
+
+/* Text: the columns and how tight they sit are panels/text.ts's (--tcols,
+   data-style, hide-*): Address, Encoding and Instruction give way last. */
+.textpanel { --tpad: 8px; --tgap: 12px; }
+.textpanel[data-style=tight] { --tpad: 4px; --tgap: 6px; }
+.textpanel[data-style=small] { --tpad: 4px; --tgap: 6px; }
+.tview { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.text { overflow-y: auto; overflow-x: hidden; font-family: var(--code); font-size: var(--fs); }
+.textpanel.overflow .text { overflow-x: auto; }
+.textpanel[data-style=small] .text, .textpanel[data-style=small] .theader { font-size: calc(var(--fs) - 1px); }
+.text:focus { outline: none; }
+.text .spacer { width: 1px; }
+.text .layer { position: absolute; top: 0; left: 0; right: 0; }
+.trow, .theader { display: grid; align-items: center; padding: 0 var(--tpad) 0 var(--tpad); white-space: nowrap; column-gap: var(--tgap); border-left: 3px solid transparent;
+  grid-template-columns: var(--tcols, 12px 8ch 8ch 38px minmax(18ch, 36ch) 4ch minmax(14ch, 1fr)); }
+.textpanel.overflow .trow { right: auto; width: max(100%, var(--tmin)); }
+.trow { position: absolute; left: 0; right: 0; height: var(--row); cursor: default; }
+.trow:hover { background: var(--hover); }
+.theader { height: 26px; font-family: var(--code); font-size: var(--fs); border-bottom: 1px solid var(--border); flex: none; overflow: hidden; }
+.theader > span { font: 500 11.5px var(--ui); color: var(--muted); }
+.theader .right { text-align: right; }
+.textpanel.hide-src .src, .textpanel.hide-lno .lno, .textpanel.hide-fmt .fmt, .textpanel.hide-addr .addr, .textpanel.hide-word .word { display: none !important; }
+.trow .addr { color: var(--muted); }
+.trow .word { color: var(--text-2); }
+.trow .dis { color: var(--text); overflow: hidden; text-overflow: ellipsis; }
+.trow .lno { color: var(--muted); text-align: right; }
+.trow .src { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; }
+.trow.band { box-shadow: inset 2px 0 0 var(--gray); }
+.trow.pc { background: var(--blue-tint2); border-left-color: var(--blue); }
+.textpanel.quiet-pc .trow.pc:not(.sel) { background: none; border-left-color: transparent; } /* the tutorial's steps 8-9 */
+.trow.sel { background: var(--amber-tint); }
+.trow.sel .dis { color: var(--navy); font-weight: 700; }
+.trow .bp { width: 12px; height: 12px; border-radius: 50%; cursor: pointer; }
+.trow:hover .bp { box-shadow: inset 0 0 0 1.5px var(--error-tint), inset 0 0 0 12px rgba(192,57,43,.18); }
+.trow.bp-on .bp { background: var(--error); box-shadow: none; }
+.badge { display: inline-flex; justify-content: center; min-width: 30px; height: 16px; line-height: 16px; border-radius: 4px; font: 700 11px var(--code); } /* CP0 */
+.b-R { background: var(--blue-tint); color: var(--blue); }
+.b-I { background: var(--teal-tint); color: var(--teal-text); }
+.b-J { background: var(--amber-tint); color: var(--amber-text); }
+.b-CP0 { background: var(--cp0-tint); color: var(--cp0-text); }
+.b-FR, .b-FI { background: var(--blue-tint); color: var(--navy); }
+.textpanel .fold { border-top: 1px dashed var(--border); }
+
+/* Data: Address | +0 | +4 | +8 | +C | ASCII | Labels (panels/data.ts) */
+.data { overflow: auto; padding: 0 0 8px; font-family: var(--code); font-size: calc(var(--fs) - .5px); --dpadl: 15px; --dpadr: 12px; --dgap: 10px; }
+.data[data-style=tight] { --dpadl: 10px; --dpadr: 6px; --dgap: 6px; }
+.data[data-style=small] { --dpadl: 6px; --dpadr: 4px; --dgap: 4px; }
+.data[data-style=small] { font-size: calc(var(--fs) - 1.5px); }
+.data.hide-ascii .ascii { display: none; }
+.dtable { display: grid; min-width: max-content; --dcell: 8ch; }
+.dtable.base-10 { --dcell: 11ch; }
+.dtable.base-2 { --dcell: 32ch; }
+.dhead, .drow { display: grid; grid-template-columns: 10ch repeat(4, var(--dcell)) max-content; column-gap: var(--dgap); padding: 0 var(--dpadr) 0 var(--dpadl); align-items: center; white-space: nowrap; }
+.data.hide-ascii .dhead, .data.hide-ascii .drow { grid-template-columns: 10ch repeat(4, var(--dcell)); }
+.dhead { position: sticky; top: 0; z-index: 1; height: 26px; background: var(--white); border-bottom: 1px solid var(--border); }
+.dhead > span { font: 500 11.5px var(--ui); color: var(--muted); }
+.dhead > span:nth-child(-n+5) { font-family: var(--code); }
+/* A section's head never widens the table (contain): in a narrow tab it
+   takes a second line instead. */
+.dsec { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; min-height: 30px; margin-top: 10px; padding: 4px 12px; contain: inline-size; font: 13px var(--ui); color: var(--navy); cursor: pointer;
+  background: var(--window); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); box-shadow: inset 3px 0 0 var(--blue); }
+.dsec:first-of-type { margin-top: 0; }
+.dsec b { font-weight: 700; }
+.dsec .range { color: var(--text-2); }
+.dsec .dsize, .dsec .dhint { color: var(--muted); font-size: 12px; }
+.dsec .dfold { width: 18px; border: 0; background: none; color: var(--navy); padding: 0; }
+.dsec.dsec-stack { box-shadow: inset 3px 0 0 var(--purple); background: #f6f3fb; color: #4b3470; }
+.dsec.dsec-kernel { box-shadow: inset 3px 0 0 var(--cp0-text); color: var(--cp0-text); }
+.drow { height: var(--row); }
+.drow.dsec-stack { box-shadow: inset 3px 0 0 #e4dcf1; }
+.drow .daddr { color: var(--muted); }
+.drow .dval.zero { color: var(--dim); }
+.drow .dval.pointed { background: var(--teal-tint); color: var(--teal-text); border-radius: 3px; box-shadow: 0 0 0 2px var(--teal-tint); }
+.drow .dval.lit, .drow .dch.lit { background: var(--amber-tint); box-shadow: 0 0 0 2px var(--amber-tint); border-radius: 3px; }
+.drow .dascii { display: flex; color: var(--text-2); padding-left: 4px; }
+/* One run of characters; between two words a faint line that takes no room. */
+.drow .dch + .dch { box-shadow: inset 1px 0 0 var(--border); }
+.drow .dch { white-space: pre; }
+.drow.dzero .dzerotext { grid-column: 2 / -1; font-family: var(--ui); font-size: 12px; color: var(--muted); padding: 0 8px; border-radius: 4px; white-space: nowrap;
+  background: repeating-linear-gradient(135deg, var(--window) 0 6px, var(--white) 6px 12px); }
+.dtags { display: flex; gap: 14px; padding: 3px 12px 0 calc(var(--dpadl) + 10ch + var(--dgap)); font-size: 12px; line-height: 16px; white-space: nowrap; }
+.dtags.dsec-stack { box-shadow: inset 3px 0 0 #e4dcf1; }
+.dtags .dlabel { color: var(--blue); font-weight: 700; }
+.dtags .dlabel .off { color: var(--muted); font-weight: 400; }
+.dtags .dptr { color: var(--teal-text); font-weight: 700; }
+
+/* Registers: hex first, decimal quieter, binary quietest; the register that
+   just changed in yellow.  The columns and how tight they sit are
+   panels/registers.ts's (--rcols, data-style, hide-*): Hex, Dec and Bin
+   give way last. */
+.regs { font-family: var(--code); font-size: var(--fs); --rpad: 9px; --rpadr: 10px; --rgap: 10px; }
+.regs[data-style=tight] { --rpad: 5px; --rpadr: 6px; --rgap: 6px; }
+.regs[data-style=small] { --rpad: 5px; --rpadr: 6px; --rgap: 6px; font-size: calc(var(--fs) - 1px); }
+.regs .phead { font-family: var(--ui); font-size: var(--fs); }
+.regs-list { overflow-y: auto; overflow-x: hidden; }
+.regs.overflow .regs-list { overflow-x: auto; }
+.rhead, .rrow { display: grid; column-gap: var(--rgap); padding: 0 var(--rpadr) 0 calc(var(--rpad) + 3px); align-items: center; white-space: nowrap;
+  grid-template-columns: var(--rcols, 7ch 10.5ch 10.5ch 28.5ch minmax(0, 1fr)); }
+.regs.overflow .rhead, .regs.overflow .rrow { width: max-content; min-width: 100%; }
+.rhead { position: sticky; top: 0; z-index: 2; height: 24px; background: var(--white); border-bottom: 1px solid var(--border); }
+.rhead > span { font: 500 11px var(--ui); color: var(--dim); }
+.rhead > span.strong { color: var(--text-2); font-weight: 600; }
+.rhead .right { text-align: right; }
+.rrow { height: var(--rrow); border-left: 3px solid transparent; padding-left: var(--rpad); }
+.rrow .rn { font-weight: 700; color: var(--navy); } /* mono: $t0 in Pretendard reads $tO */
+.rrow .hex { color: var(--text); }
+.rrow .dec { color: var(--muted); font-size: .92em; text-align: right; overflow: hidden; }
+.rrow .bin { color: var(--dim); font-size: .82em; letter-spacing: -.3px; overflow: hidden; }
+.rrow .bin span + span { margin-left: 3px; }
+.rrow .tag { display: none; font: 600 10.5px var(--ui); color: var(--changed-text); background: var(--changed-bar); color: var(--white); border-radius: 8px; padding: 0 6px; line-height: 16px; justify-self: start; }
+.rrow.zero .hex, .rrow.zero .dec, .rrow.zero .bin, .rrow.zero .rn { color: var(--dim); }
+.rrow.chg { background: var(--changed); border-left-color: var(--changed-bar); }
+.rrow.chg .hex { color: var(--changed-text); font-weight: 700; }
+.rrow.chg .dec, .rrow.chg .bin { color: var(--changed-text); }
+.rrow.chg .tag { display: inline-block; }
+.regs.hide-tag .rrow .tag, .regs.hide-dec .dec, .regs.hide-bin .bin { display: none !important; }
+.rrow.flash { animation: regflash .7s ease-out; }
+/* A flash over whatever the row's own colour is, fading to nothing. */
+@keyframes regflash { from { box-shadow: inset 0 0 0 999px rgba(255, 200, 40, .75); } to { box-shadow: inset 0 0 0 999px rgba(255, 200, 40, 0); } }
+.rgroup { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; padding: 5px 12px 4px; background: var(--window);
+  border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); font: 600 12px var(--ui); color: var(--navy); }
+.rhead + .rgroup { margin-top: 0; border-top: 0; }
+.rgroup .gspan { font-size: 11px; font-weight: 400; color: var(--muted); }
+.regs-list .cp0 { display: none; }
+.regs-list.show-cp0 .rrow.cp0 { display: grid; }
+.regs-list.show-cp0 .rgroup.cp0 { display: flex; }
+
+/* ---- Inspector ---------------------------------------------------------- */
+.insp { container-type: inline-size; }
+.insp .ibody { overflow: auto; }
+.insp .ibody.is-empty { display: flex; }
+/* A narrow Inspector: smaller bits, so that 32 of them fit across. */
+@container (max-width: 520px) {
+  .insp .fbits .bit { font-size: 11px; line-height: 20px; margin: 0; }
+  .insp .franges { font-size: 9px; padding: 0 2px; }
+  .insp .fname { font-size: 11px; }
+  .insp .fmean { font-size: 10px; }
+  .insp .bitgrid { gap: 0 2px; margin: 2px 10px 0; }
+}
+@container (max-width: 400px) {
+  .insp .fbits { margin: 1px 1px; }
+  .insp .fbits .bit { font-size: 9.5px; line-height: 18px; background: none; }
+  .insp .franges { font-size: 8.5px; }
+  .insp .fname { font-size: 10px; }
+  .insp .bitgrid { gap: 0 1px; margin: 2px 6px 0; }
+}
+.insp .mode { color: var(--text-2); }
+.insp.pinned .phead { background: var(--amber-tint); }
+.insp .mode.pin { color: var(--amber-text); font-weight: 600; }
+.ihead { display: flex; align-items: center; gap: 10px; padding: 10px 14px 6px 16px; min-width: 0; }
+.ihead .dis { font-weight: 700; font-size: calc(var(--fs) + 4px); color: var(--navy); white-space: nowrap; }
+.ihead .isrc { color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ihead .isrc .mono { color: var(--text); }
+.ihead .grow { flex: 1; }
+.ihead .where { color: var(--muted); white-space: nowrap; font-size: 12px; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
+/* The word: 32 cells in 32 equal columns, a field a coloured group. */
+.bitgrid { display: grid; grid-template-columns: repeat(32, minmax(0, 1fr)); gap: 0 3px; margin: 2px 16px 0; }
+.fbox { display: flex; flex-direction: column; min-width: 0; border-radius: 6px; padding: 2px 0 4px; }
+.franges { display: flex; justify-content: space-between; font-size: 10.5px; padding: 0 4px; opacity: .8; line-height: 14px; }
+.fbits { display: grid; margin: 1px 3px; }
+.fbits .bit { text-align: center; font-weight: 700; font-size: calc(var(--fs) + 2px); line-height: 26px; background: rgba(255,255,255,.55); border-radius: 3px; margin: 0 1px; }
+.fname { font: 700 12px var(--ui); text-align: center; margin-top: 3px; }
+.fmean { font-size: 11.5px; text-align: center; opacity: .9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 3px; }
+.f-opcode, .f-fmt { background: #dfe5ef; color: var(--navy); }
+.f-rs { background: var(--blue-tint); color: var(--blue); }
+.f-rt, .f-ft { background: var(--teal-tint); color: var(--teal-text); }
+.f-rd, .f-fs { background: var(--amber-tint); color: var(--amber-text); }
+.f-shamt, .f-fd { background: #efe9f6; color: var(--purple); }
+.f-funct { background: var(--cp0-tint); color: var(--cp0-text); }
+.f-immediate, .f-target, .f-offset { background: #e3eef0; color: #1d5c63; }
+.explain { margin: 10px 16px 0; padding: 8px 12px; border-radius: 6px; background: var(--window); color: var(--text); line-height: 1.55; }
+.explain .mono { color: var(--navy); }
+.explain .note { color: var(--text-2); font-size: 12px; margin-top: 2px; }
+.dest { margin: 6px 16px 0; padding: 6px 12px; border-radius: 6px; background: var(--blue-tint); color: var(--navy); font-size: 12.5px; }
+.ftable { margin: 10px 16px 14px; border-collapse: collapse; font-size: var(--fs); }
+.ftable td, .ftable th { padding: 0 16px 0 0; height: 22px; text-align: left; white-space: nowrap; }
+.ftable th { font: 500 11.5px var(--ui); color: var(--muted); height: 20px; border-bottom: 1px solid var(--border); }
+.ftable .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+/* A narrow Inspector folds instead of scrolling sideways: its head on two
+   lines (the instruction; then its source, word and address), the field
+   table one field to a block -- name, value, meaning; under them the bits
+   and their binary. */
+@container (max-width: 480px) {
+  .ihead { flex-wrap: wrap; row-gap: 2px; padding: 8px 12px 4px; }
+  .ihead .grow { display: none; }
+  .ihead .isrc, .ihead .where { flex: 0 1 auto; max-width: 100%; white-space: normal; overflow: visible; }
+  .ftable, .ftable tbody { display: block; margin: 8px 12px 12px; }
+  .ftable tr { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; column-gap: 12px; align-items: baseline;
+    padding: 3px 0; border-bottom: 1px solid var(--border); }
+  .ftable tr:first-child { display: none; }
+  .ftable td { height: auto; padding: 0; white-space: normal; }
+  .ftable td:nth-child(1) { grid-area: 1 / 1; }
+  .ftable td:nth-child(4) { grid-area: 1 / 2; text-align: right; }
+  .ftable td:nth-child(5) { grid-area: 1 / 3; }
+  .ftable td:nth-child(2) { grid-area: 2 / 1; padding-left: 16px; }
+  .ftable td:nth-child(3) { grid-area: 2 / 2 / auto / span 2; }
+  .ftable td:nth-child(2), .ftable td:nth-child(3) { color: var(--muted); font-size: 11.5px; }
+  .ftable td[data-label]::before { content: attr(data-label) ' '; font-family: var(--ui); color: var(--dim); }
+}
+
+/* ---- Console ------------------------------------------------------------ */
+/* The Console's height: while it is empty, as tall as its words (one
+   sentence; the height beyond goes to Registers, which is what a step
+   changes); once there is output or a question for input, its share; the
+   grip over it (--console-h, app.ts) overrides both. */
+.console.open { height: var(--console-h, clamp(120px, 26vh, 260px)); }
+.console.open.is-empty { height: var(--console-h, auto); }
+.cbody { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.console .notice-host { container-type: normal; } /* its words decide its height while it is empty */
+/* Its empty word is the words alone, compact (the character is the Inspector's, next to it). */
+.console .notice img.char { display: none; }
+.console .notice { padding: 10px 16px; gap: 0; }
+.clog { flex: 1; min-height: 0; margin: 0; padding: 6px 12px; overflow: auto; font-size: var(--fs); line-height: 1.5; white-space: pre-wrap; word-break: break-all; }
+.clog .typed { color: var(--blue); font-weight: 700; }
+.cinrow { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-top: 1px solid var(--border); flex: none; }
+.cinrow .prompt { font-weight: 600; color: var(--blue); }
+.cinrow .hint { color: var(--muted); font-size: 12px; }
+.cinput { flex: 1; height: 28px; padding: 0 8px; border: 1px solid var(--blue); border-radius: 6px; font-size: var(--fs); outline: none; }
+.cinput:focus { box-shadow: 0 0 0 3px var(--blue-tint2); }
+
+/* ---- notices (notice.ts): an empty panel's word, the card before the first
+   assemble, the error list -- one shape, in the middle of its panel, the
+   character at the far end (white surfaces only) ------------------------- */
+.notice-host { display: flex; flex: 1; min-height: 0; min-width: 0; align-items: center; justify-content: center; overflow: auto; container-type: size; }
+.notice { display: flex; align-items: center; gap: 24px; max-width: 640px; padding: 16px 24px; margin: auto; }
+.notice .say { flex: 1; min-width: 0; }
+.notice .say h3 { margin: 0 0 6px; font-size: 16px; font-weight: 600; color: var(--navy); }
+.notice .say > p { margin: 0; color: var(--text-2); line-height: 1.5; }
+.notice img.char { flex: none; }
+/* Too short or too narrow for the character (the Console at a small window, the Inspector at 1093 px): the words alone. */
+@container (max-height: 156px) or (max-width: 380px) { .notice img.char { display: none; } .notice { padding: 8px 16px; gap: 0; } }
+.congrats { position: absolute; right: 16px; bottom: 16px; z-index: 6; display: flex; align-items: center; gap: 16px; padding: 12px 18px 12px 12px; background: var(--white); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,32,91,.14); }
+.congrats h3 { margin: 0 0 2px; font-size: 15px; color: var(--navy); }
+.congrats p { margin: 0 0 8px; color: var(--text-2); }
+
+/* ---- first screen: the card is the processor ----------------------------- */
+.welcome { display: contents; }
+/* A square package, as a processor is.  Its inside is darker than the board
+   around it (#050505 against #0d0d0d) so it reads as a part set into the
+   board rather than a panel floating over it.  The circuit
+   (src/renderer/startfield/) measures this rectangle and puts its pins on
+   it: there is no second drawn square to disagree with.  Inside the package
+   a second, fainter frame is the die -- that one border is most of what
+   makes it read as a chip rather than as a box. */
+.wcard { position: relative; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center;
+  width: clamp(360px, 52vmin, 460px); aspect-ratio: 1; max-width: calc(100vw - 48px); max-height: calc(100vh - 120px);
+  background: #050505; border: 2.5px solid #fff; border-radius: 10px; }
+.wcard::before { content: ''; position: absolute; inset: 18px; border: 1px solid rgba(255,255,255,.35); border-radius: 4px; pointer-events: none; }
+/* Everything the package holds sits in one column, centred inside the die
+   frame rather than pushed around by fixed padding, so the balance keeps at
+   every window size.  The three gaps between the four blocks are named here,
+   where the column is, rather than spread over the blocks themselves. */
+.wstack { position: absolute; inset: 18px; display: flex; flex-direction: column; justify-content: center; align-items: center;
+  --gap-name: 14px; --gap-ways: 40px; --gap-between: 12px; }
+/* The mark, large, in its own colours: the university's rules forbid
+   recolouring it. */
+.wlogo { height: 60px; width: auto; margin: 0 auto; }
+/* The product's name.  Its glyphs are white; the light that runs across it
+   is the layer over them (.wtitle::after), which is why the fill is a
+   gradient at all. */
+.wtitle { position: relative; margin-top: var(--gap-name); font-size: 20px; letter-spacing: .01em; white-space: nowrap;
+  background-image: linear-gradient(90deg, #fff, #fff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.wtitle::after {
+  content: attr(data-text); position: absolute; left: 0; top: 0; white-space: nowrap; pointer-events: none;
+  background-image: linear-gradient(90deg,
+    rgba(255,255,255,0) calc(var(--sp-at, 0) * 100% - 80px),
+    #fff calc(var(--sp-at, 0) * 100%),
+    rgba(255,255,255,0) calc(var(--sp-at, 0) * 100% + 80px));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 0 7px rgba(255,255,255,.85));
+  opacity: var(--sp-amp, 0);
+}
+/* Not out to the die frame's edge: the margin is what makes the buttons read
+   as marking on a package rather than as a dialog. */
+.wbody { display: flex; flex-direction: column; width: 70%; margin-top: var(--gap-ways); }
+.actions { display: flex; flex-direction: column; gap: var(--gap-between); }
+/* The two ways in, and which is which: the first has the brighter border,
+   whiter words and a lighter ground, and carries a brighter light more
+   often (spark.ts).  One axis on its own is a coincidence. */
+.action { position: relative; display: flex; gap: 10px; align-items: center; justify-content: center; width: 100%; height: 46px; padding: 0 14px;
+  border: 1px solid rgba(255,255,255,.28); border-radius: 6px; background: #0a0a0a; }
+.action b { color: rgba(255,255,255,.82); font-weight: 600; }
+.action.main { border-color: rgba(255,255,255,.55); background: #141414; }
+.action.main b { color: #fff; }
+/* The light going round the border: a cone turned by the clock, masked down
+   to the border itself.  The trace it is the end of is on the board behind. */
+.action::after {
+  content: ''; position: absolute; inset: -2px; border-radius: 8px; padding: 2px; pointer-events: none;
+  box-sizing: border-box; filter: blur(.7px);
+  /* The lit arc is longer as well as brighter the stronger the pulse, so
+     what the eye sees follows the three peaks (spark.ts) rather than
+     flattening them: a light that only changed opacity would make the
+     weakest pulse nearly as big an event as the strongest. */
+  background: conic-gradient(from calc(var(--sp-at, 0) * 1turn),
+    rgba(255,255,255,0) 0deg,
+    rgba(255,255,255,0) calc(360deg - var(--sp-amp, 0) * 190deg),
+    rgba(255,255,255,.55) calc(360deg - var(--sp-amp, 0) * 70deg),
+    #fff 352deg, rgba(255,255,255,0) 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: var(--sp-amp, 0);
+}
+.action:hover { border-color: #fff; background: rgba(255,255,255,.09); }
+.action:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.action img { width: 18px; height: 18px; opacity: .85; flex: none; filter: brightness(0) invert(1); }
+.wbody .back { display: block; margin-top: 14px; font-size: 12px; height: 18px; color: #8a8a8a; text-align: center; }
+.wbody .back:hover { color: #fff; }
+/* The bars on the first screen (body.first-screen, app.ts): the board shows
+   through them, white words and icons, no dividing lines.  Nothing is
+   blurred -- the board behind is flat, so a backdrop-filter would cost a
+   layer for no difference.  The caption buttons' patch is transparent, their
+   symbols white (app.ts, updateOverlay). */
+body.first-screen .work { background: transparent; }
+body.first-screen .titlebar, body.first-screen .status { position: relative; z-index: 2; background: rgba(255,255,255,.03); border-color: transparent; }
+/* And it carries nothing: the card below is the program's name and its mark,
+   at the size they are meant to be read at, and the two ways in are on it.
+   A second small copy of the mark in the corner, and four buttons for what
+   the card already offers, are what the board has to be seen through.  The
+   bar itself stays -- it is what the window is dragged by, and the system's
+   caption buttons sit in it. */
+body.first-screen .titlebar .brand,
+body.first-screen .titlebar .tools { display: none; }
+body.first-screen .status { color: rgba(255,255,255,.85); }
+
+/* ---- dialogs ------------------------------------------------------------ */
+.modal { width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto; padding: 20px 22px; border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 16px 48px rgba(0,32,91,.20); color: var(--text); }
+.modal::backdrop { background: rgba(0,32,91,.35); } /* logic/overlay.ts DIALOG_BACKDROP: the caption buttons' patch matches */
+.modal.ask { width: min(480px, calc(100vw - 32px)); }
+.askbody { display: flex; gap: 18px; align-items: center; }
+.askbody img.char { flex: none; }
+.asktext h2 { margin: 0 0 6px; font-size: 17px; }
+.asktext p { margin: 0; color: var(--text-2); line-height: 1.55; }
+.asktext p.askfile { margin-bottom: 4px; color: var(--muted); font-size: 12px; }
+.asktext p.askfile .mono { color: var(--text); }
+.btn.danger { background: var(--error); border-color: var(--error); color: var(--white); }
+.btn.danger:hover:not(:disabled) { background: #a93226; }
+.modal h2 { margin: 0 0 12px; font-size: 18px; color: var(--navy); }
+.modal h4 { margin: 14px 0 6px; font-size: 13px; color: var(--navy); }
+.modal .prow, .modal .row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.modal .row.end { justify-content: flex-end; }
+.modal .grow { flex: 1; }
+.modal .value { min-width: 44px; text-align: center; }
+.modal .hint { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.modal details.advanced { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 10px; }
+.modal summary { cursor: pointer; font-weight: 600; color: var(--navy); }
+.modal summary small { font-weight: 400; color: var(--muted); }
+.modal .opts { display: flex; flex-direction: column; gap: 6px; }
+.modal .opt { display: flex; gap: 8px; align-items: flex-start; }
+.modal .opt input { margin-top: 3px; }
+.modal .opt b { display: block; font-weight: 600; }
+.modal .opt small { color: var(--text-2); font-size: 12px; }
+.modal .opt.off { opacity: .6; }
+.modal .radios { display: flex; flex-direction: column; gap: 4px; }
+.modal .radio { display: flex; gap: 8px; align-items: center; }
+.modal input.text { flex: 1; height: 28px; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; font-size: var(--fs); }
+.about .tabs { display: flex; gap: 2px; height: 34px; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+.about .tab { display: flex; align-items: center; padding: 0 12px; border: 0; background: none; color: var(--text-2); font-weight: 500; border-bottom: 2px solid transparent; }
+.about .tab.on { color: var(--navy); border-bottom-color: var(--blue); font-weight: 600; }
+.about .tabbody p { margin: 6px 0; }
+.about .licenses details { border-bottom: 1px solid var(--border); padding: 6px 0; }
+.about .licenses pre { max-height: 240px; overflow: auto; white-space: pre-wrap; font-size: 11.5px; background: var(--window); padding: 8px 10px; border-radius: 6px; }
+
+/* ---- the tutorial (tutorial.ts) ------------------------------------------------ */
+/* Lightly dimmed around what a step points at (the surroundings stay
+   readable), a ring on each target; the card beside them, Haram on its
+   white at the far end.  One Haram on screen: the others wait. */
+.tut { position: fixed; inset: 0; z-index: 40; pointer-events: none; }
+.tut-dim { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+/* Dark but for the lit panels (clicks go through it); a clear layer over
+   everything but the targets takes the clicks (tutorial.ts). */
+.tut-dim path.dim { fill: rgba(0, 32, 91, .26); pointer-events: none; }
+.tut-dim path.block { fill: rgba(0, 0, 0, 0); pointer-events: visiblePainted; }
+.tut-ring { position: absolute; border: 2px solid var(--blue); border-radius: 6px; box-shadow: 0 0 0 3px rgba(0, 85, 165, .18); pointer-events: none; }
+.tut-ring.tight { border-radius: 4px; box-shadow: none; }
+.tut-card { position: absolute; left: 0; top: 0; width: min(310px, calc(100vw - 32px)); display: flex; align-items: flex-end; gap: 10px;
+  padding: 12px 12px 12px 16px; background: var(--white); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 32, 91, .22); pointer-events: auto; -webkit-app-region: no-drag; }
+.tut-card.haram-left { flex-direction: row-reverse; padding: 12px 16px 12px 12px; }
+.tut-card img.char { flex: none; }
+.tut-say { flex: 1; min-width: 0; }
+.tut-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); }
+.tut-count { font-weight: 600; color: var(--blue); }
+.tut-quit { border: 0; background: none; padding: 0; height: auto; color: var(--text-2); font-size: 12px; }
+.tut-quit:hover { color: var(--navy); text-decoration: underline; }
+.tut-say h3 { margin: 4px 0 6px; font-size: 15px; line-height: 1.35; color: var(--navy); }
+.tut-say p { margin: 0; color: var(--text); font-size: 13px; line-height: 1.55; }
+.tut-buttons { display: flex; justify-content: flex-end; gap: 6px; margin-top: 10px; }
+.tut-card.kind-end { width: min(420px, calc(100vw - 32px)); }
+/* The narrow window (Editor | Run as tabs): a slimmer card, so that it still finds a place beside the error list's words. */
+@media (max-width: 979px) { .tut-card { width: min(280px, calc(100vw - 32px)); } .tut-card.kind-end { width: min(420px, calc(100vw - 32px)); } }
+body.tutorial-on img.char:not(.tut-char):not(.modal img.char) { visibility: hidden; }
+/* A dialog over the tutorial: its Haram speaks; the card's gives way (one Haram). */
+body.dialog-open .tut-card img.char { visibility: hidden; }
