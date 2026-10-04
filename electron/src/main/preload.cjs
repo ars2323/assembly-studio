@@ -36,7 +36,7 @@ contextBridge.exposeInMainWorld('app', {
   openFile: () => ipcRenderer.invoke('file:open').then(unwrap),
   saveFile: (file) => ipcRenderer.invoke('file:save', file).then(unwrap),
   exportImage: (job) => ipcRenderer.invoke('file:exportImage', job).then(unwrap),
-  openExample: (name) => ipcRenderer.invoke('example:open', name).then(unwrap),
+  openExample: (name, lang) => ipcRenderer.invoke('example:open', name, lang).then(unwrap),
   openHandler: () => ipcRenderer.invoke('file:openHandler').then(unwrap),
   about: () => ipcRenderer.invoke('about:info'),
   license: (i) => ipcRenderer.invoke('about:license', i).then(unwrap),

@@ -23,7 +23,7 @@ export interface AppApi {
   // The last assembled program as an executable image (.asx): the save
   // dialog, then the file.  null: cancelled; { error }: no image (why, for the student).
   exportImage(job: ImageJob): Promise<ImageReply>;
-  openExample(name: string): Promise<OpenedFile>;
+  openExample(name: string, lang?: 'ko' | 'en'): Promise<OpenedFile>; // lang: its comments' (src/examples/en/)
   openHandler(): Promise<{ name: string; text: string } | null>;
   about(): Promise<AboutInfo>;
   license(index: number): Promise<string>;  // LICENSES[index]; one past the end: Electron's
