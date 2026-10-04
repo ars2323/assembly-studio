@@ -21,7 +21,8 @@
    itself. */
 
 import { brand } from '../../../brand.ts';
-import { asset, h, icon } from '../dom.ts';
+import { h, icon, markImg } from '../dom.ts';
+import { themeSwitch } from '../theme.ts';
 import { CHIP_ATTR, startfield } from '../../startfield/index.ts';
 import { offsets, SEED, type SparkName, sparkAt } from './spark.ts';
 
@@ -137,10 +138,10 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
   const fx = h('div', { class: 'wfx', 'aria-hidden': 'true' });
   const card = h('div', { class: 'wcard', [CHIP_ATTR]: '' },
     h('div', { class: 'wstack' },
-      h('img', { class: 'wlogo', src: asset(brand.mark), alt: '' }),
+      markImg('wlogo'),
       title,
       h('div', { class: 'wbody' }, actions)),
-    corner, isaTag, fx);
+    corner, isaTag, h('div', { class: 'wtheme' }, themeSwitch()), fx);
   let revealed = picked || home || calm.matches;
   if (!revealed) card.classList.add('intro');
   const reveal = () => {

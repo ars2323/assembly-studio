@@ -9,6 +9,10 @@
   const me = document.currentScript;
   const isa = new URLSearchParams(location.search).get('isa') === 'riscv' ? 'riscv' : 'mips';
   document.documentElement.dataset.isa = isa;
+  // The theme chosen earlier in this run (theme.ts), before anything is drawn.
+  let theme = 'dark';
+  try { if (sessionStorage.getItem('studio-theme') === 'light') theme = 'light'; } catch { /* none */ }
+  document.documentElement.dataset.theme = theme;
   const script = () => {
     const s = document.createElement('script');
     s.src = `${me.dataset.bundles}app-${isa}.js`;

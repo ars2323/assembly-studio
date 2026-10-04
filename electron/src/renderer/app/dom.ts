@@ -76,3 +76,11 @@ export function userScrolls(el: HTMLElement): () => boolean {
   el.addEventListener('keydown', (e) => { if (/^(Page|Home|End|Arrow)/.test(e.key)) mark(); });
   return () => Date.now() - at < 2000;
 }
+
+// The brand's mark for the theme on the page, following it when it changes (theme.ts).
+export function markImg(cls: string): HTMLImageElement {
+  const src = () => asset(document.documentElement.dataset.theme === 'light' ? brand.markOnLight : brand.mark);
+  const img = h('img', { class: cls, src: src(), alt: '' });
+  window.addEventListener('themechange', () => { img.src = src(); });
+  return img;
+}
