@@ -13,7 +13,7 @@
    The error list keeps the classes the tutorial points at (.notice h3,
    .item, .row .btn). */
 
-import { cell, clock, count, lead, plural } from '../cells.ts';
+import { ago, cell, count, lead, plural } from '../cells.ts';
 import { code, codeText, h, withHex } from '../dom.ts';
 
 const ctrlS = () => h('kbd', {}, 'Ctrl+S');
@@ -32,7 +32,7 @@ export function busyState(): HTMLElement {
 export function assembledState(o: { instructions: number; at: Date; saveNote: string; saveWarn: boolean; edited: boolean }): HTMLElement {
   return h('div', { class: 'asm-state' },
     h('div', { class: 'cells' }, lead('ok', 'Assembled'), cell('', count(o.instructions, 'instruction')),
-      saveCell(o.saveNote, o.saveWarn), cell('time', clock(o.at))),
+      saveCell(o.saveNote, o.saveWarn), cell('time', ago(o.at))),
     o.edited ? h('p', { class: 'asm-note warn' }, 'Edited since. Run and Step use this assembled code until you press ', ctrlS(), '.') : null);
 }
 
@@ -69,7 +69,7 @@ export function errorList(o: {
   const n = o.errors.length;
   return h('div', { class: 'notice-host' }, h('div', { class: 'notice' }, h('div', { class: 'say' },
     h('h3', { class: 'cells' }, lead('err', plural(n, 'error')), cell('', o.kept ? 'Last program kept' : 'Not assembled'),
-      o.at ? cell('time', clock(o.at)) : null),
+      o.at ? cell('time', ago(o.at)) : null),
     h('p', { class: 'asm-note' }, n > 1 ? 'Fix them from the top, then press ' : 'Fix the line below, then press ', ctrlS(), ' again.',
       o.kept ? ` The ${o.narrow ? 'Run tab' : 'Run side'} still shows the last program that assembled.` : ''),
     h('div', { class: 'items' }, ...items),

@@ -120,7 +120,7 @@ body {
 .mono { overflow-wrap: anywhere; }
 button { font: inherit; color: inherit; cursor: pointer; }
 .mono { font-family: var(--code); }
-.app { display: grid; height: 100vh; grid-template-rows: var(--titlebar) minmax(0, 1fr) 24px; }
+.app { display: grid; height: 100vh; grid-template-rows: var(--titlebar) minmax(0, 1fr) 32px; } /* the status line: 24 px and the 8 px under it */
 .linkbtn { border: 0; background: none; padding: 0; color: var(--accent); font-weight: 500; }
 .linkbtn:hover { text-decoration: underline; }
 
@@ -245,8 +245,11 @@ img.icon { filter: var(--icon-filter); }
 /* Cells side by side, the bar's height; the key hints at the far end.  A
    bar too narrow for all of them: the hints give way first, then the facts
    (each to an ellipsis), the state last. */
-.status { display: flex; align-items: stretch; padding: 0; font-size: 12px; color: var(--text-2); background: var(--surface); border-top: 1px solid var(--border); white-space: nowrap; overflow: hidden; }
-.status .cell { flex: 0 1 auto; min-width: 0; padding: 0 11px; line-height: 23px; overflow: hidden; text-overflow: ellipsis; }
+/* A panel like the ones above it: the same 8 px from the window's edges
+   (the panes' padding above it), its border all round, its corners rounded. */
+.status { display: flex; align-items: stretch; margin: 0 8px 8px; padding: 0 4px 0 0; font-size: 12px; color: var(--text-2); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px; white-space: nowrap; overflow: hidden; }
+.status .cell { flex: 0 1 auto; min-width: 0; padding: 0 11px; line-height: 22px; overflow: hidden; text-overflow: ellipsis; }
 .status .cell + .cell { border-left: 1px solid var(--border); }
 .status .cell.lead { flex-shrink: 0; padding-left: 12px; }
 .status .cell.keys { display: flex; gap: 12px; margin-left: auto; flex-shrink: 40; color: var(--muted); }
@@ -392,23 +395,26 @@ img.icon { filter: var(--icon-filter); }
 /* The Editor's code is not the machine's program: one line, covering nothing. */
 .run-band { grid-row: 1; margin-bottom: 6px; padding: 3px 10px; border-radius: 6px; background: var(--amber-tint); color: var(--amber-text);
   box-shadow: inset 3px 0 0 var(--amber-text); font-size: 12px; line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.run-grid { display: grid; min-height: 0; gap: 8px;
-  grid-template-columns: clamp(var(--regs-least, 417px), 46%, var(--regs-most, 505px)) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.run-grid { display: grid; min-height: 0; gap: 0;
+  /* --regs-w: the splitter's (app.ts); otherwise what Registers needs, within its least and most. */
+  grid-template-columns: var(--regs-w, clamp(var(--regs-least, 417px), 46%, var(--regs-most, 505px))) 8px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.run-grid > .rsplit { grid-row: 1; grid-column: 2; }
 .run-grid .leftcol { grid-row: 1; grid-column: 1; display: grid; min-height: 0; gap: 0; grid-template-rows: minmax(0, 1fr) 8px auto; }
 /* The grip between Registers and the Console (app.ts): drag to share the height, double-click for the default. */
 .vgrip { display: flex; align-items: center; justify-content: center; cursor: row-resize; touch-action: none; }
 .vgrip .grip { width: 36px; height: 3px; border-radius: 2px; background: var(--border); }
 .vgrip:hover .grip { background: var(--muted); }
-.leftcol:has(> .console:not(.open)) .vgrip { cursor: default; }
-.leftcol:has(> .console:not(.open)) .vgrip .grip { visibility: hidden; }
+.leftcol:has(> .console:not(.open)) .vgrip .grip { opacity: .5; }
 .run-grid .regshost { display: grid; min-height: 0; }
-.run-grid .centre { grid-row: 1; grid-column: 2; display: grid; min-height: 0; gap: 8px; position: relative;
-  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
+.run-grid .centre { grid-row: 1; grid-column: 3; display: grid; min-height: 0; gap: 0; position: relative;
+  /* --text-h: the grip's (app.ts); otherwise half each. */
+  grid-template-rows: minmax(0, var(--text-h, 1fr)) 8px minmax(0, 1fr); }
 /* A narrow Run side: Text/Inspector on top, Registers and Console under. */
 @container run (max-width: 560px) {
-  .run-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1.2fr) minmax(0, 1fr); }
+  .run-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1.2fr) 8px minmax(0, 1fr); }
   .run-grid .centre { grid-row: 1; grid-column: 1; }
-  .run-grid .leftcol { grid-row: 2; grid-column: 1; }
+  .run-grid > .rsplit { display: none; }
+  .run-grid .leftcol { grid-row: 3; grid-column: 1; }
 }
 
 /* Text: the columns and how tight they sit are panels/text.ts's (--tcols,
@@ -827,6 +833,13 @@ body.first-screen .titlebar .tools { display: none; }
 .status .theme-switch .ts-knob { top: 1px; width: 20px; height: 14px; }
 .status .theme-switch[aria-checked="true"] .ts-knob { transform: translateX(18px); }
 .status .theme-switch img.icon { width: 11px; height: 11px; }
+/* Switching: every colour eases from the old theme's to the new one's
+   (theme.ts THEME_FADE_MS puts .theme-fade on <html> for as long), so the
+   page turns light or dark instead of cutting.  The switch's own knob and
+   icons keep their movement; the board's canvas fades by its own rule. */
+html.theme-fade, html.theme-fade *:not(canvas), html.theme-fade *::before, html.theme-fade *::after {
+  transition: background-color .5s ease, color .5s ease, border-color .5s ease, outline-color .5s ease, box-shadow .5s ease,
+    fill .5s ease, stroke .5s ease, caret-color .5s ease, filter .5s ease, transform .2s ease, opacity .2s ease !important; }
 /* On the card: bottom centre of the die frame, at every step and during the opening. */
 .wtheme { position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%); z-index: 1; }
 
