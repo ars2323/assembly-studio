@@ -2,11 +2,23 @@
 # engines/fetch.mjs downloads the zip engines.yml made for this tree's inputs
 # (release engines-<hash>; if it is missing, run engines.yml and tag again, or
 # re-run this workflow).  No tests (PLAN.md §6).
+#
+# Run by hand (workflow_dispatch) it publishes a trial instead: a pre-release
+# v<version>-trial.<run number> on the commit it ran on, not Latest -- for
+# trying an installer before a release (the tag is made by the release, no
+# tag push needed).
 name: release
 
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      brand:
+        description: 'Brand (electron/brands/<id>)'
+        type: choice
+        options: [generic, hallym]
+        default: generic
 
 permissions:
   contents: write
@@ -28,6 +40,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # no code signing
+      STUDIO_BRAND: ${{ inputs.brand || 'generic' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -37,10 +50,15 @@ jobs:
           cache: npm
           cache-dependency-path: electron/package-lock.json
 
-      - name: The tag is electron/package.json's version
+      - name: The tag (a release - electron/package.json's version; a trial - made here)
         run: |
           version=$(node -p "require('./package.json').version")
-          [ "v$version" = "$GITHUB_REF_NAME" ] || { echo "::error::the tag is $GITHUB_REF_NAME but electron/package.json says $version"; exit 1; }
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            echo "TAG=v$version-trial.$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+          else
+            [ "v$version" = "$GITHUB_REF_NAME" ] || { echo "::error::the tag is $GITHUB_REF_NAME but electron/package.json says $version"; exit 1; }
+            echo "TAG=$GITHUB_REF_NAME" >> "$GITHUB_ENV"
+          fi
           echo "VERSION=$version" >> "$GITHUB_ENV"
 
       - name: npm ci
@@ -52,7 +70,7 @@ jobs:
       - name: Package (NSIS installer)
         run: node tools/package.ts
 
-      - name: Publish (not a pre-release; Latest)
+      - name: Publish (a release - Latest; a trial - a pre-release)
         run: |
           shopt -s nullglob
           files=(dist/*.exe)
@@ -68,7 +86,12 @@ jobs:
             echo '```'
           } > ../release-notes.md
           cat ../release-notes.md
-          gh release create "$GITHUB_REF_NAME" "${files[@]}" --repo "$GITHUB_REPOSITORY" --verify-tag \
-            --title "Assembly Studio $VERSION" --notes-file ../release-notes.md --latest
-          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json url,isDraft,isPrerelease,assets \
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            gh release create "$TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+              --title "Assembly Studio $VERSION (trial $GITHUB_RUN_NUMBER, $STUDIO_BRAND)" --notes-file ../release-notes.md --latest=false
+          else
+            gh release create "$TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --verify-tag \
+              --title "Assembly Studio $VERSION" --notes-file ../release-notes.md --latest
+          fi
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url,isDraft,isPrerelease,assets \
             --jq '"\(.url)  draft=\(.isDraft) prerelease=\(.isPrerelease)  " + ([.assets[].name] | join(", "))'
