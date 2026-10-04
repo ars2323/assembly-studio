@@ -1,12 +1,11 @@
 /* The Inspector: one instruction taken apart, as the Qt build draws it
    (QtSpim/edu/edu_instruction_inspector.cpp): a head (the instruction, its
    format, its source line, word and address); the word as thirty-two bits,
-   MSB on the left, grouped into its fields; then what the instruction does,
-   with the values it will use, and for a branch or a jump the sum that
-   gives its destination; last, the fields as a table, one row each, its
-   chip in the field's colour from the word above.
+   MSB on the left, grouped into its fields, each with its name and what it
+   means under it; then what the instruction does (core/explain.ts), and for
+   a branch or a jump the sum that gives its destination.
 
-   The pieces (inspectorHead, bitGrid, explanation, fieldTable) are shared
+   The pieces (inspectorHead, bitGrid, explanation) are shared
    with the RISC-V Inspector (isa/riscv/renderer/panels/inspector.ts).
 
    It follows the program: after every step it shows the instruction at PC
@@ -76,8 +75,7 @@ export class Inspector {
       bitGrid(fields),
       explanation(explain(d, general, row.addr, currentLang()), d.known,
         note ? h('div', { class: 'note' }, note) : null,
-        dest.length ? h('pre', { class: 'dest mono' }, dest.join('\n')) : null),
-      fieldTable(fields));
+        dest.length ? h('pre', { class: 'dest mono' }, dest.join('\n')) : null));
   }
 
   private setMode(mode: 'pc' | number | null): void {
@@ -146,38 +144,4 @@ export function prose(text: string): DocumentFragment {
     node.replaceWith(...parts.map((p, i) => (i % 2 === 1 ? h('span', { class: 'nowrap' }, p) : p)));
   }
   return f;
-}
-
-// A field's bits, in groups of four from the right when there are more
-// than eight ("0000 0000 0000 0011"): easier to read, and a long field
-// (a jump's target) wraps between groups.
-function binaryGroups(bits: string): HTMLElement {
-  const groups: string[] = [];
-  if (bits.length <= 8) groups.push(bits);
-  else for (let end = bits.length; end > 0; end -= 4) groups.unshift(bits.slice(Math.max(0, end - 4), end));
-  return h('div', { class: 'bin' }, ...groups.map((g) => h('span', {}, g)));
-}
-
-// A field's name or meaning, free to break after a "|" or "="
-// ("imm[20|10:1|11|19:12]", "x4=0x0040003c") in a narrow Inspector, and
-// nowhere else (and at its spaces).
-function breakable(text: string): (string | HTMLElement)[] {
-  return text.split(/(?<=[|=])/).flatMap((p, i) => (i ? [h('wbr'), p] : [p]));
-}
-
-// The fields, one row each: a chip in the colour of the field's group in
-// the word; its bit range; its bits; its value; what the value means.  (A
-// narrow Inspector sets the bit range under the chip instead: app.css.)
-export function fieldTable(fields: FieldView[]): HTMLElement {
-  const range = (f: FieldView) => (f.high !== f.low ? `${f.high}–${f.low}` : String(f.high));
-  return h('table', { class: 'ftable' },
-    h('thead', {}, h('tr', {},
-      h('th', {}, 'Field', h('span', { class: 'sub' }, ' · Bits')), h('th', { class: 'fbits-col' }, 'Bits'),
-      h('th', {}, 'Binary'), h('th', { class: 'num' }, 'Value'), h('th', {}, 'Meaning'))),
-    h('tbody', {}, ...fields.map((f) => h('tr', {},
-      h('td', { class: 'ffield' }, h('span', { class: `chip mono ${f.cls}` }, ...breakable(f.name)), h('span', { class: 'frange mono' }, range(f))),
-      h('td', { class: 'fbits-col mono' }, range(f)),
-      h('td', { class: 'fbin mono' }, binaryGroups(f.bits)),
-      h('td', { class: 'fval mono num' }, f.value),
-      h('td', { class: 'fmeaning mono' }, ...breakable(f.meaning))))));
 }
