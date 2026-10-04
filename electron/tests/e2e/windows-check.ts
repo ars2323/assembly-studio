@@ -65,6 +65,21 @@ for (const isa of ['mips', 'riscv'] as const) {
     await wait(500);
     if (isa === 'mips') {
       desktop('02-mips');
+      // The work screen's theme switch: the frames in the 0.7 s after the click (60 Hz: about 42).
+      for (let k = 0; k < 2; k += 1) {
+        const f = await r.page.evaluate(async () => {
+          const gaps: number[] = []; let last = performance.now(); let on = true;
+          const tick = (t: number) => { gaps.push(t - last); last = t; if (on) requestAnimationFrame(tick); };
+          requestAnimationFrame(tick);
+          const t0 = performance.now();
+          (document.querySelector('.status .theme-switch') as HTMLElement).click();
+          const click = performance.now() - t0;
+          await new Promise((done) => setTimeout(done, 700)); on = false; gaps.shift();
+          return { clickMs: Math.round(click), frames: gaps.length, longestFrameMs: Math.round(Math.max(...gaps)) };
+        });
+        console.log(`theme switch ${k + 1}: ${JSON.stringify(f)}`);
+        await wait(600);
+      }
       await theme(r, 'light');
       desktop('03-mips-light');
       // A question over the window: the tutorial's "quit?" (Esc asks).
