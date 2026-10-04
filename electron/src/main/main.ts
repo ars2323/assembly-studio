@@ -37,8 +37,10 @@ import * as riscv from './engine-riscv.ts';
 import { answer, type Engine } from './ipc.ts';
 import { LICENSES, paths, version, type Isa } from './paths.ts';
 import { LIGHT_BACKGROUND, WINDOW_COLOURS } from './theme.ts';
+import { updates } from './updater.ts';
 
 export type { ImageJob, ImageReply } from './export-image.ts';
+export type { UpdateCheck, UpdateProgress } from './updater.ts';
 
 app.setName(brand.name);
 // The top bar's height in the window (src/renderer/app/app.css --titlebar).
@@ -199,6 +201,8 @@ async function main(): Promise<void> {
     const error = await shell.openPath(paths.chromiumCredits());
     if (error) throw new Error(error);
   }));
+  // Updates (updater.ts): the first screen asks once per run, at launch.
+  updates(win);
   ipcMain.handle('settings:get', () => ({ ...settings }));
   ipcMain.handle('settings:set', (_e, s: Settings) => {
     return setSettings(s);

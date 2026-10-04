@@ -1,4 +1,5 @@
-# A tag v<version>: the installer, published.  The engines are not built here:
+# A tag v<version>: the installer, published (with latest.yml and its .blockmap, which the
+# installed program reads to update itself).  The engines are not built here:
 # engines/fetch.mjs downloads the zip engines.yml made for this tree's inputs
 # (release engines-<hash>; if it is missing, run engines.yml and tag again, or
 # re-run this workflow).  No tests (PLAN.md §6).
@@ -77,6 +78,11 @@ jobs:
           shopt -s nullglob
           files=(dist/*.exe)
           [ ${#files[@]} -gt 0 ] || { echo "::error::no installer in electron/dist"; ls -la dist || true; exit 1; }
+          # What the installed program reads to update itself (src/main/updater.ts,
+          # electron-updater): latest.yml and the installer's .blockmap, next to it.
+          # Only the release marked Latest is read: a trial (a pre-release) is never an update.
+          update=(dist/latest.yml dist/*.exe.blockmap)
+          for f in "${update[@]}"; do [ -f "$f" ] || { echo "::error::no $f in electron/dist"; ls -la dist || true; exit 1; }; done
           notes="../docs/releases/$VERSION.md"
           {
             if [ -f "$notes" ]; then cat "$notes"; else echo "Assembly Studio $VERSION"; fi
@@ -89,13 +95,13 @@ jobs:
           } > ../release-notes.md
           cat ../release-notes.md
           if [ "${KIND:-}" = release-here ]; then
-            gh release create "$TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            gh release create "$TAG" "${files[@]}" "${update[@]}" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
               --title "Assembly Studio $VERSION" --notes-file ../release-notes.md --latest
           elif [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
-            gh release create "$TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+            gh release create "$TAG" "${files[@]}" "${update[@]}" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
               --title "Assembly Studio $VERSION (trial $GITHUB_RUN_NUMBER)" --notes-file ../release-notes.md --latest=false
           else
-            gh release create "$TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            gh release create "$TAG" "${files[@]}" "${update[@]}" --repo "$GITHUB_REPOSITORY" --verify-tag \
               --title "Assembly Studio $VERSION" --notes-file ../release-notes.md --latest
           fi
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url,isDraft,isPrerelease,assets \

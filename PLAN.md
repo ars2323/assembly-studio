@@ -147,3 +147,10 @@ in the repository settings). `branch-cleanup.yml` is only for temporary branches
 1. Make the branch `release/<version>` and set `version` in `electron/package.json`.
 2. Write `docs/releases/<version>.md` (it becomes the release notes).
 3. Push the tag `v<version>`, or run `release.yml` by hand with `release` ticked, to publish `v<version>`.
+
+Updates: at launch the program checks GitHub Releases (electron-updater, the release marked Latest; trials are
+pre-releases and are never offered). With a newer version, the first screen's card shows the download with a
+progress bar instead of the ISA step, then installs it silently and starts the new version; otherwise, or on any
+failure, the ISA step comes up as before (`src/main/updater.ts`, `panels/welcome.ts`). So every release keeps
+`latest.yml` and the installer's `.blockmap` as assets (`release.yml` uploads them with the installer), and the
+`engines-<hash>` releases are never deleted (`release.yml` builds from them).
