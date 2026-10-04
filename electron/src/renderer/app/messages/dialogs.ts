@@ -7,7 +7,6 @@ export const DIALOGS = {
   // Unsaved changes, before something else takes the Editor's place.
   unsaved: {
     title: { ko: '저장하지 않은 변경이 있습니다', en: 'You have unsaved changes' },
-    home: { ko: '처음 화면으로 가면 저장하지 않은 내용은 사라집니다.', en: 'Going back to the start screen discards them.' },
     newFile: { ko: '새 파일을 열면 저장하지 않은 내용은 사라집니다.', en: 'Starting a new file discards them.' },
     openFile: { ko: '다른 파일을 열면 저장하지 않은 내용은 사라집니다.', en: 'Opening another file discards them.' },
     tutorial: {

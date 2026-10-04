@@ -49,7 +49,7 @@ To uninstall, use Windows Settings › Apps.
    - **The tutorial** walks you through the screen and the basic controls with an example program, step by step
      (7 chapters, 26 steps, for both ISAs), in Korean or English (see **Language** below). On the work screen you can start it
      again at any time with the question-mark button at the right of the toolbar.
-3. To change the ISA later, click the logo in the title bar. It returns to the first screen.
+3. To use the other ISA, start the program again and choose it on the first screen.
 
 ![A tutorial card explaining a step on the work screen](docs/images/tutorial.png)
 *A tutorial card.*
@@ -72,7 +72,6 @@ To uninstall, use Windows Settings › Apps.
 | Start a new file | The New file button in the toolbar |
 | Export an executable image | The Export executable image (.asx) button in the toolbar ([format](docs/asx-format.md)) |
 | Show the tutorial again | The question-mark button in the toolbar |
-| Choose the other ISA | Click the logo in the title bar |
 
 ### Panels
 
