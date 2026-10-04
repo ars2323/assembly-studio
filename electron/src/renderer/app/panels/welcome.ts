@@ -56,8 +56,9 @@ const picked = then !== null;
 // ?home: back from the work screen (the title bar's mark): the ISA step at once, the board grown, no opening.
 const home = query.has('home');
 
-function action(label: string, ic: string, onClick: () => void, main = false): HTMLElement {
-  const b = h('button', { class: `action${main ? ' main' : ''}`, type: 'button' }, icon(ic), h('b', {}, label));
+// `ic` null: the words alone (the ISA step: a name is all an ISA button needs).
+function action(label: string, ic: string | null, onClick: () => void, main = false): HTMLElement {
+  const b = h('button', { class: `action${main ? ' main' : ''}`, type: 'button' }, ic ? icon(ic) : null, h('b', {}, label));
   b.addEventListener('click', onClick);
   return b;
 }
@@ -108,8 +109,8 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
   const build = (step: 0 | 1 | 2) => {
     if (step === 0) {
       actions.replaceChildren(
-        action('MIPS', 'cpu', () => void choose('mips'), true),
-        action('RISC-V', 'cpu', () => void choose('riscv'), true));
+        action('MIPS', null, () => void choose('mips'), true),
+        action('RISC-V', null, () => void choose('riscv'), true));
       backTo = () => {};
     } else if (step === 1) {
       actions.replaceChildren(
