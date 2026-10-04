@@ -33,7 +33,8 @@ If `electron/engine/{runtime,rars.jar,classes}` exists, it is used first.
 - Change the screen layout (button positions, panels, sizes, behaviour) only as requested. Never change it on your own.
 - Use colours only through the tokens in `app.css`.
 - There is one edition only, the generic one. Do not add the name or assets of any school or institution, or wording that
-  limits what the program is for (such as "lab exercise"). Names and marks come only from `brand` (`src/brand.ts`).
+  limits what the program is for (for example, presenting it as exercise material for a class). Names and marks come
+  only from `brand` (`src/brand.ts`).
 - When you change the UI, take screenshots and look at them yourself.
 - Documentation (README, release notes, and so on) is about this project only. Do not mention other repositories or earlier products.
 - There is no automatic CI. Keep verification minimal: core unit tests, screenshots, and a human check at review points.
