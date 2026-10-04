@@ -80,7 +80,7 @@ pre-releases either: `release.yml` builds every installer from them.
 | Run slowly | Set **Run speed** to **1 line/s**, then Run (**Instant** is full speed) |
 | Go back to the start | **Reset**. It restarts the last assembled program; it does not assemble again |
 | Set or clear a breakpoint | Click the gutter to the left of the line numbers in the Editor |
-| Comment or uncomment lines | `Ctrl+/` |
+| Comment or uncomment lines | `Ctrl+/` (on an empty line, starts a comment) |
 | Change the font size | `Ctrl` `+`, `Ctrl` `-`, `Ctrl` `0` (reset), or Settings |
 | Open a file | `Ctrl+O`, or the Open file button in the toolbar |
 | Start a new file | The New file button in the toolbar |

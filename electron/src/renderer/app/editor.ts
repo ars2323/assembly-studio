@@ -17,7 +17,8 @@
 
    Typing: Tab inserts spaces to the next multiple of four columns (with
    lines selected, Tab / Shift+Tab indent / outdent them by four); Enter
-   starts the new line at column 0, never copying the line above.
+   starts the new line with the indentation of the line above
+   (logic/newline.ts).
 
    Gutters, left to right: breakpoints (click to set or clear; a red dot),
    line numbers, errors (a "!" badge -- not a dot, so never mistaken for a
@@ -27,9 +28,10 @@
    No band on the cursor's line: while a program runs, the one band in the
    Editor is the line being executed. */
 
-import { defaultKeymap, history, historyKeymap, indentLess, indentMore, insertNewline } from '@codemirror/commands';
+import { defaultKeymap, history, historyKeymap, indentLess, indentMore } from '@codemirror/commands';
 import { indentUnit } from '@codemirror/language';
 import { commentChanges } from './logic/comment.ts';
+import { newlineChanges } from './logic/newline.ts';
 import { Compartment, EditorSelection, EditorState, RangeSet, RangeSetBuilder, StateEffect, StateField, type Extension } from '@codemirror/state';
 import {
   Decoration, type DecorationSet, EditorView, gutter, GutterMarker, keymap, lineNumbers,
@@ -169,6 +171,13 @@ function tab(view: EditorView): boolean {
   return true;
 }
 
+// Enter: a new line at the same indentation (logic/newline.ts).
+function newline(view: EditorView): boolean {
+  if (view.state.readOnly) return false;
+  view.dispatch(newlineChanges(view.state));
+  return true;
+}
+
 /* Ctrl+/ (Cmd+/ as well): the comment mark on or off (logic/comment.ts).
    One dispatch, so the whole block is one step of the undo history and the
    selection is mapped through it.  The key is always taken. */
@@ -242,7 +251,7 @@ export function createEditor(parent: HTMLElement, tokenize: Tokenize, onSave: ()
         breakpointField, breakpointGutter(onBreakpoint),
         lineNumbers(), errorGutter, history(), highlighter(tokenize), errorField, errorDecorations,
         pcField, pcDecorations, indentUnit.of('    '),
-        keymap.of([{ key: 'Tab', run: tab, shift: indentLess }, { key: 'Enter', run: insertNewline },
+        keymap.of([{ key: 'Tab', run: tab, shift: indentLess }, { key: 'Enter', run: newline },
           // Mod is Ctrl here and Cmd on a Mac; Ctrl works there too.
           { key: 'Mod-/', run: toggleComment }, { key: 'Ctrl-/', run: toggleComment },
           ...historyKeymap, ...defaultKeymap]),
