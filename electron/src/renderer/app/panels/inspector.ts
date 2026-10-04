@@ -96,11 +96,11 @@ export interface FieldView {
   meaning: string;  // "lw", "$sp", "x4=8" ...; '' when the value says it all
 }
 
-// The instruction and its format; under them its source line, word and address.
+// The format, then the instruction (the order of the Text tab's columns); under them its source line, word and address.
 export function inspectorHead(row: { disassembly: string; source: string; word: number; addr: number }, format: string): HTMLElement {
   const item = (label: string, value: Node) => h('span', { class: 'iitem' }, h('span', { class: 'ilabel' }, label), value);
   return h('div', { class: 'ihead' },
-    h('div', { class: 'ititle' }, code(row.disassembly, 'dis'), h('span', { class: `badge b-${format}` }, `${format}-type`)),
+    h('div', { class: 'ititle' }, h('span', { class: `badge b-${format}` }, `${format}-type`), code(row.disassembly, 'dis')),
     h('div', { class: 'imeta' },
       row.source ? item('Source', code(row.source, 'isrc')) : null,
       item('Word', code(hex32(row.word))),

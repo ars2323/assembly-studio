@@ -14,7 +14,7 @@
    .item, .row .btn). */
 
 import { ago, cell, count, lead, plural } from '../cells.ts';
-import { code, codeText, h, withHex } from '../dom.ts';
+import { code, codeText, h, icon, withHex } from '../dom.ts';
 
 const ctrlS = () => h('kbd', {}, 'Ctrl+S');
 const saveCell = (note: string, warn: boolean) => (note ? cell(warn ? 'warn' : '', note) : null);
@@ -29,11 +29,11 @@ export function busyState(): HTMLElement {
   return h('div', { class: 'asm-state' }, h('div', { class: 'cells' }, lead('run', 'Assembling…')));
 }
 
-export function assembledState(o: { instructions: number; at: Date; saveNote: string; saveWarn: boolean; edited: boolean }): HTMLElement {
+// Edits since are the Editor's dot (beside the file's name), not a note here.
+export function assembledState(o: { instructions: number; at: Date; saveNote: string; saveWarn: boolean }): HTMLElement {
   return h('div', { class: 'asm-state' },
     h('div', { class: 'cells' }, lead('ok', 'Assembled'), cell('', count(o.instructions, 'instruction')),
-      saveCell(o.saveNote, o.saveWarn), cell('time', ago(o.at))),
-    o.edited ? h('p', { class: 'asm-note warn' }, 'Edited since. Run and Step use this assembled code until you press ', ctrlS(), '.') : null);
+      saveCell(o.saveNote, o.saveWarn), cell('time', ago(o.at))));
 }
 
 export interface AsmError {
@@ -52,7 +52,7 @@ export function errorList(o: {
   toEditor(): void;
 }): HTMLElement {
   const first = o.errors.find((e) => e.line > 0) ?? o.errors[0];
-  const go = h('button', { class: 'btn primary', type: 'button' }, first.line ? `Go to line ${first.line}` : 'Go to the Editor');
+  const go = h('button', { class: 'btn small goline', type: 'button' }, h('span', {}, first.line ? `Go to line ${first.line}` : 'Go to the Editor'), icon('arrow-right'));
   go.addEventListener('click', () => (first.line ? o.goTo(first.line) : o.toEditor()));
   const items = o.errors.map((e) => {
     const where = h('button', { class: 'linkbtn line', type: 'button', disabled: !e.line, title: e.line ? `Go to line ${e.line}` : undefined },

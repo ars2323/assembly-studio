@@ -255,8 +255,7 @@ const runGrid = h('div', { class: 'run-grid' }, leftCol, regsSplitter, centre);
 const placeholder = h('div', { class: 'run-placeholder notice-host' });
 // Once the code in the Editor is not the program in the machine: one line
 // over the Run side, covering nothing.
-const runBand = h('div', { class: 'run-band', role: 'status', hidden: true });
-const runPanel = h('div', { class: 'run-side' }, runBand, placeholder, runGrid);
+const runPanel = h('div', { class: 'run-side' }, placeholder, runGrid);
 
 // ---- the split -------------------------------------------------------------------------
 
@@ -423,7 +422,6 @@ function layout(): void {
   runGrid.hidden = !shown;
   placeholder.hidden = shown;
   if (!shown) renderPlaceholder();
-  renderBand();
   renderAssemble();
   runGrid.classList.toggle('console-open', consolePanel.expanded);
   if (regsWidth === null) runGrid.style.removeProperty('--regs-w');
@@ -488,19 +486,6 @@ function renderPlaceholder(): void {
   placeholder.dataset.kind = kind;
 }
 
-// Over the Run side while the Editor's code is not the machine's program.
-function renderBand(): void {
-  const on = machineShown() && edited;
-  runBand.hidden = !on;
-  if (!on) return;
-  // "assembled 12s ago", kept current by ago(); built again only when the assemble changes.
-  const key = lastAssembly ? String(lastAssembly.at.getTime()) : '';
-  if (runBand.dataset.key === key && runBand.childNodes.length) return;
-  runBand.dataset.key = key;
-  runBand.replaceChildren('Edited · showing the code assembled ', lastAssembly ? ago(lastAssembly.at) : 'earlier', ' · Ctrl+S to assemble your edits');
-  runBand.title = lastAssembly ? `Assembled at ${clock(lastAssembly.at)}` : '';
-}
-
 // The Assemble panel (panels/assemble.ts): a row of cells -- the state, what
 // the assemble made, what Ctrl+S did with the file, when -- and under it what
 // to do next; with errors, the list.  Before any assemble, what Ctrl+S will
@@ -524,7 +509,7 @@ function renderAssemble(): void {
       }),
       at: failedAt, kept: machineShown(), narrow, goTo: (n) => goToErrorLine(n), toEditor: () => showView('editor'),
     })
-    : lastAssembly ? assembledState({ instructions: lastAssembly.instructions, at: lastAssembly.at, saveNote, saveWarn, edited })
+    : lastAssembly ? assembledState({ instructions: lastAssembly.instructions, at: lastAssembly.at, saveNote, saveWarn })
     : freshState(saves(), saveNote, saveWarn));
 }
 
@@ -601,7 +586,10 @@ function renderChrome(): void {
   speedOne.replaceChildren(h('span', { class: 'label' }, h('span', { class: 'pre' }, 'Speed: '), speed === 'fast' ? 'Instant' : '1 line/s'));
   // No file, nothing to run: the first screen has no toolbar.
   toolbar.hidden = !open;
-  editorHead.setMeta(open ? h('span', {}, code(file.name), ` · ${file.format?.encoding ?? 'UTF-8'} · ${file.format?.lineEnd ?? 'LF'}`) : '');
+  // The file's name, and beside it a dot while it has changes not saved (as an editor's tab shows it).
+  editorHead.setMeta(open ? h('span', {}, code(file.name),
+    dirty ? h('span', { class: 'unsaved', title: 'Unsaved changes', 'aria-label': 'Unsaved changes' }) : '',
+    ` · ${file.format?.encoding ?? 'UTF-8'} · ${file.format?.lineEnd ?? 'LF'}`) : '');
   layout();
   renderStatus();
   fitTitlebar();
