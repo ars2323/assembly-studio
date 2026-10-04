@@ -19,3 +19,4 @@ electron/src/renderer/assets/brand/
 *.swp
 .vscode/
 .claude/worktrees/
+review/
