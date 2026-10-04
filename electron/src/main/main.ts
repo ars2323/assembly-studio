@@ -38,6 +38,7 @@ import { answer, type Engine } from './ipc.ts';
 import { LICENSES, paths, version, type Isa } from './paths.ts';
 import { LIGHT_BACKGROUND, WINDOW_COLOURS } from './theme.ts';
 
+export type { ImageJob, ImageReply } from './export-image.ts';
 
 app.setName(brand.name);
 // The top bar's height in the window (src/renderer/app/app.css --titlebar).
