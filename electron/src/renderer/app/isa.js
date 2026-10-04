@@ -13,6 +13,11 @@
   let theme = 'dark';
   try { if (sessionStorage.getItem('studio-theme') === 'light') theme = 'light'; } catch { /* none */ }
   document.documentElement.dataset.theme = theme;
+  // The language likewise (i18n.ts): chosen earlier in this run, else the system's -- Korean or English.
+  let lang = 'en';
+  try { lang = (navigator.language || '').toLowerCase().startsWith('ko') ? 'ko' : 'en'; } catch { /* none */ }
+  try { const kept = sessionStorage.getItem('studio-lang'); if (kept === 'ko' || kept === 'en') lang = kept; } catch { /* none */ }
+  document.documentElement.lang = lang;
   const script = () => {
     const s = document.createElement('script');
     s.src = `${me.dataset.bundles}app-${isa}.js`;

@@ -23,6 +23,8 @@
 import { brand } from '../../../brand.ts';
 import { h, icon, markImg } from '../dom.ts';
 import { currentTheme, onTheme, THEME_FADE_MS, themeSwitch } from '../theme.ts';
+import { langSwitch, onLang, tr } from '../i18n.ts';
+import { WELCOME } from '../messages/welcome.ts';
 import { CHIP_ATTR, startfield } from '../../startfield/index.ts';
 import { offsets, SEED, type SparkName, sparkAt } from './spark.ts';
 
@@ -76,10 +78,12 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
   // The way back: an arrow in the die frame's top-left corner, on the steps after the first.
   // In the opposite corner, the ISA chosen, quietly.
   const isaTag = h('span', { class: 'wisa' });
-  // The version, quietly, in the bottom-right corner: there from the first frame, no About needed.
+  // The version, quietly, in the middle of the bottom edge: there from the first frame, no About needed.
   const version = h('span', { class: 'wver' });
   void window.app?.about().then((info) => { version.textContent = `v${info.version}`; }, () => {});
-  const back = h('button', { class: 'wback', type: 'button', title: '뒤로', 'aria-label': '뒤로' }, icon('arrow-left'));
+  const back = h('button', { class: 'wback', type: 'button' }, icon('arrow-left'));
+  const nameBack = () => { back.title = tr(WELCOME.back); back.setAttribute('aria-label', back.title); };
+  nameBack();
   const corner = h('div', { class: 'wcorner' }, back);
   let chosen: Isa = pageIsa;
   let backTo = () => {};
@@ -95,6 +99,7 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
      fade out and the new ones in (show()). */
   let equal = false;                 // the two buttons carry the same light
   let swapping = 0;
+  let now: 0 | 1 | 2 = 0;            // the step on the card
   const show = (step: 0 | 1 | 2, animate = true) => {
     if (animate && !calm.matches && actions.childElementCount > 0) {
       clearTimeout(swapping);
@@ -106,7 +111,8 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
     build(step);
     if (animate) enter();
   };
-  const build = (step: 0 | 1 | 2) => {
+  const build = (step: 0 | 1 | 2, focus = true) => {
+    now = step;
     if (step === 0) {
       actions.replaceChildren(
         action('MIPS', null, () => void choose('mips'), true),
@@ -114,21 +120,28 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
       backTo = () => {};
     } else if (step === 1) {
       actions.replaceChildren(
-        action('바로 시작', 'play', () => show(2), true),
-        action('튜토리얼 보기', 'circle-question-mark', () => void go('tutorial')));
+        action(tr(WELCOME.start), 'play', () => show(2), true),
+        action(tr(WELCOME.tutorial), 'circle-question-mark', () => void go('tutorial')));
       backTo = () => show(0);
     } else {
       actions.replaceChildren(
-        action('새 파일', 'file-plus', () => void go('new'), true),
-        action('파일 열기', 'folder-open', () => void go('open')));
+        action(tr(WELCOME.newFile), 'file-plus', () => void go('new'), true),
+        action(tr(WELCOME.openFile), 'folder-open', () => void go('open')));
       backTo = () => show(1);
     }
     equal = step === 0;
     corner.classList.toggle('on', step !== 0);
     isaTag.classList.toggle('on', step !== 0);
     isaTag.textContent = ISA_NAME[chosen];
-    if (step === 2) (actions.firstElementChild as HTMLElement).focus();
+    if (step === 2 && focus) (actions.firstElementChild as HTMLElement).focus();
   };
+  // The other language (KO/EN): the same step's words again, at once, the focus where it was.
+  onLang(() => {
+    nameBack();
+    const focused = [...actions.children].indexOf(document.activeElement as Element);
+    build(now, false);
+    if (focused >= 0) (actions.children[focused] as HTMLElement).focus();
+  });
   // The ISA is only remembered here: nothing is loaded or switched yet.
   const choose = (isa: Isa) => { chosen = isa; show(1); };
   /* A way in.  With the page's own ISA, at once.  With the other, the first
@@ -163,7 +176,7 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
       markImg('wlogo'),
       title,
       h('div', { class: 'wbody' }, actions)),
-    corner, isaTag, h('div', { class: 'wtheme' }, themeSwitch()), version);
+    corner, isaTag, h('div', { class: 'wlang' }, langSwitch()), version, h('div', { class: 'wtheme' }, themeSwitch()));
   // A switch of theme: the board cross-fades to the other look (start.setTheme),
   // over the same time the page's colours take (theme.ts).
   onTheme((t) => start.setTheme(t));
