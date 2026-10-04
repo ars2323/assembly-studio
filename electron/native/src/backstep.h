@@ -19,12 +19,13 @@ struct Span {
   uint32_t size;
 };
 
-// SPIM's syscall numbers (CPU/spim-syscall.h) that matter here.
+// SPIM's syscall numbers (CPU/spim-syscall.h) that matter here.  Prefixed:
+// Windows' headers already define SYS_OPEN and the like as macros.
 enum {
-  SYS_PRINT_INT = 1, SYS_PRINT_FLOAT = 2, SYS_PRINT_DOUBLE = 3, SYS_PRINT_STRING = 4,
-  SYS_READ_INT = 5, SYS_READ_FLOAT = 6, SYS_READ_DOUBLE = 7, SYS_READ_STRING = 8,
-  SYS_SBRK = 9, SYS_EXIT = 10, SYS_PRINT_CHAR = 11, SYS_READ_CHAR = 12,
-  SYS_OPEN = 13, SYS_READ = 14, SYS_WRITE = 15, SYS_CLOSE = 16, SYS_EXIT2 = 17,
+  SPIMSYS_PRINT_INT = 1, SPIMSYS_PRINT_FLOAT = 2, SPIMSYS_PRINT_DOUBLE = 3, SPIMSYS_PRINT_STRING = 4,
+  SPIMSYS_READ_INT = 5, SPIMSYS_READ_FLOAT = 6, SPIMSYS_READ_DOUBLE = 7, SPIMSYS_READ_STRING = 8,
+  SPIMSYS_SBRK = 9, SPIMSYS_EXIT = 10, SPIMSYS_PRINT_CHAR = 11, SPIMSYS_READ_CHAR = 12,
+  SPIMSYS_OPEN = 13, SPIMSYS_READ = 14, SPIMSYS_WRITE = 15, SPIMSYS_CLOSE = 16, SPIMSYS_EXIT2 = 17,
 };
 
 // Register numbers in R[].
@@ -41,10 +42,10 @@ inline bool isSyscall(uint32_t word) { return (word >> 26) == 0 && (word & 0x3f)
 inline bool isIoSyscall(uint32_t word, const int32_t *R) {
   if (!isSyscall(word)) return false;
   switch (R[REG_V0_]) {
-    case SYS_PRINT_INT: case SYS_PRINT_FLOAT: case SYS_PRINT_DOUBLE: case SYS_PRINT_STRING:
-    case SYS_READ_INT: case SYS_READ_FLOAT: case SYS_READ_DOUBLE: case SYS_READ_STRING:
-    case SYS_PRINT_CHAR: case SYS_READ_CHAR:
-    case SYS_OPEN: case SYS_READ: case SYS_WRITE: case SYS_CLOSE:
+    case SPIMSYS_PRINT_INT: case SPIMSYS_PRINT_FLOAT: case SPIMSYS_PRINT_DOUBLE: case SPIMSYS_PRINT_STRING:
+    case SPIMSYS_READ_INT: case SPIMSYS_READ_FLOAT: case SPIMSYS_READ_DOUBLE: case SPIMSYS_READ_STRING:
+    case SPIMSYS_PRINT_CHAR: case SPIMSYS_READ_CHAR:
+    case SPIMSYS_OPEN: case SPIMSYS_READ: case SPIMSYS_WRITE: case SPIMSYS_CLOSE:
       return true;
   }
   return false;
@@ -78,9 +79,9 @@ inline bool storeSpan(uint32_t word, const int32_t *R, Span *out) {
   }
   if (isSyscall(word)) {
     uint32_t addr = 0, size = 0;
-    if (R[REG_V0_] == SYS_READ_STRING) { addr = (uint32_t)R[REG_A0_]; size = (uint32_t)R[REG_A1_]; }
-    else if (R[REG_V0_] == SYS_READ) { addr = (uint32_t)R[REG_A1_]; size = (uint32_t)R[REG_A2_]; }
-    if (R[REG_V0_] == SYS_READ_STRING || R[REG_V0_] == SYS_READ) {
+    if (R[REG_V0_] == SPIMSYS_READ_STRING) { addr = (uint32_t)R[REG_A0_]; size = (uint32_t)R[REG_A1_]; }
+    else if (R[REG_V0_] == SPIMSYS_READ) { addr = (uint32_t)R[REG_A1_]; size = (uint32_t)R[REG_A2_]; }
+    if (R[REG_V0_] == SPIMSYS_READ_STRING || R[REG_V0_] == SPIMSYS_READ) {
       if ((int32_t)size <= 0 || size > MAX_SPAN) return false;
       *out = {addr, size};
       return true;
