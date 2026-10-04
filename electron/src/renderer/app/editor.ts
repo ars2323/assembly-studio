@@ -37,6 +37,8 @@ import {
 } from '@codemirror/view';
 
 import { userScrolls } from './dom.ts';
+import { tr } from './i18n.ts';
+import { ASSEMBLE } from './messages/assemble.ts';
 
 const tokenMarks = Object.fromEntries(['Comment', 'String', 'Directive', 'Instruction', 'Register',
   'LabelDefinition', 'Identifier', 'Number'].map((k) => [k, Decoration.mark({ class: `k-${k}` })]));
@@ -69,7 +71,7 @@ const highlighter = (tokenize: Tokenize) => ViewPlugin.fromClass(class {
 export const setErrorLines = StateEffect.define<number[]>();
 const errorLine = Decoration.line({ class: 'cm-error-line' });
 class ErrorMarker extends GutterMarker {
-  toDOM() { const s = document.createElement('span'); s.className = 'cm-error-mark'; s.textContent = '!'; s.title = 'Assembly error'; return s; }
+  toDOM() { const s = document.createElement('span'); s.className = 'cm-error-mark'; s.textContent = '!'; s.title = tr(ASSEMBLE.markTitle); return s; }
 }
 const errorMarker = new ErrorMarker();
 

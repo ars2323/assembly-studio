@@ -49,18 +49,21 @@ import { brand } from '../../brand.ts';
 import './api.ts';
 import { asset, code, codeText, h, icon, markImg, monoCh, withHex } from './dom.ts';
 import { onTheme, THEME_FADE_MS, themeSwitch } from './theme.ts';
-import { currentLang, langSwitch, onLang, tr } from './i18n.ts';
+import { currentLang, langSwitch, onLang, tr, words, type Words } from './i18n.ts';
 import { DIALOGS } from './messages/dialogs.ts';
+import { ASSEMBLE, STATUS } from './messages/assemble.ts';
 import { captionPatch, mixPalette, palette } from './logic/overlay.ts';
 import { WINDOW_COLOURS } from '../../main/theme.ts';
 import { notice } from './notice.ts';
-import { assemblerHint } from '../../core/near-miss.ts';
+import { assemblerHint, HINTS } from '../../core/near-miss.ts';
+import { ASM_MESSAGES, spimMessage } from '../../core/asm-messages.ts';
+import { precheckMips, type UnknownWord } from '../../core/precheck.ts';
 import { createEditor } from './editor.ts';
 import { tokenizeMipsLine } from '../../core/mips-syntax.ts';
 import { shortName } from './logic/names.ts';
 import { changedKeys, stateAfter, stopKeys, stopMessage, textRows, type RegisterValues, type RunState, type TextRow } from './logic/machine.ts';
-import { ago, cell, clock, count, keys, lead, lines as lineList, plural } from './cells.ts';
-import { assembledState, busyState, errorList, freshState } from './panels/assemble.ts';
+import { ago, cell, clock, count, keys, lead, lines as lineList } from './cells.ts';
+import { assembledState, busyState, errorList, freshState, type AsmError } from './panels/assemble.ts';
 import { aboutDialog } from './panels/about.ts';
 import { ConsolePanel } from './panels/console.ts';
 import { Inspector } from './panels/inspector.ts';
@@ -108,12 +111,15 @@ let selected = -1;
 const breakpoints = new Set<number>();
 const labels = new LabelMap();          // the program's, for Data
 let resumeWith: 'run' | 'step' = 'run';
-let errors: { message: AssemblerMessage; line: number }[] = [];
-let saveNote = '';     // what Ctrl+S did with the file: shown until the first step
+// An assemble's errors: the assembler's messages; a word the pre-check
+// found (core/precheck.ts: the engine was not asked); or the assembler's
+// process ending on the program (crashed).
+let errors: { message: AssemblerMessage; line: number; unknown?: UnknownWord; crashed?: boolean }[] = [];
+let saveNote: Words = '';  // what Ctrl+S did with the file: shown until the first step
 let saveWarn = false;  // ...and whether it is a warning (not saved)
-let note = '';                          // a one-off word in the status bar (breakpoints)
-let exportNote = '';                    // the same, for an export that went well
-let crashNote = '';
+let note: Words = '';                   // a one-off word in the status bar (breakpoints)
+let exportNote: Words = '';             // the same, for an export that went well
+let crashNote: Words = '';
 let progress: { pc: number; instructions: number } | null = null;
 let lastReason: RunResult['reason'] = 'limit';
 let changedNow: string[] = []; // the registers the last step or run changed: the yellow rows
@@ -468,10 +474,10 @@ function sizeRunSide(): void {
 // first assemble had errors, or the simulator stopped (a crash).
 function renderPlaceholder(): void {
   const kind = crashNote ? 'crashed' : errors.length ? 'failed' : 'fresh';
-  const where = narrow ? 'the Assemble panel on the Editor tab' : 'the Assemble panel under the Editor';
-  const [title, body] = kind === 'crashed' ? ['The simulator stopped', 'Press Reset or Ctrl+S to start again.']
-    : kind === 'failed' ? ['No program assembled yet', `Fix the errors in ${where}, then press Ctrl+S again.`]
-    : ['Not assembled yet', 'Assemble to see the registers, the instructions and the console output here.'];
+  const p = ASSEMBLE.placeholder;
+  const [title, body] = kind === 'crashed' ? [tr(p.crashedTitle), tr(p.crashedBody)]
+    : kind === 'failed' ? [tr(p.failedTitle), tr(p.failedBody, narrow)]
+    : [tr(p.freshTitle), tr(p.freshBody)];
   const key = JSON.stringify([kind, title, body, assembleName(false)]);
   if (placeholder.dataset.key === key) return;
   placeholder.dataset.key = key;
@@ -490,18 +496,38 @@ function renderPlaceholder(): void {
 let asmKey = '';
 function renderAssemble(): void {
   const key = JSON.stringify([errors.map((e) => [e.line, e.message.message, e.message.source]), lastAssembly?.at.getTime() ?? null,
-    lastAssembly?.instructions ?? null, failedAt?.getTime() ?? null, assembling, edited, machineShown(), saveNote, saveWarn, saves(), narrow]);
+    lastAssembly?.instructions ?? null, failedAt?.getTime() ?? null, assembling, edited, machineShown(), words(saveNote), saveWarn, saves(), narrow,
+    currentLang()]);
   if (key === asmKey) return;
   asmKey = key;
   asmPanel.dataset.state = assembling ? 'busy' : errors.length ? 'errors' : lastAssembly ? (edited ? 'changed' : 'ok') : 'fresh';
   asmHead.setMeta('');
   asmBody.replaceChildren(assembling ? busyState()
     : errors.length ? errorList({
-      errors: errors.map((e) => ({ line: e.line, message: e.message.message, source: e.message.source, hint: assemblerHint(e.message.message, e.message.source, currentLang()) })),
+      errors: errors.map(asmError),
       at: failedAt, kept: machineShown(), narrow, goTo: (n) => goToErrorLine(n), toEditor: () => showView('editor'),
     })
-    : lastAssembly ? assembledState({ instructions: lastAssembly.instructions, at: lastAssembly.at, saveNote, saveWarn })
-    : freshState(saves(), saveNote, saveWarn));
+    : lastAssembly ? assembledState({ instructions: lastAssembly.instructions, at: lastAssembly.at, saveNote: words(saveNote), saveWarn })
+    : freshState(saves(), words(saveNote), saveWarn));
+}
+
+// An error as the list shows it, in the language in use: the window's short
+// words for the assembler's message (core/asm-messages.ts) with its own
+// beside them, the line's text, and what is wrong on it.
+function asmError(e: (typeof errors)[number]): AsmError {
+  const lang = currentLang();
+  if (e.unknown) {
+    const w = e.unknown;
+    return { line: e.line, message: tr(w.kind === 'directive' ? ASM_MESSAGES.unknownDirective : ASM_MESSAGES.unknownInstruction),
+      raw: '', source: w.source, hint: tr(HINTS.unknown[w.kind], w.token) };
+  }
+  if (e.crashed) {
+    const source = e.line > 0 && e.line <= editor.view.state.doc.lines ? editor.view.state.doc.line(e.line).text.trim() : '';
+    return { line: e.line, message: tr(ASM_MESSAGES.stopped), raw: e.message.message, source, hint: tr(ASM_MESSAGES.stoppedHint, e.line) };
+  }
+  const m = e.message;
+  const short = spimMessage(m.message, lang);
+  return { line: e.line, message: short ?? m.message, raw: short ? m.message : '', source: m.source, hint: assemblerHint(m.message, m.source, lang) };
 }
 
 // The Editor line of PC: the Text row's line, or that of the source line a
@@ -638,7 +664,7 @@ const saves = (): boolean => !file.example;
 const assembleName = (short: boolean): string => (saves() && !short ? 'Save & Assemble' : 'Assemble');
 function nameAssemble(): void {
   (bAssemble.querySelector('.label') as HTMLElement).textContent = assembleName(toolbar.classList.contains('short'));
-  bAssemble.title = saves() ? 'Save & Assemble (Ctrl+S)' : 'Assemble (Ctrl+S): examples are not saved';
+  bAssemble.title = saves() ? 'Save & Assemble (Ctrl+S)' : tr(ASSEMBLE.exampleTitle);
 }
 
 // The toolbar gives way one step at a time, as far as it has to: the key
@@ -692,49 +718,49 @@ window.addEventListener('resize', () => fitBars());
 function renderStatus(): void {
   const parts: HTMLElement[] = [];
   let hints: [string, string][] = [];
-  if (crashNote) parts.push(lead('err', crashNote));
-  if (!open) parts.push(lead('idle', 'Ready'));
+  if (crashNote) parts.push(lead('err', words(crashNote)));
+  if (!open) parts.push(lead('idle', tr(STATUS.ready)));
   else if (assembledText === null) {
     if (errors.length) {
-      parts.push(lead('err', plural(errors.length, 'error')));
-      const e = errors[0];
-      parts.push(cell('', e.line ? `Line ${e.line} · ` : '', withHex(e.message.message)));
-    } else parts.push(lead('idle', edited ? 'Edited · not assembled' : 'Not assembled'));
-    if (saveNote) parts.push(cell(saveWarn ? 'warn' : '', saveNote));
+      parts.push(lead('err', tr(ASSEMBLE.errors, errors.length)));
+      const e = asmError(errors[0]);
+      parts.push(cell('', e.line ? `${tr(ASSEMBLE.line, e.line)} · ` : '', withHex(e.message)));
+    } else parts.push(lead('idle', tr(edited ? STATUS.edited : ASSEMBLE.notAssembled)));
+    if (saveNote) parts.push(cell(saveWarn ? 'warn' : '', words(saveNote)));
     hints = [['Ctrl+S', assembleName(false)]];
   } else {
     const pc = lastRegs ? hex32(lastRegs.pc) : '';
     if (runState === 'running' && slow) {
-      parts.push(lead('run', 'Slow run · 1 line/s'));
-      if (steps > 0) parts.push(cell('', count(steps, 'step')));
+      parts.push(lead('run', tr(STATUS.slowRun)));
+      if (steps > 0) parts.push(cell('', count(steps, STATUS.steps)));
       if (pc) parts.push(cell('', 'PC ', code(pc)));
       if (changedNow.length) parts.push(changedPart());
-      hints = [['Esc', 'Stop'], ['', 'Instant for full speed']];
+      hints = [['Esc', 'Stop'], ['', tr(STATUS.keys.instant)]];
     } else if (runState === 'running') {
-      parts.push(lead('run', 'Running…'));
-      if (progress) parts.push(cell('', 'PC ', code(hex32(progress.pc))), cell('', count(progress.instructions, 'instruction')));
+      parts.push(lead('run', tr(STATUS.running)));
+      if (progress) parts.push(cell('', 'PC ', code(hex32(progress.pc))), cell('', count(progress.instructions, ASSEMBLE.instructions)));
       hints = [['Esc', 'Stop']];
     } else {
       const reason = lastReason;
       if (runState === 'ready') {
-        parts.push(lead('run', 'Ready', pc ? ' · PC ' : '', pc ? code(pc) : null));
-        if (steps === 0 && saveNote) parts.push(cell(saveWarn ? 'warn' : '', saveNote));
+        parts.push(lead('run', tr(STATUS.ready), pc ? ' · PC ' : '', pc ? code(pc) : null));
+        if (steps === 0 && saveNote) parts.push(cell(saveWarn ? 'warn' : '', words(saveNote)));
         hints = [['F10', 'Step'], ['F5', 'Run']];
       } else {
         const tone = runState !== 'finished' ? 'run' : reason === 'error' ? 'err' : 'ok';
-        parts.push(lead(tone, codeText(stopMessage(reason, pc))));
-        hints = stopKeys(reason);
+        parts.push(lead(tone, codeText(stopMessage(reason, pc, currentLang()))));
+        hints = stopKeys(reason, currentLang());
       }
-      if (steps > 0 && runState !== 'finished') parts.push(cell('', count(steps, 'step')));
+      if (steps > 0 && runState !== 'finished') parts.push(cell('', count(steps, STATUS.steps)));
       if (changedNow.length) parts.push(changedPart());
-      if (selected >= 0) parts.push(cell('', 'Selected ', code(hex32(selected))));
+      if (selected >= 0) parts.push(cell('', tr(STATUS.selected), code(hex32(selected))));
     }
     // A later assemble that failed (the machine keeps the last program).
-    if (errors.length) parts.push(cell('err', `${plural(errors.length, 'error')} in the edited code`));
-    else if (!sameAdvanced(advanced, applied)) parts.push(cell('warn', 'Settings changed · Ctrl+S to apply'));
+    if (errors.length) parts.push(cell('err', tr(STATUS.errorsInEdited, errors.length)));
+    else if (!sameAdvanced(advanced, applied)) parts.push(cell('warn', tr(STATUS.settingsChanged)));
   }
-  if (note) parts.push(cell('warn', note));
-  else if (exportNote) parts.push(cell('ok', exportNote));
+  if (note) parts.push(cell('warn', words(note)));
+  else if (exportNote) parts.push(cell('ok', words(exportNote)));
   if (open && hints.length) parts.push(keys(...hints));
   status.replaceChildren(...parts, statusTheme);
 }
@@ -752,7 +778,7 @@ async function exportImage(): Promise<void> {
                                     assembled: (lastAssembly?.at ?? new Date()).getTime() }).catch((e: Error) => ({ error: e.message }));
   if (r === null) return;
   if ('error' in r) note = r.error;
-  else { note = ''; exportNote = `Saved ${changed ? 'the last assembled code ' : ''}as an executable image · ${r.name}`; }
+  else { note = ''; exportNote = () => tr(STATUS.exported, changed, r.name); }
   renderStatus();
 }
 
@@ -942,7 +968,7 @@ async function saveAndAssemble(): Promise<boolean> {
   saveNote = '';
   saveWarn = false;
   if (file.example) {
-    saveNote = 'Example · not saved';
+    saveNote = () => tr(ASSEMBLE.example);
     return assemble(source);
   }
   try {
@@ -951,8 +977,8 @@ async function saveAndAssemble(): Promise<boolean> {
       file.path = saved.path;
       file.name = saved.name;
       dirty = editor.text() !== source; // typed on while the dialog was up
-      saveNote = 'Saved';
-    } else [saveNote, saveWarn] = ['Not saved', true];
+      saveNote = () => tr(ASSEMBLE.saved);
+    } else [saveNote, saveWarn] = [() => tr(ASSEMBLE.notSaved), true];
   } catch (e) {
     [saveNote, saveWarn] = [(e as Error).message, true];
   }
@@ -989,11 +1015,18 @@ async function assemble(source: string): Promise<boolean> {
   };
   try {
     if (runState === 'running') { slow?.cancel(); await api.stop(); await waitWhileRunning(); }
+    // A statement that starts with no instruction or directive the core
+    // knows: every one of them, on its line, and the engine is not asked
+    // (core/precheck.ts).
+    const unknown = precheckMips(source);
+    if (unknown.length) {
+      return failed(unknown.map((w) => ({ message: parseAssemblerMessage(w.token), line: w.line, unknown: w })));
+    }
     // The core ended while assembling it (a .err directive): the second
     // process did, the machine on screen is untouched.  No second process at
     // all (it did not start): assemble on the machine itself, as before.
     const check = await api.check(source, options).catch(() => null);
-    if (check?.crashed) return failed([{ message: parseAssemblerMessage(check.crashed), line: 0 }]);
+    if (check?.crashed) return failed([{ message: parseAssemblerMessage(check.crashed), line: check.crashLine ?? 0, crashed: true }]);
     if (check && !check.ok) return failed(parsed(check.errors));
     const same = source === assembledText;
     let r: Awaited<ReturnType<typeof api.call<'assemble'>>>;
@@ -1023,7 +1056,7 @@ async function assemble(source: string): Promise<boolean> {
     const dropped = mapped.filter(([, a]) => a === null).map(([n]) => n);
     if (dropped.length) {
       editor.setBreakpointLines(mapped.filter(([, a]) => a !== null).map(([n]) => n));
-      note = `${lineList(dropped)}: no instruction, breakpoint removed`;
+      note = () => tr(STATUS.bpRemoved, lineList(dropped));
     }
     breakpoints.clear();
     for (const a of [...kept, ...mapped.map(([, a]) => a).filter((a): a is number => a !== null)]) breakpoints.add(a);
@@ -1202,8 +1235,8 @@ async function setSpeed(next: 'fast' | 'slow'): Promise<void> {
 // a yellow row is.  Three names at most, then how many more.
 function changedPart(): HTMLElement {
   const names = changedNow.slice(0, 3).flatMap((key, i) => (i ? [', ', code(key)] : [code(key)]));
-  const more = changedNow.length > 3 ? ` +${changedNow.length - 3} more` : '';
-  return cell('changed', 'Changed: ', ...names, more);
+  const more = changedNow.length > 3 ? tr(STATUS.more, changedNow.length - 3) : '';
+  return cell('changed', tr(STATUS.changed), ...names, more);
 }
 
 async function stop(): Promise<void> {
@@ -1293,13 +1326,13 @@ async function setBreakpoint(addr: number, on: boolean): Promise<void> {
 async function editorBreakpoint(line: number, on: boolean): Promise<void> {
   emit({ kind: 'breakpoint', line, on });
   if (!current()) {
-    if (machineShown()) { note = 'Breakpoints in edited code apply at the next assemble (Ctrl+S)'; renderStatus(); }
+    if (machineShown()) { note = () => tr(STATUS.bpEdited); renderStatus(); }
     return;
   }
   const addr = addressOfLine(line);
   if (addr === null) {
     editor.setBreakpointLines(editor.breakpointLines().filter((n) => n !== line));
-    note = `Line ${line} has no instruction · breakpoints go on instruction lines`;
+    note = () => tr(STATUS.bpNoInstruction, line);
     renderStatus();
     return;
   }
@@ -1334,8 +1367,12 @@ function showInspector(): void {
   else inspector.guide();
 }
 inspector.onFollow = () => { clearSelection(); renderStatus(); };
-// The other language (i18n.ts): the Inspector's explanation says it again in it.
-onLang(() => { if (open) showInspector(); });
+// The other language (i18n.ts): the Inspector's explanation, the Assemble
+// panel, the Run side's card and the status bar say it again in it.
+onLang(() => {
+  if (open) showInspector();
+  renderChrome();
+});
 
 // ---- Data ------------------------------------------------------------------------------
 
@@ -1419,7 +1456,8 @@ api.onConsole((t) => consolePanel.append(t));
 api.onProgress((p) => { progress = p; if (runState === 'running') renderStatus(); });
 api.onCrashed((message, detail) => {
   // detail: "The simulator stopped (fatal error in the simulator core: File contains an .err directive)"
-  crashNote = `${detail || message} · assemble again (Ctrl+S)`;
+  const cause = /\((.*)\)$/s.exec(detail)?.[1] ?? (detail || message);
+  crashNote = () => tr(STATUS.crashed, cause);
   assembledText = null;
   runState = 'ready';
   busy = false;

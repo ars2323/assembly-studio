@@ -22,6 +22,12 @@ export const currentLang = (): Lang => (document.documentElement.lang === 'en' ?
 
 export const tr = <A extends any[], R = string>(m: Msg<A, R>, ...a: A): R => say(currentLang(), m, ...a);
 
+// Words said later, in the language in use then: a message's (a function
+// that says it) or text that is the same in both (a file name, a system's
+// error message).
+export type Words = string | (() => string);
+export const words = (w: Words): string => (typeof w === 'function' ? w() : w);
+
 export function setLang(lang: Lang): void {
   if (lang === currentLang()) return;
   document.documentElement.lang = lang;
