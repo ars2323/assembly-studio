@@ -1,0 +1,203 @@
+# The engines, built once per input and kept as a release asset:
+#
+#   engines-<hash>.zip    (release engines-<hash>, a pre-release)
+#     spim.node           the SPIM addon (CPU/ + electron/native/), N-API, built
+#                         against Electron's headers; N-API's ABI does not change
+#                         with Electron's version, so one build serves them all
+#     engine/runtime/     a Java runtime made by jlink from the pinned Temurin
+#     engine/rars.jar     RARS built from its pinned commit (engines/build-rars.sh)
+#     engine/classes/     RarsProbe (probe/src/)
+#     engine/runtime.txt  the runtime's vendor, version and modules
+#     engines.txt         what the zip was built from
+#
+# <hash> is engines/hash.mjs over the inputs (CPU/, electron/native/, probe/src/,
+# engines/engines.lock, the build scripts, this file).  When the release for the
+# current hash already has its zip, the run stops there, successfully.
+# release.yml downloads the zip with engines/fetch.mjs.  Kept as a release asset,
+# not in the Actions cache, which drops what is not used for 7 days.
+name: engines
+
+on:
+  push:
+    branches: ['**']   # branches only: path filters are not applied to tag pushes
+    paths:
+      - 'CPU/**'
+      - 'electron/native/**'
+      - 'electron/tools/build-electron.ts'
+      - 'probe/src/**'
+      - 'engines/**'
+      - '.github/workflows/engines.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# One run at a time: two pushes with the same inputs must not both create the release.
+concurrency:
+  group: engines
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  engines:
+    name: Build engines-<hash>.zip (if missing)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      # LF in the checkout: engines/build-rars.sh runs in Git Bash, which does
+      # not read CRLF scripts.  (The hash reads CRLF as LF either way.)
+      - name: Check out with LF line ends
+        run: git config --global core.autocrlf false
+
+      - uses: actions/checkout@v4
+
+      - name: Tag, pins, and whether the release already has its zip
+        id: tag
+        run: |
+          tag=$(node engines/hash.mjs --tag)
+          pin() { tr -d '\r' < engines/engines.lock | sed -n "s/^$1=//p" | tail -n 1; }
+          {
+            echo "tag=$tag"
+            echo "java=$(pin temurin_java_version)"
+            echo "runtime=$(pin temurin_runtime_version)"
+            echo "modules=$(pin java_modules)"
+          } >> "$GITHUB_OUTPUT"
+          if assets=$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' 2> gh-err.txt); then
+            if tr -d '\r' <<< "$assets" | grep -qxF "$tag.zip"; then
+              echo "::notice title=Engines up to date::$tag already has $tag.zip; nothing to build"
+              echo "build=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "release $tag exists without $tag.zip: building it"
+              { echo "build=true"; echo "release=exists"; } >> "$GITHUB_OUTPUT"
+            fi
+          elif grep -qi 'release not found' gh-err.txt; then
+            echo "no release $tag: building it"
+            { echo "build=true"; echo "release=none"; } >> "$GITHUB_OUTPUT"
+          else
+            cat gh-err.txt >&2
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.tag.outputs.build == 'true'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: electron/package-lock.json
+
+      - name: Install winflexbison (win_bison, win_flex for the SPIM parser)
+        if: steps.tag.outputs.build == 'true'
+        run: choco install winflexbison3 --no-progress -y
+
+      - name: npm ci
+        if: steps.tag.outputs.build == 'true'
+        working-directory: electron
+        run: npm ci --ignore-scripts
+
+      - name: Build the addon for Electron (MSVC, node-gyp)
+        if: steps.tag.outputs.build == 'true'
+        working-directory: electron
+        run: |
+          node tools/build-electron.ts
+          test -s native/build/Release/spim.node
+
+      - uses: actions/setup-java@v4
+        if: steps.tag.outputs.build == 'true'
+        with:
+          distribution: temurin
+          java-version: ${{ steps.tag.outputs.java }}
+
+      - name: RARS and RarsProbe (engines/build-rars.sh)
+        if: steps.tag.outputs.build == 'true'
+        run: |
+          export PATH="$(cygpath -u "$JAVA_HOME")/bin:$PATH"
+          bash engines/build-rars.sh "$(cygpath -m "$RUNNER_TEMP")/rars"
+
+      - name: Stage spim.node and engine/ (jlink runtime, rars.jar, classes)
+        if: steps.tag.outputs.build == 'true'
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          RUNTIME: ${{ steps.tag.outputs.runtime }}
+          MODULES: ${{ steps.tag.outputs.modules }}
+        run: |
+          export PATH="$(cygpath -u "$JAVA_HOME")/bin:$PATH"
+          tmp="$(cygpath -m "$RUNNER_TEMP")"
+          stage="$tmp/stage"
+          rm -rf "$stage"
+          mkdir -p "$stage/engine"
+          cp electron/native/build/Release/spim.node "$stage/spim.node"
+          jlink --add-modules "$MODULES" --strip-debug --no-header-files --no-man-pages \
+            --compress=zip-9 --output "$stage/engine/runtime"
+          cp "$tmp/rars/rars.jar" "$stage/engine/rars.jar"
+          cp -r "$tmp/rars/classes" "$stage/engine/classes"
+
+          release="$stage/engine/runtime/release"
+          version=$(tr -d '\r' < "$release" | sed -n 's/^JAVA_RUNTIME_VERSION="\(.*\)"$/\1/p')
+          vendor=$(tr -d '\r' < "$release" | sed -n 's/^IMPLEMENTOR="\(.*\)"$/\1/p')
+          case "$version" in
+            "$RUNTIME"|"$RUNTIME"-*) ;;
+            *) echo "::error::the jlink runtime is '$version' ($vendor), engines.lock pins temurin_runtime_version=$RUNTIME"; exit 1 ;;
+          esac
+          printf '%s %s\nmodules: %s\n' "$vendor" "$version" "${MODULES//,/ }" > "$stage/engine/runtime.txt"
+
+          electron=$(node -p "require('./electron/node_modules/electron/package.json').version")
+          pin() { tr -d '\r' < engines/engines.lock | sed -n "s/^$1=//p" | tail -n 1; }
+          {
+            echo "tag=$TAG"
+            echo "commit=$GITHUB_SHA"
+            echo "rars=$(pin rars_tag) $(pin rars_commit), javac --release $(pin javac_release)"
+            echo "java=$vendor $version"
+            echo "modules=$MODULES"
+            echo "addon=spim.node, N-API, built with Electron $electron headers"
+            echo "run=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          } > "$stage/engines.txt"
+          cat "$stage/engines.txt"
+
+      - name: Smoke test (the jlink runtime starts RarsProbe and answers a ping)
+        if: steps.tag.outputs.build == 'true'
+        run: |
+          engine="$(cygpath -m "$RUNNER_TEMP")/stage/engine"
+          out=$(printf '%s\n' '{"id":1,"cmd":"ping"}' '{"id":2,"cmd":"quit"}' |
+            timeout 120 "$engine/runtime/bin/java.exe" -cp "$engine/classes;$engine/rars.jar" RarsProbe | tr -d '\r')
+          echo "$out"
+          grep -qF '"ev":"ready"' <<< "$out"
+          grep -qF '{"id":1,"ok":true}' <<< "$out"
+
+      - name: Zip
+        if: steps.tag.outputs.build == 'true'
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          tmp="$(cygpath -m "$RUNNER_TEMP")"
+          cd "$tmp/stage"
+          7z a -tzip -mx=9 "$tmp/$TAG.zip" spim.node engine engines.txt > /dev/null
+          7z l "$tmp/$TAG.zip" | tail -n 3
+          ls -l "$tmp/$TAG.zip"
+
+      - name: Publish the release (pre-release)
+        if: steps.tag.outputs.build == 'true'
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          STATE: ${{ steps.tag.outputs.release }}
+        run: |
+          tmp="$(cygpath -m "$RUNNER_TEMP")"
+          if [ "$STATE" = exists ]; then
+            gh release upload "$TAG" "$tmp/$TAG.zip" --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            {
+              echo "The engines for the inputs whose hash is \`${TAG#engines-}\` (engines/hash.mjs). Built by engines.yml; downloaded by engines/fetch.mjs. Not an app release."
+              echo
+              echo '```'
+              cat "$tmp/stage/engines.txt"
+              echo '```'
+            } > "$tmp/notes.md"
+            gh release create "$TAG" "$tmp/$TAG.zip" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --prerelease --title "$TAG" --notes-file "$tmp/notes.md"
+          fi
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url,isPrerelease,assets \
+            --jq '"\(.url)  prerelease=\(.isPrerelease)  " + ([.assets[].name] | join(", "))'
