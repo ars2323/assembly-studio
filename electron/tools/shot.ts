@@ -8,7 +8,7 @@
                      riscv  tests/riscv/samples/lab04-ok.s (RARS engine), 10 steps, sw (S format)
    data-<w>.png    the same, the Data tab
 
-   Width 1280 by default; the window is width x 800.  --isa riscv starts the
+   Width 1920 by default; the window is width x 1080.  --isa riscv starts the
    app with --isa=riscv (the engine: probe/setup.sh and probe/run.sh build,
    or electron/engine/).
    --css <file>: a stylesheet laid over the page first (trying out colours).
@@ -35,14 +35,14 @@ const langAt = args.indexOf('--lang');
 const lang = langAt >= 0 ? args.splice(langAt, 2)[1] : null;
 if (lang !== null && lang !== 'ko' && lang !== 'en') throw new Error(`--lang ${lang}: ko or en`);
 const out = path.resolve(args[0] ?? 'build/shots');
-const width = Number(args[1] ?? 1280);
+const width = Number(args[1] ?? 1920);
 mkdirSync(out, { recursive: true });
 
 const program = isa === 'mips'
   ? { file: 'tests/samples/lab04-ok.s', steps: 16, inspect: '0x00400054' }
   : { file: 'tests/riscv/samples/lab04-ok.s', steps: 10, inspect: '0x0040003c' };
 
-const r = await launch({ width, height: 800 }, { isa });
+const r = await launch({ width, height: 1080 }, { isa });
 try {
   await r.page.clock.setFixedTime(new Date('2026-10-04T10:00:00+09:00'));
   if (theme === 'light') {

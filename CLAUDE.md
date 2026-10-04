@@ -35,7 +35,8 @@ If `electron/engine/{runtime,rars.jar,classes}` exists, it is used first.
 - There is one edition only, the generic one. Do not add the name or assets of any school or institution, or wording that
   limits what the program is for (for example, presenting it as exercise material for a class). Names and marks come
   only from `brand` (`src/brand.ts`).
-- When you change the UI, take screenshots and look at them yourself.
+- When you change the UI, take screenshots at 1920x1080 and look at them yourself. Narrow windows are out of scope.
+- Windows only for now (macOS is postponed).
 - Documentation (README, release notes, and so on) is about this project only. Do not mention other repositories or earlier products.
 - There is no automatic CI. Keep verification minimal: core unit tests, screenshots, and a human check at review points.
 - Keep commits small, one purpose each. Push at the end of each stage.
