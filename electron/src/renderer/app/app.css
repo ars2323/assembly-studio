@@ -20,27 +20,42 @@
   /* Colours: every colour of the work screen is one of these (CLAUDE.md).
      The first screen's own block (below, "first screen") keeps its literals:
      it is drawn on the circuit board and does not follow the theme.
+     The theme is the board's: near-black grounds, white type and white light;
+     colour only where it means something (a field, a format, a value that
+     just changed, an error), and then dimmed to sit on the dark.
      The *-rgb tokens are "r, g, b" for rgba(var(--x-rgb), alpha).
      src/main/theme.ts repeats the three the window needs before the page
      has loaded (window and title bar background, caption symbols). */
-  --bg: #f5f7fa;            /* the window behind the panels */
-  --surface: #ffffff;       /* panels, title bar, dialogs */
-  --border: #e1e5ea; --hover: #f3f6f9;
-  --text: #1f2933; --text-2: #5a6472; --muted: #65707e; --dim: #a9b1bb;
+  color-scheme: dark;       /* scrollbars, form controls */
+  --bg: #0d0d0d;            /* the window behind the panels */
+  --surface: #141414;       /* panels, title bar, dialogs */
+  --border: #2a2a2a; --hover: #1f1f1f;
+  --text: #e6e6e6; --text-2: #a3a3a3; --muted: #8c8c8c; --dim: #5c5c5c;
   --text-2-glass: #4b5563;
-  --strong: #00205b;        /* headings, the active tab, names that matter */
-  --accent: #0055a5; --accent-hover: #004a90; --accent-rgb: 0, 85, 165;
-  --teal: #00a9a5; --gray: #bcbec0;
-  --accent-tint: #e8f0f9; --accent-tint2: #d3e2f3; --teal-tint: #e6f6f5; --teal-text: #00736f;
-  --amber-tint: #fdf3e1; --amber-text: #8a5a00; --purple: #6b4c9a; --cp0-tint: #eef0f2; --cp0-text: #4a5560;
-  --error: #c0392b; --error-hover: #a93226; --error-rgb: 192, 57, 43; --error-tint: #fbeae8; --error-text: #8e2a1f;
-  --changed: #fff1b8; --changed-bar: #e0a100; --changed-text: #6b4a00; --flash-rgb: 255, 200, 40;
-  --stack-tint: #f6f3fb; --stack-text: #4b3470; --stack-line: #e4dcf1;
-  --bit-bg: rgba(255, 255, 255, .55);
-  --f-opcode-bg: #dfe5ef; --f-shamt-bg: #efe9f6; --f-imm-bg: #e3eef0; --f-imm-text: #1d5c63;
-  --shadow-rgb: 0, 32, 91;  /* shadows */
-  --scrim-rgb: 0, 32, 91;   /* the tutorial's dimming and a dialog's backdrop (logic/overlay.ts reads it) */
-  --caption-symbol: #00205b; /* the system caption buttons' symbols on the title bar */
+  --strong: #ffffff;        /* headings, the active tab, names that matter */
+  --accent: #ffffff; --accent-hover: #262626; --accent-rgb: 255, 255, 255;
+  --accent-tint: #1f1f1f; --accent-tint2: #262626;
+  --glow: rgba(255, 255, 255, .35); /* the light a white mark gives off */
+  --icon-filter: invert(1); /* the icons are black line drawings */
+  --primary-bg: #1a1a1a; --primary-border: #ffffff; --primary-text: #ffffff; --primary-glow: rgba(255, 255, 255, .18);
+  --caret: #ffffff; --selection: #3a3a3a;
+  --teal: #5fb8b0; --gray: #4a4a4a;
+  --teal-tint: #12302d; --teal-text: #7fd1c9;
+  --amber-tint: #2e2610; --amber-text: #e3c06b; --purple: #b6a2e0; --cp0-tint: #1c1c1c; --cp0-text: #9a9a9a;
+  --blue-tint: #1a2638; --blue-text: #8fb6ec; --blue-pale: #c9d7ec; /* the R format, rs */
+  --error: #ff6b5b; --error-hover: #e05a4b; --error-rgb: 255, 107, 91; --error-tint: #2b1614; --error-text: #ff8f83;
+  --changed: #2e2610; --changed-bar: #e3c06b; --changed-text: #f2d48a; --flash-rgb: 227, 192, 107;
+  --changed-glow: rgba(227, 192, 107, .55);
+  --stack-tint: #1a1a1a; --stack-text: #bdbdbd; --stack-line: #333333;
+  --bit-bg: rgba(255, 255, 255, .06);
+  --f-opcode-bg: #1c2433; --f-shamt-bg: #241f33; --f-imm-bg: #12302d; --f-imm-text: #7fd1c9;
+  /* RISC-V: the immediate's scattered pieces (isa/riscv/renderer/riscv.css) */
+  --piece1-bg: #12302d; --piece1-text: #7fd1c9; --piece2-bg: #2e2610; --piece2-text: #e3c06b;
+  --piece3-bg: #241f33; --piece3-text: #c3b2ea; --piece4-bg: #1a2638; --piece4-text: #8fb6ec;
+  --ibox-bg: #161c1c;
+  --shadow-rgb: 0, 0, 0;    /* shadows */
+  --scrim-rgb: 0, 0, 0;     /* the tutorial's dimming and a dialog's backdrop (logic/overlay.ts reads it) */
+  --caption-symbol: #e6e6e6; /* the system caption buttons' symbols on the title bar */
   --ui: Pretendard, sans-serif; --code: D2Coding, monospace;
   --fs: 13px; --row: 22px; --rrow: 21px;
   --titlebar: 40px; --head: 34px;
@@ -100,9 +115,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--strong); font-weight: 500; white-space: nowrap; flex: none; }
 .btn:hover:not(:disabled) { background: var(--hover); }
 .btn img { width: 16px; height: 16px; opacity: .85; }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+img.icon { filter: var(--icon-filter); }
+.btn.primary { background: var(--primary-bg); border-color: var(--primary-border); color: var(--primary-text); box-shadow: 0 0 10px var(--primary-glow); }
 .btn.primary:hover:not(:disabled) { background: var(--accent-hover); }
-.btn.primary img { filter: invert(1); opacity: 1; }
+.btn.primary img { opacity: 1; }
 .btn:disabled { color: var(--gray); cursor: default; }
 .btn:disabled img { opacity: .35; }
 .btn kbd { font: 11px var(--code); color: inherit; opacity: .7; } /* F10 */
@@ -219,7 +235,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .edhost .cm-lineNumbers .cm-gutterElement { min-width: 40px; padding-right: 10px; }
 .edhost .cm-error-line { background: var(--error-tint); }
 /* The line being executed: blue, with a bar -- never the error's pink. */
-.edhost .cm-pc-line { background: var(--accent-tint2); box-shadow: inset 3px 0 0 var(--accent); }
+.edhost .cm-pc-line { background: var(--accent-tint2); box-shadow: inset 3px 0 0 var(--accent), inset 6px 0 8px -4px var(--glow); }
+.edhost .cm-cursor { border-left-color: var(--caret); }
+.edhost .cm-selectionBackground, .edhost .cm-focused .cm-selectionBackground { background: var(--selection) !important; }
+.edhost .cm-activeLine { background: transparent; }
 .cm-error-gutter { width: 18px; display: flex; align-items: center; }
 /* Breakpoints: a red dot in their own gutter, the leftmost; clicking sets or clears. */
 .cm-bp-gutter { width: 18px; cursor: pointer; }
@@ -231,7 +250,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .k-Comment { color: var(--muted); }
 .k-String { color: var(--amber-text); }
 .k-Directive { color: var(--purple); }
-.k-Instruction { color: var(--accent); font-weight: 700; }
+.k-Instruction { color: var(--strong); font-weight: 700; }
 .k-Register { color: var(--teal-text); }
 .k-LabelDefinition { color: var(--strong); font-weight: 700; }
 .k-Number { color: var(--purple); }
@@ -321,7 +340,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .trow .lno { color: var(--muted); text-align: right; }
 .trow .src { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; }
 .trow.band { box-shadow: inset 2px 0 0 var(--gray); }
-.trow.pc { background: var(--accent-tint2); border-left-color: var(--accent); }
+.trow.pc { background: var(--accent-tint2); border-left-color: var(--accent); box-shadow: inset 6px 0 8px -4px var(--glow); }
 .textpanel.quiet-pc .trow.pc:not(.sel) { background: none; border-left-color: transparent; } /* the tutorial's steps 8-9 */
 .trow.sel { background: var(--amber-tint); }
 .trow.sel .dis { color: var(--strong); font-weight: 700; }
@@ -329,11 +348,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .trow:hover .bp { box-shadow: inset 0 0 0 1.5px var(--error-tint), inset 0 0 0 12px rgba(var(--error-rgb), .18); }
 .trow.bp-on .bp { background: var(--error); box-shadow: none; }
 .badge { display: inline-flex; justify-content: center; min-width: 30px; height: 16px; line-height: 16px; border-radius: 4px; font: 700 11px var(--code); } /* CP0 */
-.b-R { background: var(--accent-tint); color: var(--accent); }
+.b-R { background: var(--blue-tint); color: var(--blue-text); }
 .b-I { background: var(--teal-tint); color: var(--teal-text); }
 .b-J { background: var(--amber-tint); color: var(--amber-text); }
 .b-CP0 { background: var(--cp0-tint); color: var(--cp0-text); }
-.b-FR, .b-FI { background: var(--accent-tint); color: var(--strong); }
+.b-FR, .b-FI { background: var(--blue-tint); color: var(--blue-pale); }
 .textpanel .fold { border-top: 1px dashed var(--border); }
 
 /* Data: Address | +0 | +4 | +8 | +C | ASCII | Labels (panels/data.ts) */
@@ -405,7 +424,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .rrow .tag { display: none; font: 600 10.5px var(--ui); color: var(--changed-text); background: var(--changed-bar); color: var(--surface); border-radius: 8px; padding: 0 6px; line-height: 16px; justify-self: start; }
 .rrow.zero .hex, .rrow.zero .dec, .rrow.zero .bin, .rrow.zero .rn { color: var(--dim); }
 .rrow.chg { background: var(--changed); border-left-color: var(--changed-bar); }
-.rrow.chg .hex { color: var(--changed-text); font-weight: 700; }
+.rrow.chg .hex { color: var(--changed-text); font-weight: 700; text-shadow: 0 0 6px var(--changed-glow); }
 .rrow.chg .dec, .rrow.chg .bin { color: var(--changed-text); }
 .rrow.chg .tag { display: inline-block; }
 .regs.hide-tag .rrow .tag, .regs.hide-dec .dec, .regs.hide-bin .bin { display: none !important; }
@@ -456,8 +475,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .fbits .bit { text-align: center; font-weight: 700; font-size: calc(var(--fs) + 2px); line-height: 26px; background: var(--bit-bg); border-radius: 3px; margin: 0 1px; }
 .fname { font: 700 12px var(--ui); text-align: center; margin-top: 3px; }
 .fmean { font-size: 11.5px; text-align: center; opacity: .9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 3px; }
-.f-opcode, .f-fmt { background: var(--f-opcode-bg); color: var(--strong); }
-.f-rs { background: var(--accent-tint); color: var(--accent); }
+.f-opcode, .f-fmt { background: var(--f-opcode-bg); color: var(--blue-pale); }
+.f-rs { background: var(--blue-tint); color: var(--blue-text); }
 .f-rt, .f-ft { background: var(--teal-tint); color: var(--teal-text); }
 .f-rd, .f-fs { background: var(--amber-tint); color: var(--amber-text); }
 .f-shamt, .f-fd { background: var(--f-shamt-bg); color: var(--purple); }
@@ -622,7 +641,7 @@ body.first-screen .status { color: rgba(255,255,255,.85); }
 
 /* ---- dialogs ------------------------------------------------------------ */
 .modal { width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto; padding: 20px 22px; border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 16px 48px rgba(var(--shadow-rgb), .20); color: var(--text); }
-.modal::backdrop { background: rgba(var(--scrim-rgb), .35); } /* logic/overlay.ts DIALOG_BACKDROP: the caption buttons' patch matches */
+.modal::backdrop { background: rgba(var(--scrim-rgb), .6); } /* logic/overlay.ts DIALOG_ALPHA: the caption buttons' patch matches */
 .modal.ask { width: min(480px, calc(100vw - 32px)); }
 .askbody { display: flex; gap: 18px; align-items: center; }
 .askbody img.char { flex: none; }
@@ -666,7 +685,7 @@ body.first-screen .status { color: rgba(255,255,255,.85); }
 .tut-dim { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 /* Dark but for the lit panels (clicks go through it); a clear layer over
    everything but the targets takes the clicks (tutorial.ts). */
-.tut-dim path.dim { fill: rgba(var(--scrim-rgb), .26); pointer-events: none; }
+.tut-dim path.dim { fill: rgba(var(--scrim-rgb), .55); pointer-events: none; }
 .tut-dim path.block { fill: transparent; pointer-events: visiblePainted; }
 .tut-ring { position: absolute; border: 2px solid var(--accent); border-radius: 6px; box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .18); pointer-events: none; }
 .tut-ring.tight { border-radius: 4px; box-shadow: none; }

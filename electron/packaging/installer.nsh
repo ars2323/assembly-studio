@@ -44,7 +44,7 @@
   FunctionEnd
 !macroend
 
-; The progress bar in the app's blue (#0055A5) on a pale track, not Windows'
+; The progress bar in the app's near-black (#1A1A1A) on a pale track, not Windows'
 ; green: the control takes colours only without its visual style, so that is
 ; taken off it first (SetWindowTheme), then PBM_SETBARCOLOR and
 ; PBM_SETBKCOLOR (COLORREF: 0x00BBGGRR).  1004 is the progress bar's id on
@@ -53,8 +53,8 @@
   FindWindow $0 "#32770" "" $HWNDPARENT
   GetDlgItem $0 $0 1004
   System::Call 'uxtheme::SetWindowTheme(p r0, w "", w "")'
-  SendMessage $0 0x409 0 0xA55500
-  SendMessage $0 0x2001 0 0xF5EEE8
+  SendMessage $0 0x409 0 0x1A1A1A
+  SendMessage $0 0x2001 0 0xE8E8E8
 !macroend
 
 ; The uninstaller, like the installer: its progress, then its finish page --
