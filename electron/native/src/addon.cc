@@ -20,8 +20,11 @@
 #include <unistd.h>  // _exit
 #endif
 
+#include <algorithm>
 #include <string>
 #include <vector>
+
+#include "backstep.h"
 
 // The core's headers have no include guards; each is included once, in the
 // order QtSpim/edu/edu_loader.cpp uses.
@@ -264,6 +267,8 @@ static void initializeStack() {
 static bool finished = false;
 static mem_addr stoppedAt = 0;
 
+static void forgetHistory();  // step back's records (below)
+
 // ------------------------------------------------------------ helpers
 
 static std::string bytesOf(const Napi::Value &value) {
@@ -345,6 +350,7 @@ static Napi::Value Assemble(const Napi::CallbackInfo &info) {
   inputWanted = false;
   finished = false;
   stoppedAt = 0;
+  forgetHistory();
   initializeWorld(bytesOf(info[1]));  // also deletes every breakpoint
   size_t handler_errors = errors.size();
   initializeStack();
@@ -370,7 +376,419 @@ static Napi::Value Assemble(const Napi::CallbackInfo &info) {
   return result;
 }
 
-// run(steps) -> why it stopped:
+// One run of the core, as QtSpim's Run and Single Step do it: at most
+// STEPS instructions, and why it stopped (Run() below lists the reasons).
+// errors() keeps what the core reported.
+static const char *runCore(int steps) {
+  bool stepOver = stoppedAt != 0 && stoppedAt == PC && inst_is_breakpoint(PC);
+  stoppedAt = 0;
+  force_break = false;
+  bool continuable = false;
+  bool atBreakpoint = run_program(PC, steps, false, stepOver, &continuable);
+
+  if (inputWanted) {
+    // Undo the syscall that found no input: it runs again later.
+    PC = inputPC;
+    R[REG_V0] = inputV0;
+    FPR[0] = inputF0;
+    inputWanted = false;
+    force_break = false;
+    return "input";
+  }
+  if (!continuable) {
+    finished = true;
+    return errors.empty() ? "exit" : "error";
+  }
+  if (atBreakpoint) {
+    stoppedAt = PC;
+    return "breakpoint";
+  }
+  return "limit";
+}
+
+static bool is(const char *reason, const char *what) { return strcmp(reason, what) == 0; }
+
+// ------------------------------------------------------------ step back
+//
+// The core keeps no history, so this front end does.  Before an
+// instruction runs, a record takes what it can change: every register
+// (general, HI, LO, PC, the coprocessors' -- CP0 and the FPU -- all
+// copied, it is cheap) and the old bytes of the memory it may write
+// (backstep.h storeSpan(): the stores, and the read syscalls' buffers).
+// backstep() puts the last record back.  The last HISTORY_LIMIT records
+// are kept (backstep::Ring).
+//
+// Step and the slow run record every instruction (run(n, "each")).
+//
+// A fast Run does not: run_spim() has no hook between two instructions,
+// and running it one instruction at a time changes what a run does (the
+// interrupts and the memory-mapped console are checked once per call) as
+// well as costing time.  Instead each slice (run(n, "slice")) starts with
+// a snapshot of the machine -- registers, the data, stack and kernel data
+// segments, the queued input -- and when the run stops, the end of it is
+// run again from a snapshot, the last HISTORY_LIMIT instructions one at a
+// time with records (rebuild()).  The machine must then come out exactly
+// as the run left it (but for CP0 Count, which follows the wall clock);
+// if it does not -- a program driven by the timer or by interrupts -- the
+// run's end is put back as it was and there is no history.  What the
+// program printed is printed once: the second run's output is dropped.
+//
+// Not recorded, so not undone: console output already printed and input
+// already read (a step back over a read syscall restores its registers and
+// buffer; the line stays read), and the memory-mapped console's device
+// state.  With delayed loads on there is no history at all: the core keeps
+// a load in flight in run_spim()'s own statics.
+static const size_t HISTORY_LIMIT = 1000;
+
+// Everything an instruction can change in the registers.
+struct RegisterFile {
+  reg_word r[R_LENGTH];
+  reg_word hi, lo;
+  mem_addr pc, npc;
+  reg_word ccr[4][32], cpr[4][32];
+  int fwr[FGR_LENGTH];
+};
+
+static void saveRegisters(RegisterFile &f) {
+  memcpy(f.r, R, sizeof f.r);
+  f.hi = HI;
+  f.lo = LO;
+  f.pc = PC;
+  f.npc = nPC;
+  memcpy(f.ccr, CCR, sizeof f.ccr);
+  memcpy(f.cpr, CPR, sizeof f.cpr);
+  memcpy(f.fwr, FWR, sizeof f.fwr);
+}
+
+static void loadRegisters(const RegisterFile &f) {
+  memcpy(R, f.r, sizeof f.r);
+  HI = f.hi;
+  LO = f.lo;
+  PC = f.pc;
+  nPC = f.npc;
+  memcpy(CCR, f.ccr, sizeof f.ccr);
+  memcpy(CPR, f.cpr, sizeof f.cpr);
+  memcpy(FWR, f.fwr, sizeof f.fwr);
+}
+
+// Equal but for CP0 Count, which the core bumps by the wall clock.
+static bool sameRegisters(const RegisterFile &a, const RegisterFile &b) {
+  RegisterFile x = b;
+  x.cpr[0][CP0_Count_Reg] = a.cpr[0][CP0_Count_Reg];
+  return memcmp(&a, &x, sizeof a) == 0;
+}
+
+// Old bytes of memory.  `had[i]` is 0 where the byte was not mapped yet (a
+// store below the stack grows it): put back as 0, the new memory's value.
+// A text word (self-modifying code) is kept as its encoding.
+struct Patch {
+  mem_addr addr;
+  bool text;
+  std::string old;
+  std::string had;
+};
+
+struct Record {
+  RegisterFile regs;
+  std::vector<Patch> patches;
+  bool io;  // a syscall that printed or read: its output and input stay
+};
+
+static backstep::Ring<Record> history(HISTORY_LIMIT);
+
+static bool inText(mem_addr addr);
+static bool readable(mem_addr addr, uint32_t bytes);
+
+static bool inTextRange(mem_addr addr) {
+  return (addr >= TEXT_BOT && addr < text_top) || (addr >= K_TEXT_BOT && addr < k_text_top);
+}
+
+// The instruction word at ADDR, the student's under a breakpoint.
+static bool wordAt(mem_addr addr, uint32_t *word) {
+  if (!inText(addr)) return false;
+  bool breakpoint = inst_is_breakpoint(addr);
+  if (breakpoint) delete_breakpoint(addr);
+  instruction *inst = read_mem_inst(addr);
+  if (inst != NULL) *word = (uint32_t)(ENCODING(inst) != 0 ? ENCODING(inst) : inst_encode(inst));
+  if (breakpoint) add_breakpoint(addr);
+  return inst != NULL;
+}
+
+static void savePatch(Record &rec, mem_addr addr, uint32_t size) {
+  if (inTextRange(addr)) {
+    for (mem_addr w = addr & ~3u; w < addr + size && inTextRange(w); w += 4) {
+      uint32_t word = 0;
+      bool there = wordAt(w, &word);
+      rec.patches.push_back({w, true, std::string((const char *)&word, 4), std::string(1, there ? 1 : 0)});
+    }
+    return;
+  }
+  Patch p{addr, false, std::string(size, '\0'), std::string(size, '\0')};
+  for (uint32_t i = 0; i < size; i++) {
+    if (readable(addr + i, 1)) {
+      p.old[i] = (char)read_mem_byte(addr + i);
+      p.had[i] = 1;
+    }
+  }
+  rec.patches.push_back(std::move(p));
+}
+
+static void restorePatch(const Patch &p) {
+  if (p.text) {
+    uint32_t old, now = 0;
+    memcpy(&old, p.old.data(), 4);
+    if (p.had[0] && inText(p.addr) && !inst_is_breakpoint(p.addr) && wordAt(p.addr, &now) && now != old) {
+      set_mem_word(p.addr, old);  // the core's own path for a store into text
+    }
+    return;
+  }
+  for (uint32_t i = 0; i < p.old.size(); i++) {
+    if (readable(p.addr + i, 1)) set_mem_byte(p.addr + i, p.had[i] ? (uint8_t)p.old[i] : 0);
+  }
+}
+
+// Takes what the instruction at PC can change: before it runs.
+static void record(Record &rec) {
+  saveRegisters(rec.regs);
+  rec.patches.clear();
+  rec.io = false;
+  // The instruction at PC; with delayed branches also the one after it,
+  // which a branch runs in the same step; with an interrupt pending, the
+  // handler's first instruction, which then runs instead.  Saving bytes an
+  // instruction does not write costs nothing: putting them back changes
+  // nothing.
+  mem_addr at[3];
+  int n = 0;
+  at[n++] = PC;
+  if (delayed_branches) at[n++] = PC + BYTES_PER_WORD;
+  if ((CP0_Status & CP0_Status_IE) && !(CP0_Status & CP0_Status_EXL) &&
+      ((CP0_Cause & CP0_Cause_IP) & (CP0_Status & CP0_Status_IM))) {
+    at[n++] = EXCEPTION_ADDR;
+  }
+  for (int k = 0; k < n; k++) {
+    uint32_t word;
+    if (!wordAt(at[k], &word)) continue;
+    backstep::Span span;
+    if (backstep::storeSpan(word, (const int32_t *)R, &span)) savePatch(rec, span.addr, span.size);
+    if (k == 0) rec.io = backstep::isIoSyscall(word, (const int32_t *)R);
+  }
+}
+
+static bool historyPossible() { return !delayed_loads; }
+
+// One instruction, recorded.  Nothing is recorded for what did not run: a
+// breakpoint reached (its instruction runs at the next step) or a read
+// syscall that found no input.
+static const char *recordedStep() {
+  if (!historyPossible()) {
+    history.clear();
+    return runCore(1);
+  }
+  Record &rec = history.next();
+  mem_addr before = PC;
+  record(rec);
+  const char *reason = runCore(1);
+  bool ran = !is(reason, "input") && !(is(reason, "breakpoint") && PC == before);
+  if (ran) history.commit();
+  return reason;
+}
+
+// ---- the end of a fast run, again
+
+struct Snapshot {
+  bool valid = false;
+  RegisterFile regs;
+  mem_addr dataTop = 0, stackBot = 0, kDataTop = 0;
+  std::string data, stack, kdata, input;
+  std::vector<instruction *> text, ktext;  // to see a program that rewrote its code
+  mem_addr stoppedAt = 0;
+  bool finished = false;
+  bool historyCurrent = false;  // `history` leads up to this machine
+  long steps = 0;               // the slice from here ran this many (to its limit)
+};
+
+static Snapshot sliceA, sliceB, runEnd;
+static Snapshot *current = &sliceA;   // the last slice's start
+static Snapshot *previous = &sliceB;  // the slice before it, when that one ran to its limit
+static bool tailPending = false;      // the last slice ran to its limit; its end has no history yet
+
+static void take(Snapshot &s) {
+  s.valid = true;
+  saveRegisters(s.regs);
+  s.dataTop = data_top;
+  s.stackBot = stack_bot;
+  s.kDataTop = k_data_top;
+  s.data.assign((const char *)data_seg_b, data_top - DATA_BOT);
+  s.stack.assign((const char *)stack_seg_b, STACK_TOP - stack_bot);
+  s.kdata.assign((const char *)k_data_seg_b, k_data_top - K_DATA_BOT);
+  s.input = inputBytes;
+  s.text.assign(text_seg, text_seg + (text_top - TEXT_BOT) / BYTES_PER_WORD);
+  s.ktext.assign(k_text_seg, k_text_seg + (k_text_top - K_TEXT_BOT) / BYTES_PER_WORD);
+  s.stoppedAt = stoppedAt;
+  s.finished = finished;
+}
+
+static bool sameText(const Snapshot &s) {
+  return s.text.size() == (text_top - TEXT_BOT) / BYTES_PER_WORD &&
+         s.ktext.size() == (k_text_top - K_TEXT_BOT) / BYTES_PER_WORD &&
+         std::equal(s.text.begin(), s.text.end(), text_seg) &&
+         std::equal(s.ktext.begin(), s.ktext.end(), k_text_seg);
+}
+
+// The machine back as S has it.  The data segment's top comes down (the
+// core's sbrk grows it again from there) or goes up; a stack that grew
+// since keeps its size, the part S did not have zeroed, as new stack is.
+static bool put(const Snapshot &s) {
+  if (!s.valid || k_data_top != s.kDataTop || !sameText(s)) return false;
+  if (data_top < s.dataTop) expand_data(s.dataTop - data_top);
+  if (stack_bot > s.stackBot) expand_stack(stack_bot - s.stackBot);
+  if (data_top < s.dataTop || stack_bot > s.stackBot) return false;
+  loadRegisters(s.regs);
+  data_top = s.dataTop;
+  memcpy(data_seg_b, s.data.data(), s.data.size());
+  memset(stack_seg_b, 0, s.stackBot - stack_bot);
+  memcpy(stack_seg_b + (s.stackBot - stack_bot), s.stack.data(), s.stack.size());
+  memcpy(k_data_seg_b, s.kdata.data(), s.kdata.size());
+  inputBytes = s.input;
+  stoppedAt = s.stoppedAt;
+  finished = s.finished;
+  inputWanted = false;
+  force_break = false;
+  errors.clear();
+  return true;
+}
+
+static bool matches(const Snapshot &s) {
+  RegisterFile now;
+  saveRegisters(now);
+  return sameRegisters(s.regs, now) && data_top == s.dataTop && stack_bot == s.stackBot &&
+         k_data_top == s.kDataTop && memcmp(data_seg_b, s.data.data(), s.data.size()) == 0 &&
+         memcmp(stack_seg_b, s.stack.data(), s.stack.size()) == 0 &&
+         memcmp(k_data_seg_b, s.kdata.data(), s.kdata.size()) == 0 && inputBytes == s.input &&
+         stoppedAt == s.stoppedAt && finished == s.finished && sameText(s);
+}
+
+static const int PROBE_CHUNK = 64;  // the first pass finds the stop to within this many
+
+// Runs the end of the run again from a snapshot, recording its last
+// HISTORY_LIMIT instructions.  END is why the run stopped; KNOWN how many
+// instructions the last slice ran when it ran to its limit (-1: it stopped
+// on the way, somewhere this finds).  Whether it came out the same is
+// rebuild()'s to check.
+static bool replay(const char *end, long known) {
+  const long N = (long)HISTORY_LIMIT;
+  long k = known;
+  if (k < 0) {
+    // Where in the slice it stopped, to within PROBE_CHUNK, running fast.
+    if (!put(*current)) return false;
+    k = 0;
+    for (;;) {
+      const char *r = runCore(PROBE_CHUNK);
+      if (!is(r, "limit")) break;
+      k += PROBE_CHUNK;
+      if (k > current->steps) return false;
+    }
+  }
+  // From where, and how far fast, so that the steps recorded cover the
+  // last N.
+  const Snapshot *from = current;
+  long fast = 0;
+  bool keep = false;
+  if (k >= N) fast = k - N;
+  else if (current->historyCurrent) keep = true;
+  else if (previous->valid) {
+    from = previous;
+    fast = std::max(0L, previous->steps + k - N);
+  }
+  if (!put(*from)) return false;
+  if (!keep) history.clear();
+  if (fast > 0 && !is(runCore((int)fast), "limit")) return false;
+  long before = from == previous ? previous->steps : 0;
+  if (known >= 0) {
+    for (long i = before + known - fast; i > 0; i--) {
+      if (!is(recordedStep(), "limit")) return false;
+    }
+    return is(end, "limit");
+  }
+  for (long i = before + k + PROBE_CHUNK + 1 - fast; i > 0; i--) {
+    const char *r = recordedStep();
+    if (!is(r, "limit")) return is(r, end);
+  }
+  return false;
+}
+
+// After a fast run stopped: its last instructions recorded, the machine as
+// the run left it either way.
+static void rebuild(const char *end, long known) {
+  if (!sameText(*current) || (previous->valid && !sameText(*previous))) {
+    history.clear();  // the program rewrote its code: its end cannot be run again
+    return;
+  }
+  take(runEnd);
+  std::string console = consoleBytes;
+  std::vector<std::string> said = errors;
+  bool same = replay(end, known) && matches(runEnd);
+  if (same) {
+    CP0_Count = runEnd.regs.cpr[0][CP0_Count_Reg];
+  } else {
+    history.clear();
+    if (!put(runEnd)) {
+      // Only if the replay rewrote the program's code; the registers at
+      // least are the run's.
+      loadRegisters(runEnd.regs);
+    }
+    finished = runEnd.finished;
+    stoppedAt = runEnd.stoppedAt;
+  }
+  consoleBytes = console;
+  errors = said;
+  inputWanted = false;
+  force_break = false;
+}
+
+static void forgetSlices() {
+  tailPending = false;
+  sliceA.valid = sliceB.valid = false;
+}
+
+static void forgetHistory() {
+  history.clear();
+  forgetSlices();
+}
+
+// A fast run's slice: a snapshot, then the core at full speed.
+static const char *runSlice(int steps) {
+  if (!historyPossible() || mapped_io) {
+    // Delayed loads: no history.  The memory-mapped console's device
+    // state cannot be put back, so its end cannot be run again.
+    history.clear();
+    forgetSlices();
+    return runCore(steps);
+  }
+  std::swap(current, previous);
+  previous->valid = previous->valid && tailPending;
+  take(*current);
+  current->historyCurrent = !tailPending;
+  current->steps = steps;
+  tailPending = false;
+  const char *reason = runCore(steps);
+  if (is(reason, "limit")) {
+    tailPending = true;
+    history.clear();  // older than this slice: no longer the last steps
+    return reason;
+  }
+  rebuild(reason, -1);
+  return reason;
+}
+
+// After a run stopped between two slices (the user's stop).
+static void settleHistory() {
+  if (!tailPending) return;
+  tailPending = false;
+  rebuild("limit", current->steps);
+}
+
+// run(steps[, history]) -> why it stopped:
 //   "exit"        the program ended (syscall exit)
 //   "error"       the core reported a run-time error and cannot go on
 //   "breakpoint"  PC is at a breakpoint, not yet executed
@@ -379,43 +797,108 @@ static Napi::Value Assemble(const Napi::CallbackInfo &info) {
 //   "limit"       `steps` instructions ran; more to run
 // A user's stop is not here: it happens between runs (src/sim/worker.ts).
 //
+// history  "off" (the default): no record, and the history is dropped;
+//          "each": every instruction recorded (Step);
+//          "slice": a slice of a fast Run, its end recorded when it stops
+//          (settleHistory() after a stop between two slices).
+//
 // The first run after a load, or after the program ended, sets PC to the
 // start address and rebuilds the stack (SpimView::initializePCAndStack()).
 static Napi::Value Run(const Napi::CallbackInfo &info) {
   Napi::Env env = info.Env();
-  if (info.Length() < 1 || !info[0].IsNumber()) return throwType(env, "run(steps)");
+  const char *usage = "run(steps[, 'off' | 'each' | 'slice'])";
+  if (info.Length() < 1 || !info[0].IsNumber()) return throwType(env, usage);
   int steps = info[0].As<Napi::Number>().Int32Value();
+  std::string mode = info.Length() > 1 && info[1].IsString() ? info[1].As<Napi::String>().Utf8Value() : "off";
+  if (mode != "off" && mode != "each" && mode != "slice") return throwType(env, usage);
   if (PC == 0 || finished) {
     PC = starting_address();
     initializeStack();
     finished = false;
+    history.clear();
+    forgetSlices();
   }
-  bool stepOver = stoppedAt != 0 && stoppedAt == PC && inst_is_breakpoint(PC);
-  stoppedAt = 0;
   errors.clear();
-  force_break = false;
-  bool continuable = false;
-  bool atBreakpoint = run_program(PC, steps, false, stepOver, &continuable);
-
-  const char *reason;
-  if (inputWanted) {
-    // Undo the syscall that found no input: it runs again later.
-    PC = inputPC;
-    R[REG_V0] = inputV0;
-    FPR[0] = inputF0;
-    inputWanted = false;
-    force_break = false;
-    reason = "input";
-  } else if (!continuable) {
-    reason = errors.empty() ? "exit" : "error";
-    finished = true;
-  } else if (atBreakpoint) {
-    reason = "breakpoint";
-    stoppedAt = PC;
+  if (mode == "slice") return Napi::String::New(env, runSlice(steps));
+  forgetSlices();
+  const char *reason = "limit";
+  if (mode == "off") {
+    history.clear();
+    reason = runCore(steps);
   } else {
-    reason = "limit";
+    for (int i = 0; i < steps; i++) {
+      reason = recordedStep();
+      if (!is(reason, "limit")) break;
+    }
   }
   return Napi::String::New(env, reason);
+}
+
+// settleHistory(): after a fast run was stopped between two slices, its
+// last instructions recorded (and the machine as the run left it).
+static Napi::Value SettleHistory(const Napi::CallbackInfo &info) {
+  settleHistory();
+  return info.Env().Undefined();
+}
+
+// backstep() -> { undone, io }: the last recorded instruction undone --
+// registers and memory as they were before it.  `io`: it was a syscall
+// that printed or read, whose output and input stay.
+static Napi::Value Backstep(const Napi::CallbackInfo &info) {
+  Napi::Env env = info.Env();
+  settleHistory();
+  Napi::Object result = Napi::Object::New(env);
+  if (history.empty()) {
+    result["undone"] = false;
+    result["io"] = false;
+    return result;
+  }
+  const Record &rec = history.last();
+  for (auto p = rec.patches.rbegin(); p != rec.patches.rend(); ++p) restorePatch(*p);
+  loadRegisters(rec.regs);
+  result["undone"] = true;
+  result["io"] = rec.io;
+  history.pop();
+  forgetSlices();
+  finished = false;
+  inputWanted = false;
+  force_break = false;
+  errors.clear();
+  // Back on a breakpoint's instruction: the next run or step runs it (as
+  // after stopping there) instead of stopping again.
+  stoppedAt = inText(PC) && inst_is_breakpoint(PC) ? PC : 0;
+  return result;
+}
+
+// history() -> { depth, limit, possible }: how many instructions step back
+// can undo now, at most `limit`; `possible` is false with delayed loads.
+static Napi::Value History(const Napi::CallbackInfo &info) {
+  Napi::Env env = info.Env();
+  Napi::Object result = Napi::Object::New(env);
+  result["depth"] = Napi::Number::New(env, (double)(tailPending ? 0 : history.size()));
+  result["limit"] = Napi::Number::New(env, (double)HISTORY_LIMIT);
+  result["possible"] = historyPossible();
+  return result;
+}
+
+// storeSpans(word, registers[32]) -> [{ addr, size }]: what the
+// instruction `word` may write with these registers (backstep.h), for the
+// tests.
+static Napi::Value StoreSpans(const Napi::CallbackInfo &info) {
+  Napi::Env env = info.Env();
+  if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsArray()) return throwType(env, "storeSpans(word, registers[32])");
+  Napi::Array regs = info[1].As<Napi::Array>();
+  int32_t r[32] = {0};
+  for (uint32_t i = 0; i < 32 && i < regs.Length(); i++) r[i] = (int32_t)regs.Get(i).As<Napi::Number>().Int64Value();
+  backstep::Span span;
+  Napi::Array out = Napi::Array::New(env);
+  if (backstep::storeSpan(info[0].As<Napi::Number>().Uint32Value(), r, &span)) {
+    Napi::Object o = Napi::Object::New(env);
+    o["addr"] = Napi::Number::New(env, span.addr);
+    o["size"] = Napi::Number::New(env, span.size);
+    out[0u] = o;
+  }
+  return out;
 }
 
 // provideInput(bytes): queue console input (a line typed ends with '\n').
@@ -650,6 +1133,10 @@ static Napi::Object Init(Napi::Env env, Napi::Object exports) {
   console_out.i = 2;
   exports["assemble"] = Napi::Function::New(env, Assemble);
   exports["run"] = Napi::Function::New(env, Run);
+  exports["settleHistory"] = Napi::Function::New(env, SettleHistory);
+  exports["backstep"] = Napi::Function::New(env, Backstep);
+  exports["history"] = Napi::Function::New(env, History);
+  exports["storeSpans"] = Napi::Function::New(env, StoreSpans);
   exports["consoleOutput"] = Napi::Function::New(env, ConsoleOutput);
   exports["provideInput"] = Napi::Function::New(env, ProvideInput);
   exports["setBreakpoint"] = Napi::Function::New(env, SetBreakpoint);
