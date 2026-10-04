@@ -29,6 +29,7 @@
 
 import { defaultKeymap, history, historyKeymap, indentLess, indentMore, insertNewline } from '@codemirror/commands';
 import { indentUnit } from '@codemirror/language';
+import { commentChanges } from './logic/comment.ts';
 import { Compartment, EditorSelection, EditorState, RangeSet, RangeSetBuilder, StateEffect, StateField, type Extension } from '@codemirror/state';
 import {
   Decoration, type DecorationSet, EditorView, gutter, GutterMarker, keymap, lineNumbers,
@@ -166,6 +167,15 @@ function tab(view: EditorView): boolean {
   return true;
 }
 
+/* Ctrl+/ (Cmd+/ as well): the comment mark on or off (logic/comment.ts).
+   One dispatch, so the whole block is one step of the undo history and the
+   selection is mapped through it.  The key is always taken. */
+function toggleComment(view: EditorView): boolean {
+  const spec = commentChanges(view.state);
+  if (spec) view.dispatch(spec);
+  return true;
+}
+
 // ---- the line being executed ---------------------------------------------------------
 
 // The source line of PC, from the Text panel's line column (the core's own
@@ -231,6 +241,8 @@ export function createEditor(parent: HTMLElement, tokenize: Tokenize, onSave: ()
         lineNumbers(), errorGutter, history(), highlighter(tokenize), errorField, errorDecorations,
         pcField, pcDecorations, indentUnit.of('    '),
         keymap.of([{ key: 'Tab', run: tab, shift: indentLess }, { key: 'Enter', run: insertNewline },
+          // Mod is Ctrl here and Cmd on a Mac; Ctrl works there too.
+          { key: 'Mod-/', run: toggleComment }, { key: 'Ctrl-/', run: toggleComment },
           ...historyKeymap, ...defaultKeymap]),
         EditorView.updateListener.of((u) => { if (u.docChanged) onChange(); }),
         EditorView.domEventHandlers({

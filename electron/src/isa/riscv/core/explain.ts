@@ -1,8 +1,8 @@
 /* One sentence that says what an instruction does, with the values it will
    use -- the Inspector's line under the picture.  Pure: it takes the
    decoded word and the register values *before* the instruction runs.
-   RV32I and the M and F instructions the course meets, in all six
-   formats.  Branches, jumps and auipc also
+   The engine runs RV32IMFD (+ Zicsr); these are the I, M and F
+   instructions the course meets, in all six formats.  Branches, jumps and auipc also
    need the instruction's own address (pc): their target is relative to it.
 
    Code -- register names, numbers taken from the machine -- is wrapped in

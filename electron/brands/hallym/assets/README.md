@@ -22,7 +22,7 @@ product of Hallym University.
   only their file names were changed to ASCII (to keep Korean file names out
   of packaging and URLs). They are not recompressed, resized or recoloured.
   Where the screen shows them smaller, only CSS scales them.
-- The app's teal (the Qt edition's token `#00A9A5`) is almost Hari's colour
+- The app's former teal (`#00A9A5`) is almost Hari's colour
   (`#00ADA9`), so **no character is placed on a teal surface**; characters
   stand only on white or light grey.
 - Characters appear only where there is nothing else (an empty panel, the
@@ -31,8 +31,8 @@ product of Hallym University.
   colour carries meaning.
 - Nothing is written on the board held in `sign.png`; the message goes beside
   the character.
-- The first screen's video runs behind the card, blurred and under navy; the
-  character stands on the card's opaque white, never on the video.
+- The first screen is the program's own drawing (a circuit board and a
+  card); no character stands on it.
 
 ## Files
 
@@ -71,15 +71,11 @@ product of Hallym University.
 | emblem-a-navy.svg | Emblem A (navy) |
 | logotype-ko-en.svg | Korean-English logotype |
 | signature-h-ko-en.svg | Korean-English horizontal signature |
-| symbol-basic.svg | The symbol (basic form): the logo on the window's top bar. Byte for byte the Qt edition's `QtSpim/edu/theme/brand/symbol-basic.svg` |
+| symbol-basic.svg | The symbol (basic form): the logo on the window's top bar and the first screen's card |
 
 ### The first screen's background
 
-There is no asset for it any more. The first screen's background was a clip
-of the university's promotional video until 2.7.1; from 2.8.0 the program
-draws it (`electron/src/renderer/startfield/`), so there is no video, no
-still and nothing of the campus in the installer. What the clip was, and
-what replaced it, is in `electron/docs/PORTING.md`.
+None of these assets: the program draws it (`electron/src/renderer/startfield/`).
 
 ## Where they come from
 
@@ -90,18 +86,15 @@ what replaced it, is in `electron/docs/PORTING.md`.
   sharing). The rules above come from that manual. The PDF is not an asset
   of the app and is not in the repository.
 - `logo.zip` (sha256 `67e499e5…67985f07`) holds ten original `.ai` files
-  (A1–A4) and `.jpg` previews. These `.ai` files are **byte for byte the
-  same** as the Qt edition's `assets/ci/A1`–`A4` (at the repository root).
-  The SVGs in `marks/` are the ones the Qt edition made from the same
-  originals (Qt edition commit `0d7eb5c`: .ai → PDF (Ghostscript,
-  `-dEPSCrop`) → SVG (pdftocairo); each mark cropped to its coloured pixels
-  and only the dimension guides removed; colours, proportions and elements
-  unchanged).
+  (A1–A4) and `.jpg` previews. The SVGs in `marks/` were made from those
+  originals: .ai → PDF (Ghostscript, `-dEPSCrop`) → SVG (pdftocairo); each
+  mark cropped to its coloured pixels and only the dimension guides removed;
+  colours, proportions and elements unchanged.
 - Received 2026-09-24. The zips were unpacked and deleted.
 
-## The application icon — `packaging/icons/`
+## The application icon — `brands/hallym/packaging/icons/`
 
 The installed program's executable, shortcut and window icon. It is made from
-the Hallym University symbol, and everything above applies to it. It is a byte
-for byte copy of the Qt edition's `QtSpim/edu/theme/brand/` `app-16.png` …
-`app-256.png` and `HallymMIPS.ico`. It is not redrawn, resized or recoloured.
+the Hallym University symbol, and everything above applies to it
+(`app-16.png` … `app-256.png`, `app.ico`). It is not redrawn, resized or
+recoloured.

@@ -107,6 +107,59 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
       title,
       h('div', { class: 'wbody' }, actions, back)));
 
+  /* The column centred by what can be SEEN, not by its boxes.  The flex
+     column centres the boxes, and a box can hold nothing visible: on the first
+     step the way back ("← 처음으로", visibility: hidden, 14 + 18 px) is under
+     the buttons, so the boxes were centred and the ink sat 15.6 px high --
+     72 px above it and 103 below inside the die frame at 1920x1080, 1.43 : 1.
+     And the mark is a picture: its own transparent margin is part of its box.  So: the
+     ink's top and bottom -- the mark's from its alpha, the name's and the two
+     buttons' from their boxes -- measured inside the column, and the column
+     moved by what puts their middle on the die frame's.  Measured relative to
+     the column itself, so the move already made does not enter it.  The way
+     back is left out on both steps, and a step does not centre again: counted
+     when it shows, the second step moved everything up 15 px, and measured
+     again at the step, 1 px (rounding); the screen keeps its shape from one
+     step to the other.  The steps hold the same
+     ink -- the mark, the name, two buttons of one height -- so the move made
+     for the first is the second's (the ISA step too). */
+  const stack = card.firstElementChild as HTMLElement;
+  const logo = stack.querySelector<HTMLImageElement>('.wlogo')!;
+  let logoInk: { top: number; bottom: number } | null = null;   // fractions of the mark's height
+  const measureLogo = (): void => {
+    if (!logo.complete || logo.naturalWidth === 0) return;
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = Math.max(1, Math.round(256 * logo.naturalHeight / logo.naturalWidth));
+    const g = c.getContext('2d');
+    if (!g) return;
+    g.drawImage(logo, 0, 0, c.width, c.height);
+    const a = g.getImageData(0, 0, c.width, c.height).data;
+    let top = -1, bottom = -1;
+    for (let y = 0; y < c.height; y++) {
+      for (let x = 0; x < c.width; x++) if (a[(y * c.width + x) * 4 + 3] > 8) { if (top < 0) top = y; bottom = y + 1; break; }
+    }
+    if (top >= 0) logoInk = { top: top / c.height, bottom: bottom / c.height };
+  };
+  const centre = (): void => {
+    const box = stack.getBoundingClientRect();
+    if (box.height === 0) return;                              // not on the screen
+    let top = Infinity, bottom = -Infinity;
+    const ink = (t: number, b: number): void => { top = Math.min(top, t - box.top); bottom = Math.max(bottom, b - box.top); };
+    const l = logo.getBoundingClientRect();
+    ink(l.top + l.height * (logoInk?.top ?? 0), l.top + l.height * (logoInk?.bottom ?? 1));
+    for (const el of [title, ...actions.children] as HTMLElement[]) {
+      const cs = getComputedStyle(el);
+      if (cs.visibility === 'hidden' || cs.display === 'none') continue;
+      const r = el.getBoundingClientRect();
+      if (r.height > 0) ink(r.top, r.bottom);
+    }
+    if (top === Infinity) return;
+    stack.style.setProperty('--ink-shift', `${Math.round(box.height / 2 - (top + bottom) / 2)}px`);
+  };
+  logo.addEventListener('load', () => { measureLogo(); centre(); });
+  void document.fonts?.ready.then(centre);
+  new ResizeObserver(centre).observe(stack);
+
   /* The light, put on the elements as custom properties every frame of the
      board's clock.  Which element is which is by its place, not by its
      words: the first choice is always the one being pushed. */

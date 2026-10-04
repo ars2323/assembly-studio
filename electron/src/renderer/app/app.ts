@@ -346,9 +346,13 @@ const asmRoom = (): number => Math.max(ASM_LEAST, paneEditor.clientHeight - edit
 
 function layout(): void {
   stageWelcome.hidden = open;
-  document.body.classList.toggle('first-screen', !open); // its bars over the photo (app.css), the caption patch (updateOverlay)
-  firstScreen.show(!open); // the video plays on the first screen only
+  document.body.classList.toggle('first-screen', !open); // its bars over the board (app.css), the caption patch (updateOverlay)
   split.hidden = !open;
+  /* After the two stages have been shown and hidden, never before: showing
+     the first screen measures the card to put the board's pins on it, and
+     with the Editor side still laid out the card stands somewhere else
+     (coming back from the tutorial, the board kept a hole above the card). */
+  firstScreen.show(!open);
   viewSwitch.hidden = !open || !narrow;
   split.classList.toggle('narrow', narrow);
   split.dataset.view = view;

@@ -546,7 +546,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
    every window size.  The three gaps between the four blocks are named here,
    where the column is, rather than spread over the blocks themselves. */
 .wstack { position: absolute; inset: 18px; display: flex; flex-direction: column; justify-content: center; align-items: center;
-  --gap-name: 14px; --gap-ways: 40px; --gap-between: 12px; }
+  --gap-name: 14px; --gap-ways: 40px; --gap-between: 12px;
+  transform: translateY(var(--ink-shift, 0px)); } /* what is seen centred, not the boxes (panels/welcome.ts) */
 /* The mark, large, in its own colours: the university's rules forbid
    recolouring it. */
 .wlogo { height: 60px; width: auto; margin: 0 auto; }
