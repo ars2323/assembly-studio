@@ -496,7 +496,7 @@ export const MIPS = {
       ko: '노란 줄은 방금 실행한 명령이 바꾼 레지스터입니다. `add $t3, $t1, $t2` 가 5 + 7 = 12 를 `$t3` 에 넣었습니다. '
         + '아래 상태 표시줄의 Changed: 칸에도 나옵니다. 다음 줄을 실행하면 노란 표시는 그 줄이 바꾼 레지스터로 옮겨 갑니다.',
       en: 'The yellow row is the register the instruction that just ran changed: `add $t3, $t1, $t2` put 5 + 7 = 12 in `$t3`. '
-        + 'The status bar below says Changed: `$t3` too. Run the next line and the yellow moves to the register that line changes.',
+        + 'The status bar below shows it under Changed: too. Run the next line and the yellow moves to the register that line changes.',
     },
   },
   store: {
