@@ -129,7 +129,12 @@ body {
   /* Korean sentences break between words (어절), never inside one; only a
      piece of code too long for a whole line breaks anywhere. */
   word-break: keep-all;
+  /* Nothing on the screen is selected or dragged by a stray drag: only the
+     Editor's text and what is typed into a box are (below). */
+  user-select: none; -webkit-user-select: none;
 }
+img, svg, canvas { -webkit-user-drag: none; user-drag: none; }
+.cm-editor .cm-content, .cm-editor .cm-line, input, textarea, [contenteditable="true"] { user-select: text; -webkit-user-select: text; }
 .mono { overflow-wrap: anywhere; }
 button { font: inherit; color: inherit; cursor: pointer; }
 .mono { font-family: var(--code); }
