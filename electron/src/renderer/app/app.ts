@@ -556,6 +556,12 @@ let advanced: Advanced = defaultAdvanced();
 let applied: Advanced = defaultAdvanced();
 
 const about = aboutDialog();
+// The Data tab's radix: from Settings or from the tab's own Hex · Dec · Bin (panels/data.ts).
+async function setDataBase(base: 2 | 10 | 16): Promise<void> {
+  settings = await api.setSettings({ ...settings, dataBase: base });
+  if (text.tab === 'data') void refreshData();
+}
+text.data.onBase = (base) => void setDataBase(base);
 const settingsBox = settingsDialog({
   fontSize: () => settings.fontSize,
   setFontSize: async (px) => {
@@ -564,10 +570,7 @@ const settingsBox = settingsDialog({
     return settings.fontSize;
   },
   dataBase: () => settings.dataBase,
-  setDataBase: async (base) => {
-    settings = await api.setSettings({ ...settings, dataBase: base });
-    if (text.tab === 'data') void refreshData();
-  },
+  setDataBase: (base) => setDataBase(base),
   advanced: () => advanced,
   setAdvanced: (a) => { advanced = a; renderStatus(); },
   pickHandler: () => api.openHandler(),
