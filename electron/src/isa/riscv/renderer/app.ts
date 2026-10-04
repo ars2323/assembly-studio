@@ -522,7 +522,7 @@ function renderAssemble(): void {
     : errors.length ? errorList({
       errors: errors.map((e) => {
         const source = sourceOf(e.line);
-        return { line: e.line, message: e.message, source, hint: source ? rarsHint(e.message, source) : '' };
+        return { line: e.line, message: e.message, source, hint: source ? rarsHint(e.message, source, currentLang()) : '' };
       }),
       at: failedAt, kept: machineShown(), narrow, goTo: (n) => goToErrorLine(n), toEditor: () => showView('editor'),
     })
