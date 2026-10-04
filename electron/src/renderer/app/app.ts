@@ -1424,6 +1424,7 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'F5') { e.preventDefault(); void runOrStop(); return; }
   if (e.key === 'F10') { e.preventDefault(); void step(); return; }
   if (e.key === 'Escape') {
+    if ((e.target as HTMLElement).closest?.('input, textarea')) return; // a box's own Esc (the Registers alias)
     if (runState === 'running') { e.preventDefault(); void stop(); }
     else if (selected >= 0) { clearSelection(); renderStatus(); }
     return;
