@@ -1,7 +1,7 @@
 /* The colour of the window's caption buttons (Windows draws them, over a
    patch the page cannot paint: titleBarOverlay) on the first screen and
    while the page is covered.
-   The tutorial dims the window with the scrim colour at 55 %; a dialog's
+   The tutorial dims the window with the scrim colour at 60 %; a dialog's
    backdrop is the scrim at 60 %; both at once, one over the other.  The
    patch is given the colour the title bar takes under the same layers, so it
    does not stand out as a square at the top right.  The colours are the
@@ -9,7 +9,7 @@
 
 export type Rgb = [number, number, number];
 
-export const TUTORIAL_ALPHA = 0.55; // app.css .tut-dim
+export const TUTORIAL_ALPHA = 0.6;  // app.css .tut-dim path.dim
 export const DIALOG_ALPHA = 0.6;   // app.css .modal::backdrop
 
 export function composite(base: Rgb, layers: { color: Rgb; alpha: number }[]): Rgb {
