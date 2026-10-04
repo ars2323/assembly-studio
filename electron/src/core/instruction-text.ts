@@ -186,8 +186,8 @@ export function instructionDetailLines(d: DecodedInstruction, address: number, d
 export function instructionNoteLines(d: DecodedInstruction, convention: BranchConvention): string[] {
   if (d.hasDestination && d.kind === 'Branch' && convention === 'SpimNoDelaySlot') {
     return [
-      '이 시뮬레이터의 기본 모드는 지연 분기가 없어 PC 기준으로 인코딩합니다. '
-        + '교재의 MIPS(PC+4 기준)와 offset 값이 1 다릅니다.',
+      '이 시뮬레이터의 기본 모드는 Delayed branch가 없어 Offset을 PC 기준으로 인코딩합니다. '
+        + '교재의 MIPS(PC+4 기준)보다 Offset이 1 큽니다.',
       "This simulator's default mode has no delayed branches and encodes from PC. "
         + 'Textbook MIPS encodes from PC+4, so its offset is 1 less.',
     ];
