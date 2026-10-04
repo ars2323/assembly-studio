@@ -111,14 +111,16 @@ pre-releases either: `release.yml` builds every installer from them.
 - **Text and Data.** The **Text** tab lists the assembled instructions: address, machine code, format and the source
   line. The **Data** tab shows the data and the stack in memory. **Hex**, **Dec** and **Bin** in the Data tab's header
   choose the radix of the values.
-- **Inspector.** Splits one instruction into its 32-bit fields and shows each field's name, value and meaning (the
-  explanation is in the language you chose). Click an instruction in the Text tab to keep the Inspector on it; **Follow PC** (or
+- **Inspector.** Splits one instruction into its 32 bits, grouped into its fields, each with its name and meaning,
+  and says what the instruction does in the same way for every use of it: the fields by name with this instruction's
+  register or number, for example "rt (`$a0`) … shamt (`2`) … rd (`$v0`)" (in the language you chose). Click an instruction in the Text tab to keep the Inspector on it; **Follow PC** (or
   `Esc`) makes it follow the current instruction again.
 - **Console.** The program's output, and the box for its input.
 - **Light and dark.** The sun/moon switch at the bottom right (on the first screen, the card's bottom-right corner).
 - **Language.** The KO/EN switch beside it (on the first screen, the card's bottom-left corner), or Settings ›
-  **Language**: Korean or English for the first screen, the tutorial, the instruction explanations, the dialogs and
-  the tutorial's example comments. The panels, buttons and status line are in English in both. It starts in the
+  **Language**: Korean or English for the first screen, the tutorial, the instruction explanations, the assembler's
+  errors and hints, the dialogs and the tutorial's example comments. The panels, buttons, the Assemble panel's state
+  and the status line are in English in both. It starts in the
   system's language (Korean on a Korean system, English otherwise).
 - **Resizing.** Drag the border between two panels to resize them. Double-click a border to return to the default size.
 - **Settings.** The gear button in the toolbar:
