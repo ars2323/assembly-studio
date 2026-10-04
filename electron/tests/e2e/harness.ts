@@ -66,6 +66,17 @@ export async function resize(r: { app: ElectronApplication; page: Page }, size: 
   await r.page.waitForFunction((s) => Math.abs(window.innerWidth - s.width) <= 1 && Math.abs(window.innerHeight - s.height) <= 1, size);
 }
 
+// The window's language (renderer/app/i18n.ts), as its KO/EN switch sets it:
+// <html lang>, kept for the run, and every part of the page told.
+export async function setLang(page: Page, lang: 'ko' | 'en'): Promise<void> {
+  await page.evaluate((l) => {
+    if (document.documentElement.lang === l) return;
+    document.documentElement.lang = l;
+    try { sessionStorage.setItem('studio-lang', l); } catch { /* none */ }
+    window.dispatchEvent(new CustomEvent('langchange', { detail: l }));
+  }, lang);
+}
+
 // The next save dialog answers `file`; the next open dialog answers `file`.
 export async function answerSave(app: ElectronApplication, file: string): Promise<void> {
   await app.evaluate(({ dialog }, f) => {
@@ -91,7 +102,7 @@ export async function openOnly(r: Running, file: string): Promise<void> {
   await r.page.keyboard.press('Control+o');
   // Unsaved text first: the window asks (its own dialog); go on without it.
   const ask = r.page.locator('dialog.ask');
-  await ask.waitFor({ timeout: 300 }).then(() => ask.getByRole('button', { name: '버리고 계속' }).click(), () => {});
+  await ask.waitFor({ timeout: 300 }).then(() => ask.getByRole('button', { name: /버리고 계속|Discard and continue/ }).click(), () => {});
   await r.page.waitForSelector('.editor-panel .cm-content');
   await r.page.waitForFunction(() => document.querySelector('.cm-content')?.textContent !== '');
 }

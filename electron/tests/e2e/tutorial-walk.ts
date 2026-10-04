@@ -3,21 +3,24 @@
    each card: something is pointed at, a click reaches every target, the
    card covers none of them.
 
-     xvfb-run -a -s '-screen 0 2400x1400x24' node tests/e2e/tutorial-walk.ts <out-dir> [--isa mips|riscv] [--width 1280] [--theme dark|light]
+     xvfb-run -a -s '-screen 0 2400x1400x24' node tests/e2e/tutorial-walk.ts <out-dir> [--isa mips|riscv] [--width 1280] [--theme dark|light] [--lang ko|en]
 
-   (node tools/build-ui.ts first.)  Writes <isa>-<theme>-<width>-<nn>-<id>[-done|-phase2|...].png
+   (node tools/build-ui.ts first.)  --lang: chosen with the first screen's KO/EN
+   switch (Korean by default).  Writes <isa>-<theme>-<width>-<lang>-<nn>-<id>[-done|-phase2|...].png
    and prints one line per card; the problems last (exit 1 if any). */
 
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 
-import { launch, setSpeed } from './harness.ts';
+import { launch, setLang, setSpeed } from './harness.ts';
+import { WELCOME } from '../../src/renderer/app/messages/welcome.ts';
 
 const args = process.argv.slice(2);
 const opt = (name: string, def: string) => { const i = args.indexOf(`--${name}`); return i >= 0 ? args.splice(i, 2)[1] : def; };
 const isa = opt('isa', 'mips') as 'mips' | 'riscv';
 const width = Number(opt('width', '1280'));
 const theme = opt('theme', 'dark');
+const lang = opt('lang', 'ko') as 'ko' | 'en';
 const out = path.resolve(args[0] ?? 'build/tutorial');
 mkdirSync(out, { recursive: true });
 
@@ -52,7 +55,7 @@ const intersects = (a: Rect, b: Rect) => a.left < b.right && b.left < a.right &&
 async function capture(suffix = ''): Promise<State> {
   await settle();
   const s = await state();
-  const name = `${isa}-${theme}-${width}-${String(s.index + 1).padStart(2, '0')}-${s.id}${suffix}`;
+  const name = `${isa}-${theme}-${width}-${lang}-${String(s.index + 1).padStart(2, '0')}-${s.id}${suffix}`;
   await page.screenshot({ path: path.join(out, `${name}.png`) });
   const where = `${name}`;
   if (s.kind !== 'end' && s.shown.targets.length === 0) problems.push(`${where}: nothing pointed at`);
@@ -64,11 +67,22 @@ async function capture(suffix = ''): Promise<State> {
     });
     if (card.left < 0 || card.top < 0 || card.right > width || card.bottom > 800) problems.push(`${where}: the card is off the window`);
   }
+  // In English, nothing on the screen in Korean (the card, the Inspector, the example's comments...).
+  if (lang === 'en') {
+    const hangul = await page.evaluate(() => (document.body.innerText.match(/[^\n]*[가-힣][^\n]*/g) ?? []).slice(0, 3));
+    if (hangul.length) problems.push(`${where}: Korean on the screen: ${hangul.join(' | ')}`);
+  }
   console.log(`${where}  [${s.shown.targets.length} targets${s.shown.did.length ? `; ${s.shown.did.join(', ')}` : ''}]  ${s.title}`);
   return s;
 }
 
 const key = (k: string) => page.keyboard.press(k);
+// The screen as it is, in the other language (not checked: a look only).
+async function captureOther(): Promise<void> {
+  await settle();
+  const s = await state();
+  await page.screenshot({ path: path.join(out, `${isa}-${theme}-${width}-${lang}-${String(s.index + 1).padStart(2, '0')}-${s.id}-other-language.png`) });
+}
 
 try {
   if (theme === 'light') {
@@ -77,9 +91,13 @@ try {
   // The first screen: the card, the ISA, the tutorial.
   await page.locator('.wcard').click();
   await page.waitForTimeout(900);
+  // The language, by the switch in the card's bottom-left corner.
+  const langNow = () => page.evaluate(() => document.documentElement.lang);
+  if (await langNow() !== lang) await page.locator('.wlang .lang-switch').click();
+  if (await langNow() !== lang) throw new Error(`the KO/EN switch did not set ${lang}`);
   await page.getByRole('button', { name: isa === 'mips' ? 'MIPS' : 'RISC-V', exact: true }).click();
   await page.waitForTimeout(700);
-  await page.getByRole('button', { name: '튜토리얼 보기' }).click();
+  await page.getByRole('button', { name: WELCOME.tutorial[lang] }).click();
   await page.waitForSelector('.tut-card');
   await page.mouse.move(2, 790);
 
@@ -91,6 +109,12 @@ try {
       break;
     }
     if (s.kind === 'explain') {
+      if (s.id === 'inspector') {
+        // The other language, live: the card and the Inspector's explanation say it again in it, and back.
+        await setLang(page, lang === 'en' ? 'ko' : 'en');
+        await captureOther();
+        await setLang(page, lang);
+      }
       if (s.id === 'theme') {
         // The switch works under the tutorial: the other theme, captured, and back.
         await page.locator('.status .theme-switch').click();
@@ -157,7 +181,7 @@ try {
     }
   }
   const after = await state();
-  if (after.active) problems.push('the tutorial is still on after 끝내기');
+  if (after.active) problems.push('the tutorial is still on after Finish');
 } finally {
   await r.close().catch((e: Error) => problems.push(e.message));
 }
