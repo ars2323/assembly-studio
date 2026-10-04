@@ -1,19 +1,19 @@
-# 실행 이미지 형식 (.asx) — 버전 1
+# Executable image format (.asx) — version 1
 
-어셈블된 프로그램을 **메모리 그대로** 적은 텍스트 파일이다: 명령 워드, 데이터 바이트, 시작
-주소, 라벨. 어셈블러 없이 MIPS 나 RISC-V 코드를 실행하는 프로그램이 읽는다. 목적 파일이
-아니다: 링크하거나 재배치할 것이 없다.
+An `.asx` file is a text file that holds an assembled program **exactly as it sits in memory**: instruction words,
+data bytes, the start address and the labels. It is meant for programs that run MIPS or RISC-V code without an
+assembler. It is not an object file: there is nothing to link or relocate.
 
-앱의 툴바 **Export executable image (.asx)** 가 만든다. 두 ISA 모두에서, 파일이 열려 있으면
-보이고 프로그램이 어셈블된 뒤에 눌린다. 이미지는 **마지막으로 어셈블한 프로그램**의 것이다
-(그 뒤에 편집기가 바뀌었어도). 쓰는 쪽은 `electron/src/core/asx.ts` 이고, 이 문서가 기준이다.
+The app's toolbar button **Export executable image (.asx)** writes it. In both ISAs the button is shown while a file
+is open and works once the program has been assembled. The image is of the **program assembled last** (even if the
+editor has changed since). The writer is `electron/src/core/asx.ts`; this document is the reference.
 
-## 1. 예
+## 1. Example
 
 ```
 ASX 1
 isa           riscv
-source        lab04-ok.s
+source        sum.s
 source-sha256 b96f3bf3bde4b725229f8bc5e0153d950c325a7b4b51dc27150c765d1ab8083a
 produced-by   Assembly Studio 1.0.0
 assembled     2026-10-04T16:27+09:00
@@ -36,93 +36,95 @@ f0f0f2b7
 00 00 00 00
 ```
 
-## 2. 파일
+## 2. File
 
-- UTF-8, 줄 끝 LF, 마지막 줄도 LF 로 끝난다.
-- 빈 줄은 무리를 나눌 뿐 뜻이 없다. 읽는 쪽은 건너뛴다.
-- 수는 모두 부호 없는 32비트. 주소와 레지스터 값은 `0x` 와 소문자 hex 8자리.
-- **키-값 줄**: 키, 공백 하나 이상, 값(줄 끝까지, 공백이 들어갈 수 있다). 키는 한 단어이거나
-  `reg <이름>`, `symbol <이름>` 처럼 두 단어다. 쓰는 쪽은 키를 13칸으로 맞추지만(길면 공백
-  하나) 읽는 쪽은 칸 수에 기대지 않는다.
+- UTF-8, LF line endings; the last line also ends with LF.
+- Blank lines only separate groups and carry no meaning. A reader skips them.
+- All numbers are unsigned 32-bit. Addresses and register values are `0x` followed by 8 lowercase hex digits.
+- **Key-value lines**: a key, one or more spaces, then the value (to the end of the line; it may contain spaces).
+  A key is one word, or two words such as `reg <name>` and `symbol <name>`. The writer pads keys to 13 columns
+  (one space if longer), but a reader must not depend on the column count.
 
-## 3. 머리
+## 3. Header
 
-순서가 정해져 있다.
+The order is fixed.
 
-| 줄 | 값 |
+| Line | Value |
 |---|---|
-| `ASX 1` | 마법 문자열과 버전. 첫 줄. 다르면 읽지 않는다 |
-| `isa` | `mips` 또는 `riscv` |
-| `source` | 원본 파일 이름(경로 없이). 저장한 적 없으면 `untitled.s` |
-| `source-sha256` | 어셈블한 원본의 SHA-256(소문자 hex 64자리). **파일에 적힌 그대로**(인코딩, BOM, 줄 끝)의 바이트. 저장한 파일을 그대로 어셈블했으면 그 파일의 SHA-256 과 같다. 새 파일은 UTF-8, BOM 없음, LF 로 친다 |
-| `produced-by` | 앱 이름과 버전 |
-| `assembled` | 어셈블한 때. 분까지의 지역 시각과 UTC 오프셋: `2026-10-04T16:27+09:00` |
-| `endian` | `little` 또는 `big`: 워드를 메모리에 놓는 바이트 순서 |
-| `entry` | 실행을 시작할 PC |
-| `reg <이름>` | 어셈블 직후 레지스터 값. 스택 포인터, 전역 포인터 순 (§6) |
-| `symbol <이름>` | 라벨과 주소. 0개 이상, 주소 순, 같은 주소는 이름 순. 없으면 그 무리와 뒤의 빈 줄이 없다 |
+| `ASX 1` | Magic string and version. The first line. If it differs, do not read the file |
+| `isa` | `mips` or `riscv` |
+| `source` | Source file name (no path). `untitled.s` if it was never saved |
+| `source-sha256` | SHA-256 of the assembled source (64 lowercase hex digits), over the bytes **as written in the file** (encoding, BOM, line endings). If a saved file was assembled as it is, this equals that file's SHA-256. A new file counts as UTF-8, no BOM, LF |
+| `produced-by` | App name and version |
+| `assembled` | When it was assembled: local time to the minute with the UTC offset, e.g. `2026-10-04T16:27+09:00` |
+| `endian` | `little` or `big`: the byte order in which words are placed in memory |
+| `entry` | The PC where execution starts |
+| `reg <name>` | Register values right after assembly: stack pointer, then global pointer (§6) |
+| `symbol <name>` | A label and its address. Zero or more, ordered by address, then by name for equal addresses. If there are none, the group and the blank line after it are absent |
 
 ## 4. `.text`
 
 ```
-.text <주소> words <n>
+.text <address> words <n>
 ```
 
-뒤로 줄마다 하나:
+Followed by one item per line:
 
-- `xxxxxxxx` — 워드 하나, 소문자 hex 8자리. **워드의 값**(명령 인코딩)이지 메모리의 바이트 순서가
-  아니다. i 번째 워드(0부터)는 `<주소> + 4i` 에 `endian` 순서로 놓는다.
-- `zero <k>` — 0 인 워드 k 개. 쓰는 쪽은 4개(16바이트) 이상 이어진 0 만 이렇게 쓰고, 더 짧은
-  것은 `00000000` 줄로 쓴다.
+- `xxxxxxxx` — one word, 8 lowercase hex digits. This is **the word's value** (the instruction encoding), not
+  the byte order in memory. Word i (from 0) goes at `<address> + 4i`, in `endian` order.
+- `zero <k>` — k zero words. The writer uses this only for runs of 4 or more zero words (16 bytes); shorter runs
+  are written as `00000000` lines.
 
-워드 수(`zero` 포함)의 합이 `n` 이다. `.text` 는 늘 있다(명령이 없는 프로그램은 이미지가 없다).
+The total number of words (including `zero`) is `n`. `.text` is always present (a program with no instructions has
+no image).
 
 ## 5. `.data`
 
 ```
-.data <주소> bytes <n>
+.data <address> bytes <n>
 ```
 
-데이터가 없으면 이 무리가 통째로 없다. 뒤로 줄마다 하나:
+If there is no data, the whole group is absent. Followed by one item per line:
 
-- `bb bb …` — 바이트 1–16개, 소문자 hex 2자리씩 공백으로 나눔. **메모리 주소 순**이다(바이트
-  순서가 이미 반영돼 있다: `.word 1` 은 little 이면 `01 00 00 00`).
-- `zero <k>` — 0 인 바이트 k 개. 16개 이상 이어진 0 만 이렇게 쓴다.
+- `bb bb …` — 1 to 16 bytes, 2 lowercase hex digits each, separated by spaces. They are **in memory address order**
+  (byte order is already applied: `.word 1` is `01 00 00 00` on a little-endian machine).
+- `zero <k>` — k zero bytes. Used only for runs of 16 or more zero bytes.
 
-바이트 수의 합이 `n` 이다.
+The total number of bytes is `n`.
 
-`.text` 와 `.data` 밖의 메모리(스택, 힙, 커널)는 이미지에 없다. 읽는 쪽은 0 으로 둔다.
+Memory outside `.text` and `.data` (stack, heap, kernel) is not in the image. A reader sets it to 0.
 
-## 6. ISA 별
+## 6. Per ISA
 
 ### MIPS (SPIM)
 
-| 항목 | 내용 |
+| Item | Content |
 |---|---|
-| `.text` | 사용자 텍스트 세그먼트의 첫 워드부터 마지막 워드까지. `0x00400000` 의 시작 코드(`__start`, 예외 처리기 파일의 것)를 포함하고 커널 텍스트는 뺀다. `.text <주소>` 가 남긴 틈은 0 |
-| `.data` | 어셈블러가 첫 데이터를 놓은 곳부터 다음 데이터가 갈 곳까지(끝의 `.space` 포함). 사용자 데이터 세그먼트에 0 이 아닌 바이트가 그 밖에 있으면 워드 경계로 넓힌다. 커널 데이터는 뺀다 |
-| `entry` | `main` 의 주소. 예외 처리기 없이 자기 `__start` 를 가진 프로그램은 `__start` |
-| `reg` | `$sp`, `$gp` (`$sp` 는 argc 를 가리킨다) |
-| `endian` | `$sp` 의 argc 가 메모리에 놓인 순서로 정한다(코어가 도는 기계의 순서, 보통 `little`) |
-| `symbol` | 프로그램 자신의 라벨(전역, 지역), 사용자 텍스트·데이터에 있는 것. 예외 처리기의 라벨(`__start`, `__eoth`, 커널 라벨)은 뺀다 |
+| `.text` | From the first to the last word of the user text segment. Includes the startup code at `0x00400000` (`__start`, from the exception handler file) and excludes kernel text. Gaps left by `.text <address>` are 0 |
+| `.data` | From where the assembler placed the first data to where the next data would go (including a trailing `.space`). If the user data segment has non-zero bytes outside that range, the range is widened to a word boundary. Kernel data is excluded |
+| `entry` | The address of `main`. For a program with its own `__start` and no exception handler, `__start` |
+| `reg` | `$sp`, `$gp` (`$sp` points to argc) |
+| `endian` | Taken from the order in which argc at `$sp` is laid out in memory (the order of the machine the core runs on, usually `little`) |
+| `symbol` | The program's own labels (global and local) in user text and data. Labels of the exception handler (`__start`, `__eoth`, kernel labels) are excluded |
 
-### RISC-V (RARS 1.6, 기본 메모리 구성)
+### RISC-V (RARS 1.6, default memory configuration)
 
-| 항목 | 내용 |
+| Item | Content |
 |---|---|
-| `.text` | 어셈블된 명령 워드. `entry` 와 첫 명령 중 낮은 쪽부터 마지막 명령까지, 틈은 0. 의사명령은 펼쳐진 기본 명령들로 들어간다. RARS 는 `.text` 에 데이터 지시어를 받지 않으므로 모든 워드가 명령이다 |
-| `.data` | `.data` 의 기준 주소 `0x10010000` 부터 다음 데이터가 갈 곳까지(끝의 `.space` 포함). 데이터 라벨(`.extern` 은 `0x10000000` 부터)과, `0x10000000`–`0x10040000`(힙 시작) 사이와 라벨이 닿는 곳의 0 이 아닌 바이트까지 넓힌다(워드 경계로 맞추지 않는다) |
-| `entry` | `0x00400000`, 텍스트 세그먼트의 시작. 앱의 엔진은 RARS 의 "start at main" 설정을 끈 채 어셈블하므로 RARS 도 여기서 시작한다. `main` 라벨(전역이든 아니든)은 시작 주소를 바꾸지 않는다: 첫 명령이 맨 앞에 있어야 한다 |
-| `reg` | `sp`(x2) = `0x7fffeffc`, `gp`(x3) = `0x10008000`. 엔진에서 읽은 값이다 |
-| `endian` | `little`. RARS 의 메모리는 늘 리틀 엔디안이고, 읽는 쪽이 알려진 워드를 써 보고 확인한다 |
-| `symbol` | RARS 심벌 표의 라벨 전부(지역, 전역, `.extern`). RARS 에는 시작 코드가 없으므로 모두 프로그램의 것이다 |
+| `.text` | The assembled instruction words, from the lower of `entry` and the first instruction to the last instruction; gaps are 0. Pseudo-instructions appear as the basic instructions they expand to. RARS does not accept data directives in `.text`, so every word is an instruction |
+| `.data` | From the `.data` base address `0x10010000` to where the next data would go (including a trailing `.space`). Widened to cover data labels (`.extern` starts at `0x10000000`) and non-zero bytes between `0x10000000` and `0x10040000` (the start of the heap) and wherever labels reach (not aligned to a word boundary) |
+| `entry` | `0x00400000`, the start of the text segment. The app's engine assembles with RARS's "start at main" setting off, so RARS also starts here. A `main` label (global or not) does not change the start address: the first instruction must come first |
+| `reg` | `sp` (x2) = `0x7fffeffc`, `gp` (x3) = `0x10008000`. Values read from the engine |
+| `endian` | `little`. RARS memory is always little-endian; the exporter confirms it by having the engine write a known word and reading it back |
+| `symbol` | Every label in the RARS symbol table (local, global, `.extern`). RARS has no startup code, so they all belong to the program |
 
-"다음 데이터가 갈 곳"은 엔진이 알려 주지 않는다. 앱은 프로그램 뒤에 `.data` 와 라벨 하나
-(`__asx_data_end:`)를 붙여 엔진의 두 번째 인스턴스에서 어셈블하고 그 라벨의 주소를 읽는다.
-`.data` 는 사용자 데이터 세그먼트를 멈춘 곳에서 잇는다. 그 라벨은 이미지의 `symbol` 에 들어가지
-않는다. 프로그램에 같은 이름의 라벨이 있으면 붙이지 않고, 그러면 끝의 `.space` 중 라벨도 0 이
-아닌 바이트도 없는 부분은 빠진다.
+"Where the next data would go" is not reported by the engine. The app appends `.data` and one label
+(`__asx_data_end:`) to the program, assembles it in a second engine instance, and reads that label's address.
+The appended `.data` continues where the user data segment stopped. That label does not appear among the image's
+`symbol` lines. If the program already has a label with that name, nothing is appended; in that case the part of a
+trailing `.space` that has neither a label nor a non-zero byte is left out.
 
-## 7. 버전
+## 7. Versions
 
-`ASX` 뒤의 수가 버전이다. 지금은 **1**. 줄의 뜻이나 순서를 바꾸거나 줄을 더하면 올린다.
+The number after `ASX` is the version, currently **1**. It goes up whenever a line's meaning or order changes, or a
+line is added.
