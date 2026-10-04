@@ -20,7 +20,7 @@ export function aboutDialog(engine: (info: AboutInfo) => (string | Node)[] = () 
       if (i === 0) {
         body.replaceChildren(
           h('div', { class: 'about-id' }, markImg('about-mark'),
-            h('div', {}, h('div', { class: 'about-name' }, brand.name), h('div', { class: 'about-ver' }, 'Version ', code(info.version)))),
+            h('div', {}, h('div', { class: 'about-name' }, brand.name), h('div', { class: 'about-ver' }, 'Version ', code(info.version)), h('div', { class: 'about-by' }, 'Made by ', brand.author))),
           h('p', {}, ...engine(info)),
           h('p', { class: 'hint' }, brand.about),
           h('p', { class: 'hint' }, 'Electron ', code(info.electron), ' · Chromium ', code(info.chrome), ' · Node.js ', code(info.node)));
