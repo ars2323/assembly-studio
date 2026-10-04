@@ -55,6 +55,9 @@ const printable = (c: number) => (c >= 0x20 && c <= 0x7e ? String.fromCharCode(c
 const offsetName = (n: number) => `+${n.toString(16).toUpperCase()}`;
 const size = (bytes: number) => (bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toLocaleString(undefined, { maximumFractionDigits: 1 })} KB`);
 
+const RADIX = { 16: 'Hex', 10: 'Dec', 2: 'Bin' } as const;
+const RADIX_NAME = { 16: 'hexadecimal', 10: 'decimal', 2: 'binary' } as const;
+
 export class DataView {
   readonly root: HTMLElement;
   private folded = new Set<DataSection['kind']>(['kernel']);
@@ -62,9 +65,19 @@ export class DataView {
   private forceAscii = false;
   private base: 2 | 10 | 16 = 16;
   onToggles: (buttons: HTMLElement[]) => void = () => {};
+  // The radix chosen in the tab's head (Settings has the same choice): app.ts stores it and shows the tab again.
+  onBase: (base: 2 | 10 | 16) => void = () => {};
+  // Hex · Dec · Bin in the tab's head, one of the three (the Registers' boxes' look, as radios).
+  private readonly radix: HTMLElement;
 
   constructor() {
     this.root = h('div', { class: 'pbody data' });
+    this.radix = h('span', { class: 'colboxes', role: 'radiogroup', 'aria-label': 'Data radix' },
+      ...([16, 10, 2] as const).map((b) => {
+        const input = h('input', { type: 'radio', name: 'data-radix', 'aria-label': RADIX[b] });
+        input.addEventListener('change', () => { if (input.checked) this.onBase(b); });
+        return h('label', { class: 'colbox radio', 'data-base': String(b), title: `Show the words in ${RADIX_NAME[b]}` }, input, h('span', {}, RADIX[b]));
+      }));
     new ResizeObserver(() => this.fit()).observe(this.root);
     // A word and its four characters light up together.
     this.root.addEventListener('pointerover', (e) => this.hover(e, true));
@@ -88,7 +101,12 @@ export class DataView {
     this.root.dataset.style = f.style.name;
     this.root.classList.toggle('hide-ascii', f.hidden.has('ascii'));
     const auto = fit(width, columns, [['ascii']], new Set(), ch, all).hidden.has('ascii');
-    this.onToggles(auto ? [columnButton('ASCII', this.forceAscii, () => { this.forceAscii = !this.forceAscii; this.fit(); })] : []);
+    for (const label of this.radix.querySelectorAll<HTMLElement>('label')) {
+      const on = Number(label.dataset.base) === this.base;
+      label.classList.toggle('on', on);
+      (label.querySelector('input') as HTMLInputElement).checked = on;
+    }
+    this.onToggles([this.radix, ...(auto ? [columnButton('ASCII', this.forceAscii, () => { this.forceAscii = !this.forceAscii; this.fit(); })] : [])]);
   }
 
   private columns(): Column[] {

@@ -655,6 +655,9 @@ img.icon { filter: var(--icon-filter); }
 .colbox input { appearance: none; display: grid; place-content: center; width: 11px; height: 11px; margin: 0; border: 1px solid var(--muted); border-radius: 3px; background: none; cursor: inherit; }
 .colbox input::before { content: ''; width: 5px; height: 2.5px; border-left: 1.5px solid var(--surface); border-bottom: 1.5px solid var(--surface); transform: translateY(-.5px) rotate(-45deg); visibility: hidden; }
 .colbox input:checked { background: var(--strong); border-color: var(--strong); }
+/* The Data tab's radix: the same boxes as radios, one of three (panels/data.ts). */
+.colbox.radio input { border-radius: 50%; }
+.colbox.radio input::before { width: 5px; height: 5px; border: 0; border-radius: 50%; background: var(--surface); transform: none; }
 .colbox input:checked::before { visibility: visible; }
 .colbox input:disabled { opacity: .6; }
 .colbox:has(input:focus-visible) { outline: 2px solid var(--strong); outline-offset: 1px; }
