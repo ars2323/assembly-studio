@@ -5,7 +5,7 @@
    start: start.png; mips: work-mips.png and errors.png; riscv:
    work-riscv-light.png; tutorial: tutorial.png (after node tools/build-ui.ts). */
 
-import { launch, openAndAssemble, sample, settled, textRow } from './harness.ts';
+import { launch, openAndAssemble, program, sample, settled, textRow } from './harness.ts';
 const out = process.argv[2]; const which = process.argv[3];
 const size = { width: 1920, height: 1080 };
 const setTheme = async (p: any, t: string) => { await p.evaluate((t: string) => { document.documentElement.dataset.theme = t; window.dispatchEvent(new CustomEvent('themechange', { detail: t })); }, t); await p.waitForTimeout(700); };
@@ -21,7 +21,10 @@ if (which === 'start') {
     await (await textRow(p, '0x00400054')).locator('.dis').click();
     await p.mouse.move(0, 0); await p.waitForTimeout(400);
     await p.screenshot({ path: `${out}/work-mips.png` });
-    await openAndAssemble(r, sample(r.dir, 'tests/samples/syntax-error-midfile.s', 'errors.s'));
+    // A short program with one typo: the error, its hint and Go to line.
+    await openAndAssemble(r, program(r.dir, 'errors.s', [
+      '# Adds 5 to itself and ends.', '        .text', '        .globl main', 'main:',
+      '        li      $t0, 5', '        addd    $t1, $t0, $t0', '        li      $v0, 10', '        syscall', ''].join('\n')));
     await p.waitForTimeout(500);
     await p.screenshot({ path: `${out}/errors.png` });
   } finally { await r.close(); }
