@@ -7,7 +7,7 @@
 
    The result goes to native/build/Release/spim.node, where `npm run build`
    puts the Node build.  Either one loads in both: the addon uses N-API
-   only, whose ABI does not change with Node's (docs/ARCHITECTURE.md 4).
+   only, whose ABI does not change with Node's.
 */
 
 import { execFileSync } from 'node:child_process';

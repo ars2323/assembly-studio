@@ -64,11 +64,12 @@ export const version: string = bundled
 
 /* The notices About shows, in order: title, and the file in the source tree.
    tools/package.ts copies each into licenses/ under the same key, and puts
-   LICENSE and NOTICE next to the executable as well (BSD: the notice goes
-   with the binary). */
+   LICENSE.txt and NOTICE.txt next to the executable as well (BSD: the
+   notice goes with the binary). */
 export const LICENSES: { name: string; title: string }[] = [
   { name: 'LICENSE', title: 'Assembly Studio — BSD 3-Clause License' },
-  { name: 'NOTICE', title: 'NOTICE — SPIM, RARS, Java runtime, Electron, fonts, icons' },
+  { name: 'NOTICE', title: 'NOTICE — every third-party component (engines, Java runtime, Electron, fonts, icons, npm packages, build tools)' },
+  { name: 'Temurin-GPLv2-CE.txt', title: 'Eclipse Temurin (OpenJDK) 21 — GPL v2 with the Classpath Exception' },
   { name: 'OFL-Pretendard.txt', title: 'Pretendard — SIL Open Font License 1.1' },
   { name: 'OFL-D2Coding.txt', title: 'D2Coding — SIL Open Font License 1.1' },
   { name: 'lucide-LICENSE.txt', title: 'Lucide icons — ISC License' },
@@ -80,6 +81,7 @@ export const LICENSES: { name: string; title: string }[] = [
 export const LICENSE_SOURCES: Record<string, string> = {
   'LICENSE': '../LICENSE',
   'NOTICE': '../NOTICE',
+  'Temurin-GPLv2-CE.txt': 'licenses/Temurin-GPLv2-CE.txt',
   'OFL-Pretendard.txt': 'src/renderer/assets/fonts/OFL-Pretendard.txt',
   'OFL-D2Coding.txt': 'src/renderer/assets/fonts/OFL-D2Coding.txt',
   'lucide-LICENSE.txt': 'src/renderer/assets/icons/lucide/LICENSE.txt',
