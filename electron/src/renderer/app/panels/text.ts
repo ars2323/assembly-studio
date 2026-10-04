@@ -134,9 +134,14 @@ export class TextPanel {
     this.head.fitMeta();
   }
 
+  // "30 instructions": the Text tab's; the Data tab has nothing to count.
+  private count = '';
+  private showCount(): void { this.head.setMeta(this.tab === 'text' ? this.count : ''); }
+
   setTab(tab: 'text' | 'data'): void {
     this.tab = tab;
     this.head.select(tab === 'text' ? 0 : 1);
+    this.showCount();
     this.textView.hidden = tab !== 'text';
     this.dataView.hidden = tab !== 'data';
     if (tab === 'text') this.fit(); else this.data.fit();
@@ -166,7 +171,8 @@ export class TextPanel {
       Object.assign(h('button', { class: 'linkbtn', type: 'button' }, this.showKernel ? 'Hide' : 'Show'),
         { onclick: () => { this.showKernel = !this.showKernel; this.refilter(); } }));
     this.fold.hidden = kernel === 0;
-    this.head.setMeta(this.all.length ? `${this.all.length - kernel} instructions` : '');
+    this.count = this.all.length ? `${this.all.length - kernel} instructions` : '';
+    this.showCount();
     this.rowHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--row')) || 22;
     this.sizeSpacer();
     for (const el of this.rendered.values()) el.remove();
