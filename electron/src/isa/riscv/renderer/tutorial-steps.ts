@@ -1,5 +1,5 @@
-/* The RISC-V tutorial: seven chapters over src/isa/riscv/examples/
-   tutorial.s (and tutorial-error.s in chapter 6).  The engine is
+/* The RISC-V tutorial: eight chapters over src/isa/riscv/examples/
+   tutorial.s (and tutorial-error.s in chapter 7).  The engine is
    renderer/app/tutorial/engine.ts; the steps both ISAs share,
    renderer/app/tutorial/common.ts.  The Registers panel knows a register
    by its number (x28), the code by its name (t3): the steps name both. */
@@ -9,7 +9,7 @@ import { tr } from '../../../renderer/app/i18n.ts';
 import { CHAPTERS as NAMES, RISCV, STEPS } from '../../../renderer/app/messages/tutorial.ts';
 import type { Chapter, Step } from '../../../renderer/app/tutorial/engine.ts';
 import {
-  $, $$, button, dataCell, lines, pcLine, reg, scrollIn, sideLine, statusChanged, trow,
+  $, $$, button, dataCell, ifShown, lines, pcLine, reg, scrollIn, sideLine, statusChanged, trow,
 } from '../../../renderer/app/tutorial/targets.ts';
 
 // The example's lines the steps are about.
@@ -20,9 +20,13 @@ const SW = /^\s+sw\s+t3, 0\(a1\)/;
 const LW = /^\s+lw\s+s0, 0\(a1\)/;
 const PRINT = /^\s+li\s+a7, 4\b/;
 const ECALL = /^\s+ecall/;              // the first: it prints msg
+const READ = /^\s+li\s+a7, 5\b/;
+// (For the tests: each is one line of the example, in both languages.)
+export const LINES = { ADD, SUB, BIG, SW, LW, PRINT, ECALL, READ };
 const T3 = { key: 'x28', name: 't3' };
 const SP = 'x2';
 const stackTag = () => $$('.dtags.dsec-stack').find((e) => /\bsp\b/.test(e.textContent ?? '')) ?? null;
+const radixBoxes = () => $('.textpanel [role=radiogroup]');
 
 const twoWords: Step = {
   id: 'pseudo', kind: 'explain', file: 'tutorial.s', view: 'run', tab: 'text',
@@ -37,7 +41,7 @@ const registers: Step = {
   id: 'registers', kind: 'explain', file: 'tutorial.s', view: 'run',
   title: () => tr(RISCV.registers.title),
   body: () => tr(RISCV.registers.body),
-  targets: () => [reg('x5')],
+  targets: () => [reg('x5'), ...ifShown($('.regs .fold'))],
   prepare: async (t) => { if (!t.host.assembled()) await t.host.assemble(); },
   reveal: () => scrollIn(reg('x5')),
 };
@@ -68,15 +72,6 @@ const changed: Step = {
   reveal: (t) => t.host.revealRegister(T3.key),
 };
 
-const inspector: Step = {
-  id: 'inspector', kind: 'explain', file: 'tutorial.s', view: 'run', tab: 'text', quietPc: true,
-  title: () => tr(STEPS.inspector.title),
-  body: () => tr(STEPS.inspector.body),
-  targets: () => [$('.insp .ititle'), $('.insp .bitgrid'), $('.insp .phead')],
-  prepare: async (t) => { await t.atLeast(SUB); },
-  inspect: (t) => t.addr(ADD),
-};
-
 const bits: Step = {
   id: 'bits', kind: 'explain', file: 'tutorial.s', view: 'run', tab: 'text', quietPc: true,
   title: () => tr(STEPS.bits.title),
@@ -100,7 +95,7 @@ const store: Step = {
   result: { view: 'run', tab: 'data',
     title: () => tr(STEPS.store.result.title),
     body: () => tr(STEPS.store.result.body, 't3'),
-    targets: (t) => [dataCell(t, 'total')],
+    targets: (t) => [dataCell(t, 'total'), radixBoxes()],
     reveal: (t) => scrollIn(dataCell(t, 'total')) },
   skip: async (t) => { await t.host.runUntil(t.addr(LW)); },
 };
@@ -116,12 +111,13 @@ const stack: Step = {
 
 export const CHAPTERS: Chapter[] = [
   { title: NAMES.screen, steps: [common.welcome('RISC-V'), common.editor()] },
-  { title: NAMES.assemble, steps: [common.assemble(), common.textColumns(), twoWords, registers] },
-  { title: NAMES.step, steps: [step, changed, common.hexDecBin(T3, SUB), common.pin(T3, SUB), common.alias(T3, SUB), inspector, bits] },
+  { title: NAMES.assemble, steps: [common.assemble(), common.textColumns(false), twoWords, registers] },
+  { title: NAMES.step, steps: [step, changed, common.stepBack(T3, ADD, SUB)] },
+  { title: NAMES.registers, steps: [common.hexDecBin(T3, SUB), common.pin(T3, SUB), common.alias(T3, SUB), common.inspect(ADD, SUB), bits] },
   { title: NAMES.memory, steps: [common.dataTab(), store, stack] },
-  { title: NAMES.run, steps: [common.breakpoint(PRINT), common.run(PRINT), common.slow(), common.reset(T3)] },
-  { title: NAMES.output, steps: [
-    common.console(ECALL, RISCV.console.says, RISCV.console.printed),
+  { title: NAMES.run, steps: [common.breakpoint(PRINT), common.run(PRINT), common.reset(T3), common.slow(PRINT)] },
+  { title: NAMES.io, steps: [
+    common.consoleIo(PRINT, READ, RISCV.console.says), common.undoIo(PRINT, 'li a7, 10', 'ecall'),
     common.error(), common.fixLine()] },
-  { title: NAMES.screenYours, steps: [common.separators(), common.theme(), common.end()] },
+  { title: NAMES.yours, steps: [common.tools(), common.editing(), common.settings(false), common.separators(), common.switches(), common.end()] },
 ];

@@ -1,8 +1,8 @@
 # MIPS 튜토리얼 예제 (읽기 전용)
-# 5 + 7 을 계산해 메모리와 스택에 넣고, 결과를 출력합니다.
+# 5 + 7 을 계산해 메모리와 스택에 넣고, 입력받은 수를 더해 출력합니다.
 
         .data
-msg:    .asciiz "sum = "        # 출력할 문자열
+msg:    .asciiz "number? "      # 출력할 문자열
 total:  .word   0               # 계산 결과를 넣을 자리
 
         .text
@@ -20,9 +20,12 @@ main:
         li      $v0, 4          # syscall 4: 문자열 출력
         la      $a0, msg        # 출력할 문자열의 주소
         syscall
-        lw      $a0, 0($sp)     # 스택에서 값을 꺼내
+        li      $v0, 5          # syscall 5: 정수 입력 (읽은 수는 $v0 에)
+        syscall
+        lw      $a0, 0($sp)     # 스택에서 12 를 꺼내고
+        addi    $sp, $sp, 4     # 스택을 원래대로 돌려놓습니다
+        add     $a0, $a0, $v0   # 입력받은 수를 더해
         li      $v0, 1          # syscall 1: 정수 출력
         syscall
-        addi    $sp, $sp, 4     # 스택을 원래대로 돌려놓습니다
         li      $v0, 10         # syscall 10: 프로그램 끝
         syscall
