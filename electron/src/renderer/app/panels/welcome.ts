@@ -67,10 +67,10 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
   const calm = matchMedia('(prefers-reduced-motion: reduce)');
   const actions = h('div', { class: 'actions' });
   // The way back: an arrow in the die frame's top-left corner, on the steps after the first.
-  // Next to it, the ISA chosen.
+  // In the opposite corner, the ISA chosen, quietly.
   const isaTag = h('span', { class: 'wisa' });
   const back = h('button', { class: 'wback', type: 'button', title: '뒤로', 'aria-label': '뒤로' }, icon('arrow-left'));
-  const corner = h('div', { class: 'wcorner' }, back, isaTag);
+  const corner = h('div', { class: 'wcorner' }, back);
   let chosen: Isa = pageIsa;
   let backTo = () => {};
   back.addEventListener('click', () => backTo());
@@ -101,6 +101,7 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
     }
     equal = step === 0;
     corner.classList.toggle('on', step !== 0);
+    isaTag.classList.toggle('on', step !== 0);
     isaTag.textContent = ISA_NAME[chosen];
     if (animate) { enter(); sparkle(); }
     if (step === 2) (actions.firstElementChild as HTMLElement).focus();
@@ -139,7 +140,7 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
       h('img', { class: 'wlogo', src: asset(brand.mark), alt: '' }),
       title,
       h('div', { class: 'wbody' }, actions)),
-    corner, fx);
+    corner, isaTag, fx);
   let revealed = picked || home || calm.matches;
   if (!revealed) card.classList.add('intro');
   const reveal = () => {

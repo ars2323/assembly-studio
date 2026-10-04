@@ -43,18 +43,22 @@ export const GLOW_DEPTH = 1.8;
 /** How much of its own light a beating flare adds at the top of its swell. */
 export const BEAT_GAIN = 0.85;
 /** The lit run behind a pulse's head, in px, and the shape of it: the three
-    runs that make its falloff, and the three widths each is drawn at. */
-export const PULSE_TAIL = 110;
+    runs that make its falloff, and the widths each is drawn at.  Thin, like
+    the light that runs round the card's buttons: a fine bright line inside
+    the trace with a little light around it, not a band laid over the trace. */
+export const PULSE_TAIL = 150;
 export const PULSE_SHAPE = [
-  { of: 1.0, alpha: 0.34 },
-  { of: 0.55, alpha: 0.33 },
-  { of: 0.22, alpha: 0.33 },
+  { of: 1.0, alpha: 0.30 },
+  { of: 0.55, alpha: 0.32 },
+  { of: 0.22, alpha: 0.38 },
 ] as const;
 export const PULSE_WIDTHS = [
-  { width: 24, alpha: 0.26 },
-  { width: 10, alpha: 0.58 },
-  { width: 2.6, alpha: 1.0 },
+  { width: 5, alpha: 0.10 },
+  { width: 2.6, alpha: 0.32 },
+  { width: 1.3, alpha: 1.0 },
 ] as const;
+/** The head: a small bright point with a soft glint. */
+export const PULSE_HEAD = { radius: 1.5, glow: 4.5, glowAlpha: 0.35 } as const;
 
 export const COLOURS = {
   background: '#0d0d0d',
@@ -364,9 +368,13 @@ export function drawPulse(ctx: CanvasRenderingContext2D, g: Geometry, t: number)
     }
     if (!drew) continue;
     const tip = run(path, head - 1, head)[1] ?? path.points[0];
-    ctx.fillStyle = white(0.9 * fade);
+    ctx.fillStyle = white(PULSE_HEAD.glowAlpha * fade);
     ctx.beginPath();
-    ctx.arc(tip.x, tip.y, 2.4, 0, Math.PI * 2);
+    ctx.arc(tip.x, tip.y, PULSE_HEAD.glow, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = white(0.95 * fade);
+    ctx.beginPath();
+    ctx.arc(tip.x, tip.y, PULSE_HEAD.radius, 0, Math.PI * 2);
     ctx.fill();
   }
 

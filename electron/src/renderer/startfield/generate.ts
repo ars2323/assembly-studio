@@ -163,9 +163,16 @@ const DIRS: Pt[] = [
 ];
 const STRAIGHT = 0.6, TURN90 = 0.25;   // the rest (0.15) is 45 deg
 const BRANCH_P = 0.10;
-const PINS_PER_SIDE = 10;
+const PINS_MAX = 14;                   // a side's pins: one on every grid line of its middle, at most this many
 const PIN_LENGTH = 14;
 const PIN_BARE_ENDS = 0.12;            // no pin in the last eighth of an edge
+/* The fan-out, the same on every side: out straight FAN_OUT steps; the
+   middle FAN_STRAIGHT pins on each side of the centre go on straight, the
+   others turn 45 deg away from the middle for as many steps as they are
+   pins out from it, then go straight out again for FAN_OUT; only then does
+   the trace wander. */
+const FAN_OUT = 2;
+const FAN_STRAIGHT = 1.5;
 const CARD_KEEP_OUT = 1;
 const BRIGHT_SHARE = 0.18;             // of the near layer
 const DECOR_AREA = 7000;               // px^2 per decorative trace
@@ -242,6 +249,7 @@ export function drawn(points: Pt[], chamfer = CHAMFER): Pt[] {
     // diagonals: both are square corners and both get the same straight cut.
     if (inx * outx + iny * outy !== 0) { out.push(b); continue; }
     const li = Math.hypot(inx, iny), lo = Math.hypot(outx, outy);
+    if (li === 0 || lo === 0) { out.push(b); continue; }    // a repeated point: nothing to cut
     const ci = Math.min(chamfer, li / 2), co = Math.min(chamfer, lo / 2);
     out.push({ x: b.x - (inx / li) * ci, y: b.y - (iny / li) * ci });
     out.push({ x: b.x + (outx / lo) * co, y: b.y + (outy / lo) * co });
@@ -308,23 +316,39 @@ function pinsOf(card: Rect, grid: number): Pin[] {
     { side: 'right', n: { x: 1, y: 0 }, along: 'y', from: card.y, len: card.height, fixed: card.x + card.width },
   ];
   for (const s of sides) {
-    // Ten a side, evenly spaced over the middle of the edge: a package
-    // leaves its corners bare.  Each pin is put on the grid line nearest its
-    // place, so the trace that leaves it runs straight down that line.
-    const first = s.from + s.len * PIN_BARE_ENDS;
+    // One pin on every grid line of the edge's middle, centred on the edge,
+    // the same count on all four sides: a package leaves its corners bare
+    // and its pins at one pitch.  Each trace leaves its pin straight down
+    // that grid line.
     const span = s.len * (1 - 2 * PIN_BARE_ENDS);
-    const taken = new Set<number>();
-    for (let k = 0; k < PINS_PER_SIDE; k++) {
-      const along = first + (span * k) / (PINS_PER_SIDE - 1);
-      let line = Math.round(along / grid);
-      while (taken.has(line)) line += 1;
-      taken.add(line);
+    const count = Math.max(2, Math.min(PINS_MAX, Math.floor(span / grid) + 1));
+    const middle = (s.from + s.len / 2) / grid;
+    const firstLine = Math.round(middle - (count - 1) / 2);
+    for (let k = 0; k < count; k++) {
+      const line = firstLine + k;
       const at = s.along === 'x' ? { x: line * grid, y: s.fixed } : { x: s.fixed, y: line * grid };
       const tip = { x: at.x + s.n.x * PIN_LENGTH, y: at.y + s.n.y * PIN_LENGTH };
       pins.push({ side: s.side, at, tip });
     }
   }
   return pins;
+}
+
+/** The fixed start of a pin's trace (the fan-out above), step by step, as
+    far as the field lets it go. */
+function fan(field: Field, i: number, j: number, plan: number[]): { points: Pt[]; i: number; j: number; dir: number } {
+  const points: Pt[] = [{ x: i * field.grid, y: j * field.grid }];
+  let dir = plan[0];
+  for (const cand of plan) {
+    const dd = DIRS[cand];
+    if (!field.free(i, j, dd)) break;
+    if (dd.x !== 0 && dd.y !== 0) field.takeDiagonal(i, j, dd);
+    i += dd.x; j += dd.y;
+    field.takeVertex(i, j);
+    points.push({ x: i * field.grid, y: j * field.grid });
+    dir = cand;
+  }
+  return { points, i, j, dir };
 }
 
 /** One self-avoiding walk.  Right angles are allowed here and cut by
@@ -398,18 +422,44 @@ export function generate(input: Input): Geometry {
   };
 
   // ---- the chip's own traces, out of every pin ---------------------------
+  // The out direction of each side, and which way "away from the middle" is
+  // for the pins before and after it (DIRS: 0 right, 2 down, 4 left, 6 up).
+  const OUT: Record<Side, { out: number; before: number; after: number }> = {
+    top: { out: 6, before: 5, after: 7 },
+    bottom: { out: 2, before: 3, after: 1 },
+    left: { out: 4, before: 5, after: 3 },
+    right: { out: 0, before: 7, after: 1 },
+  };
   const pending: { i: number; j: number; dir: number }[] = [];
-  for (const pin of pins) {
-    const dir = pin.side === 'top' ? 6 : pin.side === 'bottom' ? 2 : pin.side === 'left' ? 4 : 0;
-    const d = DIRS[dir];
-    // The first grid vertex beyond the pin's tip.
-    const i = d.x === 0 ? Math.round(pin.tip.x / GRID) : d.x > 0 ? Math.ceil(pin.tip.x / GRID) : Math.floor(pin.tip.x / GRID);
-    const j = d.y === 0 ? Math.round(pin.tip.y / GRID) : d.y > 0 ? Math.ceil(pin.tip.y / GRID) : Math.floor(pin.tip.y / GRID);
-    if (!field.releaseOut(i, j, d)) continue;
-    field.takeVertex(i, j);
-    const branches: typeof pending = [];
-    add(walk(field, i, j, dir, steps(rand) + 2, rand, branches), 2, 'pin', true);
-    pending.push(...branches);
+  const perSide = new Map<Side, Pin[]>();
+  for (const pin of pins) perSide.set(pin.side, [...(perSide.get(pin.side) ?? []), pin]);
+  for (const [side, list] of perSide) {
+    const { out, before, after } = OUT[side];
+    const d = DIRS[out];
+    list.forEach((pin, k) => {
+      // The first grid vertex beyond the pin's tip, on the pin's own line.
+      const i = d.x === 0 ? Math.round(pin.tip.x / GRID) : d.x > 0 ? Math.ceil(pin.tip.x / GRID) : Math.floor(pin.tip.x / GRID);
+      const j = d.y === 0 ? Math.round(pin.tip.y / GRID) : d.y > 0 ? Math.ceil(pin.tip.y / GRID) : Math.floor(pin.tip.y / GRID);
+      if (!field.releaseOut(i, j, d)) return;
+      field.takeVertex(i, j);
+      const m = k - (list.length - 1) / 2;               // pins out from the middle
+      const turns = Math.max(0, Math.round(Math.abs(m) - FAN_STRAIGHT));
+      const plan = [
+        ...Array(FAN_OUT).fill(out),
+        ...Array(turns).fill(m < 0 ? before : after),
+        ...Array(FAN_OUT + (turns === 0 ? 1 : 0)).fill(out),
+      ];
+      const head = fan(field, i, j, plan);
+      const branches: typeof pending = [];
+      const rest = walk(field, head.i, head.j, head.dir, steps(rand), rand, branches);
+      // From the pin's tip: the trace is joined to its pin, no gap between them.
+      // (Not twice when the tip is on the grid vertex itself: a zero-length
+      // segment makes drawn()'s chamfer divide by zero and the trace vanish.)
+      const start = head.points[0];
+      const lead = start.x === pin.tip.x && start.y === pin.tip.y ? [] : [pin.tip];
+      add([...lead, ...head.points, ...rest.slice(1)], 2, 'pin', true);
+      pending.push(...branches);
+    });
   }
   for (const b of pending) {
     const parent = paths.find((p) => p.points.some((q) => q.x === b.i * GRID && q.y === b.j * GRID));
