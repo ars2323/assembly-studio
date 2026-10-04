@@ -13,12 +13,13 @@ rars_commit=7acf3254e84ab75fa612402b22fe915a2e00bdab
 # through JDK_JAVAC_OPTIONS so RARS's build-jar.sh is not touched).
 javac_release=11
 
-# The JDK the jlink runtime is made from: Eclipse Temurin 21.0.12+1 (LTS).
+# The JDK the jlink runtime is made from: Eclipse Temurin 21.0.12.1+1 (LTS; the
+# respin that replaced 21.0.12+1 -- setup-java "21.0.12" resolves to it).
 # temurin_java_version goes to actions/setup-java; the built runtime's
-# JAVA_RUNTIME_VERSION must be temurin_runtime_version, alone or followed by
-# '-' (21.0.12+1-LTS), or engines.yml fails.
+# java.runtime.version must be temurin_runtime_version, alone or followed by
+# '-' (21.0.12.1+1-LTS), or engines.yml fails.
 temurin_java_version=21.0.12
-temurin_runtime_version=21.0.12+1
+temurin_runtime_version=21.0.12.1+1
 
 # The modules of the jlink runtime: the minimum RARS needs without being
 # changed (java.desktop cannot be left out).
