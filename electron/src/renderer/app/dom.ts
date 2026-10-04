@@ -4,6 +4,7 @@
 
 import { codeParts } from '../../core/explain.ts';
 import { brand } from '../../brand.ts';
+import { THEME_FADE_MS } from './theme.ts';
 
 type Child = Node | string | null | undefined | false;
 
@@ -81,6 +82,11 @@ export function userScrolls(el: HTMLElement): () => boolean {
 export function markImg(cls: string): HTMLImageElement {
   const src = () => asset(document.documentElement.dataset.theme === 'light' ? brand.markOnLight : brand.mark);
   const img = h('img', { class: cls, src: src(), alt: '' });
-  window.addEventListener('themechange', () => { img.src = src(); });
+  // Out with the old theme's, in with the new one's, over the page's fade (theme.ts).
+  window.addEventListener('themechange', () => {
+    const half = THEME_FADE_MS / 2;
+    img.animate([{ opacity: 1 }, { opacity: 0 }], { duration: half, easing: 'ease-in' }).finished
+      .then(() => { img.src = src(); img.animate([{ opacity: 0 }, { opacity: 1 }], { duration: half, easing: 'ease-out' }); }, () => { img.src = src(); });
+  });
   return img;
 }
