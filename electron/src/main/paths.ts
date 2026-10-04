@@ -69,6 +69,7 @@ export const version: string = bundled
 export const LICENSES: { name: string; title: string }[] = [
   { name: 'LICENSE', title: 'Assembly Studio — BSD 3-Clause License' },
   { name: 'NOTICE', title: 'NOTICE — every third-party component (engines, Java runtime, Electron, fonts, icons, npm packages, build tools)' },
+  { name: 'SPIM-README.txt', title: 'SPIM — BSD License (SPIM\'s README)' },
   { name: 'Temurin-GPLv2-CE.txt', title: 'Eclipse Temurin (OpenJDK) 21 — GPL v2 with the Classpath Exception' },
   { name: 'OFL-Pretendard.txt', title: 'Pretendard — SIL Open Font License 1.1' },
   { name: 'OFL-D2Coding.txt', title: 'D2Coding — SIL Open Font License 1.1' },
@@ -81,6 +82,7 @@ export const LICENSES: { name: string; title: string }[] = [
 export const LICENSE_SOURCES: Record<string, string> = {
   'LICENSE': '../LICENSE',
   'NOTICE': '../NOTICE',
+  'SPIM-README.txt': 'licenses/SPIM-README.txt',
   'Temurin-GPLv2-CE.txt': 'licenses/Temurin-GPLv2-CE.txt',
   'OFL-Pretendard.txt': 'src/renderer/assets/fonts/OFL-Pretendard.txt',
   'OFL-D2Coding.txt': 'src/renderer/assets/fonts/OFL-D2Coding.txt',

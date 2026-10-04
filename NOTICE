@@ -92,9 +92,11 @@ Used for:   The MIPS engine. The simulator core in CPU/ is used unmodified
             default exception handler (CPU/exceptions.s) ships with the
             program. The editor's MIPS keyword table
             (electron/src/core/op-table.ts) is generated from CPU/op.h.
-Full text:  Below. In the repository, also at the top of each source file in
-            CPU/. In the installed program, in this NOTICE (About > Licenses,
-            and NOTICE.txt).
+Full text:  Below. In the repository, SPIM's own README with the license,
+            verbatim: electron/licenses/SPIM-README.txt; CPU/ORIGIN.md lists
+            the SHA-256 of every core file. In the installed program, in
+            this NOTICE (About > Licenses, and NOTICE.txt) and as "SPIM —
+            BSD License (SPIM's README)" in About > Licenses.
 
      Redistribution and use in source and binary forms, with or without modification, are
      permitted provided that the following conditions are met:
