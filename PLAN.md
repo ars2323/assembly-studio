@@ -132,5 +132,5 @@ S2(색)를 S3(RISC-V)보다 먼저 한다: MIPS 하나일 때 바꾸면 한 번�
 ## 9. 1.0.0 이후
 
 1.0.0 을 발행했다. 이후의 변경은 버전을 올려 낸다: 고침은 1.0.x, 기능 추가는 1.x.0.
-`electron/package.json` 의 version 과 `docs/releases/<버전>.md` 를 함께 쓰고 태그 `v<버전>` 을 올린다.
+`electron/package.json` 의 version 과 `docs/releases/<버전>.md` 를 함께 쓰고, 태그 `v<버전>` 을 올리거나 release.yml 을 손으로 실행(`release` 체크)해 발행한다.
 
