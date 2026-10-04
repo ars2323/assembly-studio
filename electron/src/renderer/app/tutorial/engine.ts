@@ -169,6 +169,8 @@ export class Tutorial {
   private card: HTMLElement | null = null;
   private arrow: HTMLElement | null = null;
   private entering = false;
+  private missingSince = 0;   // since when a target has not been there (layout(): the card holds)
+  private placed: { beat: string; left: number; top: number } | null = null; // where layout() last put the card
   private skipTimer = 0;
   private skipShown = false;
   private frame = 0;
@@ -337,7 +339,8 @@ export class Tutorial {
   private armSkip(): void {
     this.skipShown = false;
     clearTimeout(this.skipTimer);
-    this.skipTimer = window.setTimeout(() => { this.skipShown = true; this.renderCard(); }, 6000);
+    // The same card with the Skip button added: it does not come in again.
+    this.skipTimer = window.setTimeout(() => { this.skipShown = true; this.renderCard(false); }, 6000);
   }
 
   next(): void { void this.go(this.index + 1); }
@@ -514,6 +517,7 @@ export class Tutorial {
       ...([recap, doing] as (HTMLElement | null)[]).filter((e): e is HTMLElement => e !== null),
       h('div', { class: 'tut-foot' }, hints, h('div', { class: 'tut-buttons' }, ...buttons)));
     this.lastLayout = '';
+    this.missingSince = 0;
     if (fresh) this.entering = true; // the next layout places it, then it comes in
   }
 
@@ -530,6 +534,17 @@ export class Tutorial {
       now.reveal(this);
       if (!this.did.includes('scrolled')) this.did.push('scrolled');
     }
+    // A target not there yet (a tab just switched, a panel redrawing itself):
+    // the card stays where it is -- a new one unseen -- for a moment, rather
+    // than going to the middle of the window and jumping back a frame later.
+    if (rects.missing) {
+      this.missingSince ||= performance.now();
+      if (performance.now() - this.missingSince < HOLD_MS) {
+        if (this.entering) for (const el of [this.card, this.rings, this.arrow]) el.style.visibility = 'hidden';
+        return;
+      }
+    } else this.missingSince = 0;
+    for (const el of [this.card, this.rings, this.arrow]) el.style.visibility = '';
     const w = window.innerWidth;
     const hh = window.innerHeight;
     // The areas lit whole: each target's panel (the toolbar, the status
@@ -570,6 +585,14 @@ export class Tutorial {
       ? { left: (w - size.width) / 2, top: (hh - size.height) / 2, side: null }
       : place(grown, size, view, keepOff, 16) ?? place(grown, size, view, [], 16)
         ?? { left: w - size.width - 8, top: hh - size.height - 8, side: null };
+    // Within one beat, a move of a few pixels (a button's label changing
+    // width: Run, Stop) is not followed: the card stays still.
+    const beat = `${this.index}/${this.phase}/${this.result}`;
+    const was = this.placed;
+    if (!fresh && was && was.beat === beat && at.side !== null && Math.abs(at.left - was.left) <= NUDGE && Math.abs(at.top - was.top) <= NUDGE) {
+      at.left = was.left; at.top = was.top;
+    }
+    this.placed = { beat, left: at.left, top: at.top };
     this.card.style.left = `${Math.round(at.left)}px`;
     this.card.style.top = `${Math.round(at.top)}px`;
     this.pointArrow(at, size, grown[0]);
@@ -678,6 +701,11 @@ function distance(a: Rect, b: Rect): number {
   const dy = Math.max(0, b.top - a.bottom, a.top - b.bottom);
   return Math.hypot(dx, dy);
 }
+
+// How long the card waits for a target that is not there yet (layout()).
+const HOLD_MS = 500;
+// The move layout() does not follow within one beat (px).
+const NUDGE = 8;
 
 function grow(r: Rect, by: number): Rect {
   return { left: r.left - by, top: r.top - by, right: r.right + by, bottom: r.bottom + by };
