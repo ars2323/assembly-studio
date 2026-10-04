@@ -24,7 +24,7 @@ Status: **1.0.0 is released.** Stages S0–S6 are done; later work follows §9.
 | Choosing the ISA | Step 0 of the first screen's card: "MIPS / RISC-V". Chosen on every launch, never remembered. Only the chosen ISA's engine runs; going back home stops it and the user chooses again. `--isa=mips\|riscv` for development and tests |
 | Editions | One generic edition. The brand layer (`electron/brands/generic`) only keeps the name, mark and icons in one place |
 | Name | `Assembly Studio`; executable `AssemblyStudio` |
-| UI language | The work screen's states and names are in English (Assemble panel, status line, panel labels). Korean is used for instruction explanations (Inspector), the tutorial, the first screen and dialogs |
+| UI language | The work screen's states and names are in English (Assemble panel, status line, panel labels). Instruction explanations (Inspector), the tutorial, the first screen and dialogs are in Korean or English: a KO/EN switch (first screen's card, status line, Settings), for the run only, starting from the system's language (since 1.1.0) |
 | Logo | Chosen from two or three drafts |
 | Screen | Button positions, panel arrangement, sizes and behaviour stay as they are. Only the colours change (§4) |
 | Themes | Dark and light, switched at any time with the sun/moon switch |

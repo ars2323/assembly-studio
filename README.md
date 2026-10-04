@@ -44,10 +44,10 @@ To uninstall, use Windows Settings › Apps.
 ## First run
 
 1. On the first screen, choose **MIPS** or **RISC-V**. You choose on every launch; the choice is not remembered.
-2. Choose **Start now** (바로 시작) or **View the tutorial** (튜토리얼 보기).
+2. Choose **Start now** (바로 시작) or **Take the tutorial** (튜토리얼 보기).
    - **Start now** then offers **New file** (새 파일) and **Open file** (파일 열기).
    - **The tutorial** walks you through the screen and the basic controls with an example program, step by step
-     (7 chapters, 26 steps, for both ISAs). The tutorial's text is in Korean. On the work screen you can start it
+     (7 chapters, 26 steps, for both ISAs), in Korean or English (see **Language** below). On the work screen you can start it
      again at any time with the question-mark button at the right of the toolbar.
 3. To change the ISA later, click the logo in the title bar. It returns to the first screen.
 
@@ -92,19 +92,24 @@ To uninstall, use Windows Settings › Apps.
   line. The **Data** tab shows the data and the stack in memory. **Hex**, **Dec** and **Bin** in the Data tab's header
   choose the radix of the values.
 - **Inspector.** Splits one instruction into its 32-bit fields and shows each field's name, value and meaning (the
-  explanations are in Korean). Click an instruction in the Text tab to keep the Inspector on it; **Follow PC** (or
+  explanation is in the language you chose). Click an instruction in the Text tab to keep the Inspector on it; **Follow PC** (or
   `Esc`) makes it follow the current instruction again.
 - **Console.** The program's output, and the box for its input.
-- **Light and dark.** The sun/moon switch at the bottom right (on the first screen, below the card).
+- **Light and dark.** The sun/moon switch at the bottom right (on the first screen, the card's bottom-right corner).
+- **Language.** The KO/EN switch beside it (on the first screen, the card's bottom-left corner), or Settings ›
+  **Language**: Korean or English for the first screen, the tutorial, the instruction explanations, the dialogs and
+  the tutorial's example comments. The panels, buttons and status line are in English in both. It starts in the
+  system's language (Korean on a Korean system, English otherwise).
 - **Resizing.** Drag the border between two panels to resize them. Double-click a border to return to the default size.
 - **Settings.** The gear button in the toolbar:
   - **Font size**;
   - **Data radix** (the same choice as in the Data tab);
+  - **Language** (KO / EN, the same as the switches);
   - **Advanced** (MIPS only): machine options (pseudo-instructions, delayed branches, delayed loads, mapped I/O,
     quiet), program arguments, and the exception handler;
   - **About · Licenses**: the version, the engine, and every license (see [below](#license-and-third-party-notices)).
 
-Settings and the panel layout last only for the current session. The next launch starts with the defaults, so a
+Settings, the language, the theme and the panel layout last only for the current session. The next launch starts with the defaults, so a
 shared PC always starts the same way.
 
 ## Executable image export (.asx)
