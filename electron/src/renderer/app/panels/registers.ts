@@ -32,7 +32,7 @@ import { cells, changedKeys, registerRows, type RegisterValues } from '../logic/
 import type { Column, Fit } from '../logic/columns.ts';
 import { code, h } from '../dom.ts';
 import { perf } from '../perf.ts';
-import { RegisterTable } from './regtable.ts';
+import { RegisterTable, type Mark, type Marks } from './regtable.ts';
 
 const COLUMNS: Column[] = [{ key: 'rn', ch: 7 }, { key: 'hex', ch: 10.5 }, { key: 'dec', ch: 10.5 }, { key: 'bin', ch: 28.5 }];
 
@@ -101,5 +101,9 @@ export class RegisterPanel {
   // the width and the boxes, and let go again.
   revealRegister(key: string): void { this.table.revealRegister(key); }
   showColumn(key: 'dec' | 'bin'): 'already' | 'hidden' | 'shown' { return this.table.showColumn(key); }
+  // The stars and aliases (regtable.ts): heard, read and set.
+  set onMark(listener: (m: Mark) => void) { this.table.onMark = listener; }
+  marks(): Marks { return this.table.marks(); }
+  setMarks(m: Marks): void { this.table.setMarks(m); }
   releaseColumn(key: 'dec' | 'bin'): void { this.table.releaseColumn(key); }
 }
