@@ -92,6 +92,9 @@ export const STATUS = {
   selected: { ko: '선택 ', en: 'Selected ' },
   changed: { ko: '바뀜: ', en: 'Changed: ' },
   more: { ko: (n: number) => ` 외 ${n}개`, en: (n: number) => ` +${n} more` },
+  // After Step back (logic/stepback.ts); after undoing a call that printed or read, the Console keeps it.
+  stepBack: { ko: (pc: string) => `한 단계 되돌림 · PC \`${pc}\``, en: (pc: string) => `Stepped back · PC \`${pc}\`` },
+  backIo: { ko: '콘솔에 출력된 내용과 이미 읽은 입력은 그대로입니다', en: 'Console output and input already read stay' },
   settingsChanged: { ko: '설정 바뀜 · Ctrl+S 로 적용', en: 'Settings changed · Ctrl+S to apply' },
   // After a stop (logic/machine.ts stopMessage).
   stop: {

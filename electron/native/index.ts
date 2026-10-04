@@ -27,6 +27,22 @@ export interface TextWord {
    PC is at a read syscall waiting for provideInput(). */
 export type RunStop = 'exit' | 'error' | 'breakpoint' | 'input' | 'limit';
 
+/* What a run records for step back (native/src/addon.cc, "step back"):
+     off    nothing, and the history so far is dropped (the default)
+     each   every instruction (Step, the slow run)
+     slice  a slice of a fast Run: when the run stops, its last
+            instructions are run again from a snapshot and recorded;
+            settleHistory() does it for a run stopped between slices */
+export type RunHistory = 'off' | 'each' | 'slice';
+
+/* backstep(): whether an instruction was undone, and whether it was a
+   syscall that printed or read (its output and the input it took stay). */
+export interface BackstepResult { undone: boolean; io: boolean }
+
+/* How many instructions step back can undo now (at most `limit`), and
+   whether it can at all (not with delayed loads). */
+export interface HistoryInfo { depth: number; limit: number; possible: boolean }
+
 export interface Registers {
   pc: number;
   hi: number;
@@ -50,7 +66,11 @@ export interface Segments {
 interface NativeCore {
   assemble(source: Uint8Array, handler: Uint8Array, argv: Uint8Array[],
            env: Uint8Array[], fileName: Uint8Array, options: MachineOptions): { ok: boolean; errors: string[]; symbols: string; data: DataRange };
-  run(steps: number): RunStop;
+  run(steps: number, history?: RunHistory): RunStop;
+  settleHistory(): void;
+  backstep(): BackstepResult;
+  history(): HistoryInfo;
+  storeSpans(word: number, registers: number[]): { addr: number; size: number }[];
   consoleOutput(): Uint8Array;
   provideInput(bytes: Uint8Array): void;
   setBreakpoint(addr: number): boolean;
@@ -184,7 +204,22 @@ export function assemble(source: Uint8Array | string, options: AssembleOptions =
     run after assemble() (or after the program ended) starts the program: PC
     to the start address, stack rebuilt.  Right after stopping at a
     breakpoint, the next run first executes the instruction under it. */
-export const run = (steps: number): RunStop => core.run(steps);
+export const run = (steps: number, history: RunHistory = 'off'): RunStop => core.run(steps, history);
+
+/** After a fast run ('slice') stopped between two slices: its last
+    instructions recorded for step back. */
+export const settleHistory = (): void => core.settleHistory();
+
+/** Undoes the last recorded instruction: registers and memory as they were
+    before it.  Console output and input already read stay. */
+export const backstep = (): BackstepResult => core.backstep();
+
+export const history = (): HistoryInfo => core.history();
+
+/** The memory the instruction `word` may write, given the registers before
+    it runs ($0..$31): at most one span.  Pure; for the tests. */
+export const storeSpans = (word: number, registers: readonly number[]): { addr: number; size: number }[] =>
+  core.storeSpans(word >>> 0, [...registers]);
 
 /** QtSpim's Single Step, n times (Run is a large n).  Returns whether the
     program can go on -- at a breakpoint or waiting for input too. */

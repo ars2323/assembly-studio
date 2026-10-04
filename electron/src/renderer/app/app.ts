@@ -52,6 +52,8 @@ import { onTheme, THEME_FADE_MS, themeSwitch } from './theme.ts';
 import { currentLang, langSwitch, onLang, tr, words, type Words } from './i18n.ts';
 import { DIALOGS } from './messages/dialogs.ts';
 import { ASSEMBLE, STATUS } from './messages/assemble.ts';
+import { STEPBACK } from './messages/stepback.ts';
+import { backKeys, isStepBackKey, STEP_BACK_KEY } from './logic/stepback.ts';
 import { captionPatch, mixPalette, palette } from './logic/overlay.ts';
 import { WINDOW_COLOURS } from '../../main/theme.ts';
 import { notice } from './notice.ts';
@@ -122,6 +124,8 @@ let exportNote: Words = '';             // the same, for an export that went wel
 let crashNote: Words = '';
 let progress: { pc: number; instructions: number } | null = null;
 let lastReason: RunResult['reason'] = 'limit';
+let undo = 0;                          // how many instructions Step back can undo (the engine says)
+let back: { io: boolean } | null = null; // the last thing done was a step back (the status bar)
 let changedNow: string[] = []; // the registers the last step or run changed: the yellow rows
 let narrow = false;
 let view: 'editor' | 'run' = 'editor'; // narrow windows: the side on show
@@ -152,6 +156,12 @@ const fileLabel = h('span', { class: 'file' });
 const bAssemble = button('Save & Assemble', 'hammer', 'Ctrl+S', () => void saveAndAssemble());
 const bRun = button('Run', 'play', 'F5', () => void runOrStop());
 const bStep = button('Step', 'step-forward', 'F10', () => void step());
+// Step back: undoes the last instruction executed.  Its tooltip says what
+// it cannot undo, in the language in use.
+const bBack = button('Step back', 'step-back', STEP_BACK_KEY, () => void stepBack());
+const backTitle = () => { bBack.title = tr(STEPBACK.tooltip); };
+backTitle();
+onLang(backTitle);
 const bRestart = button('Reset', 'rotate-ccw', '', () => void restart());
 bAssemble.dataset.tut = 'assemble';
 bRun.dataset.tut = 'run';
@@ -169,7 +179,7 @@ speedOne.addEventListener('click', () => void setSpeed(speed === 'fast' ? 'slow'
 const speedBox = h('span', { class: 'speedbox' }, h('span', { class: 'speedlabel' }, 'Run speed'), speedSwitch, speedOne);
 // A thin line between two groups of the toolbar.
 const divider = (cls = ''): HTMLElement => h('span', { class: `tsep${cls ? ` ${cls}` : ''}`, 'aria-hidden': 'true' });
-const runctl = h('span', { class: 'runctl' }, bAssemble, divider(), bRun, speedBox, bStep, divider(), bRestart);
+const runctl = h('span', { class: 'runctl' }, bAssemble, divider(), bRun, speedBox, bStep, bBack, divider(), bRestart);
 const bSettings = iconButton('Settings', 'settings', () => settingsBox.open());
 // The assembled program as an executable image (.asx, docs/asx-format.md).
 const bExport = iconButton('Export executable image (.asx)', 'file-output', () => void exportImage());
@@ -626,6 +636,7 @@ function renderChrome(): void {
   bRun.title = running ? 'Stop (Esc)' : 'Run (F5)';
   setBtn(bRun, open && (running || (runState !== 'finished' && runState !== 'input')), running);
   setBtn(bStep, open && !running && runState !== 'finished', current() && !running);
+  setBtn(bBack, open && !running && assembledText !== null && undo > 0, false);
   setBtn(bRestart, lastGood !== null && !busy, false);
   bExport.hidden = !open;
   bExport.disabled = lastGood === null || busy;
@@ -742,7 +753,11 @@ function renderStatus(): void {
       hints = [['Esc', 'Stop']];
     } else {
       const reason = lastReason;
-      if (runState === 'ready') {
+      if (back && runState === 'paused') {
+        parts.push(lead('run', codeText(tr(STATUS.stepBack, pc))));
+        if (back.io) parts.push(cell('', tr(STATUS.backIo)));
+        hints = backKeys(undo > 0);
+      } else if (runState === 'ready') {
         parts.push(lead('run', tr(STATUS.ready), pc ? ' · PC ' : '', pc ? code(pc) : null));
         if (steps === 0 && saveNote) parts.push(cell(saveWarn ? 'warn' : '', words(saveNote)));
         hints = [['F10', 'Step'], ['F5', 'Run']];
@@ -956,6 +971,8 @@ async function forgetMachine(): Promise<void> {
   rows = [];
   text.setRows([]);
   lastRegs = null;
+  undo = 0;
+  back = null;
   clearSelection();
   consolePanel.clear();
 }
@@ -1045,6 +1062,8 @@ async function assemble(source: string): Promise<boolean> {
     steps = 0;
     progress = null;
     changedNow = [];
+    undo = 0;
+    back = null;
     lastReason = 'limit';
     errors = [];
     rows = textRows(await api.call('textSegment'));
@@ -1146,6 +1165,41 @@ async function step(): Promise<void> {
   await go(() => api.call('step', 1));
 }
 
+// Step back: the last instruction executed undone -- registers and memory
+// as they were before it (the core's front end keeps the last 1000:
+// native/src/addon.cc, "step back").  Everything that follows a step
+// follows it too: the changed registers, the PC line, the Inspector, Data.
+// What the program printed stays in the Console.
+async function stepBack(): Promise<void> {
+  if (busy || assembledText === null || runState === 'running' || undo <= 0) return;
+  busy = true;
+  note = '';
+  exportNote = '';
+  const before = lastRegs;
+  try {
+    const r = await api.call('backstep');
+    undo = r.undo;
+    if (!r.undone) return;
+    const now = await api.call('registers');
+    steps = Math.max(0, steps - 1);
+    back = { io: r.io };
+    runState = 'paused';
+    lastReason = 'limit';
+    registers?.update(now, before);
+    changedNow = [...changedKeys(before, now)];
+    lastRegs = now;
+    text.setPc(now.pc);
+    showInspector();
+    consolePanel.waitForInput(false);
+    if (text.tab === 'data') void refreshData();
+  } catch {
+    // the process died: onCrashed says so
+  } finally {
+    busy = false;
+    renderChrome();
+  }
+}
+
 async function go(call: () => Promise<RunResult>): Promise<RunResult | null> {
   busy = true;
   note = '';
@@ -1161,6 +1215,8 @@ async function go(call: () => Promise<RunResult>): Promise<RunResult | null> {
   try {
     const now = await api.call('registers');
     if (result.reason !== 'input' && resumeWith === 'step') steps += 1;
+    undo = result.undo;
+    back = null;
     lastReason = result.reason;
     // A slow run between two of its steps is still running.
     runState = slow && result.reason === 'limit' ? 'running' : stateAfter(result.reason);
@@ -1272,6 +1328,8 @@ async function restart(): Promise<void> {
     steps = 0;
     progress = null;
     changedNow = [];
+    undo = 0;
+    back = null;
     lastReason = 'limit';
     rows = textRows(await api.call('textSegment'));
     for (const a of breakpoints) await api.call('setBreakpoint', a);
@@ -1434,6 +1492,7 @@ window.addEventListener('keydown', (e) => {
   const mod = e.ctrlKey || e.metaKey;
   const inEditor = editorHost.contains(e.target as Node);
   if (e.key === 'F5') { e.preventDefault(); void runOrStop(); return; }
+  if (isStepBackKey(e)) { e.preventDefault(); if (!tutorial.active) void stepBack(); return; } // the tutorial teaches F10 alone
   if (e.key === 'F10') { e.preventDefault(); void step(); return; }
   if (e.key === 'Escape') {
     if ((e.target as HTMLElement).closest?.('input, textarea')) return; // a box's own Esc (the Registers alias)
@@ -1458,6 +1517,8 @@ api.onCrashed((message, detail) => {
   // detail: "The simulator stopped (fatal error in the simulator core: File contains an .err directive)"
   const cause = /\((.*)\)$/s.exec(detail)?.[1] ?? (detail || message);
   crashNote = () => tr(STATUS.crashed, cause);
+  undo = 0;
+  back = null;
   assembledText = null;
   runState = 'ready';
   busy = false;
