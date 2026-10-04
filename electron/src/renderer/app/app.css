@@ -1018,6 +1018,7 @@ html.theme-fade, html.theme-fade *:not(canvas), html.theme-fade *::before, html.
 .about-mark { width: 44px; height: 44px; flex: none; }
 .about-name { font-size: 17px; font-weight: 700; color: var(--strong); }
 .about-ver { margin-top: 2px; color: var(--text-2); font-size: 12.5px; }
+.about-by { margin-top: 2px; color: var(--text-2); font-size: 12.5px; }
 .about .tabs { display: flex; gap: 2px; height: 34px; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
 .about .tab { display: flex; align-items: center; padding: 0 12px; border: 0; background: none; color: var(--text-2); font-weight: 500; border-bottom: 2px solid transparent; }
 .about .tab.on { color: var(--strong); border-bottom-color: var(--accent); font-weight: 600; }
