@@ -68,7 +68,7 @@ jobs:
           shopt -s nullglob
           files=(dist/*.exe)
           [ ${#files[@]} -gt 0 ] || { echo "::error::no installer in electron/dist"; ls -la dist || true; exit 1; }
-          notes="docs/releases/$VERSION.md"
+          notes="../docs/releases/$VERSION.md"
           {
             if [ -f "$notes" ]; then cat "$notes"; else echo "Assembly Studio $VERSION"; fi
             echo
