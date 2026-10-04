@@ -24,7 +24,7 @@ export const welcome = (isa: string): Step => ({
   id: 'welcome', kind: 'explain', file: 'tutorial.s', view: 'editor',
   title: () => '튜토리얼을 시작합니다',
   body: (t) => `${isa} 어셈블리 코드를 기계어로 바꾸고, 한 줄씩 실행하며 레지스터와 메모리가 바뀌는 모습을 보는 프로그램입니다. `
-    + '툴바 왼쪽에는 어셈블과 실행 버튼이, 오른쪽에는 Tutorial · New file · Open file · Settings 아이콘이 있습니다. '
+    + '툴바 왼쪽은 어셈블과 실행 버튼이고, 오른쪽 아이콘으로는 튜토리얼을 다시 보거나 파일을 만들고 열거나 설정을 바꿉니다. '
     + (t.host.narrow() ? '그 아래 화면은 툴바의 Editor · Run 으로 바꿔 가며 봅니다.' : '그 아래 왼쪽이 Editor, 오른쪽이 실행 결과를 보는 Run 쪽입니다.'),
   targets: () => [$('.toolbar .runctl'), $('.toolbar .tools')],
   prepare: async (t) => { if (t.host.running()) await t.host.stop(); },
@@ -126,7 +126,7 @@ export const alias = (r: Reg, after: RegExp): Step => ({
     title: () => '이름이 붙었습니다',
     body: (t) => {
       const a = t.host.marks().aliases.find(([k]) => k === r.key)?.[1] ?? ALIAS;
-      return `이제 \`${r.name}\` 옆에 별칭 \`${a}\` 도 함께 나옵니다. C 코드의 변수 이름을 붙여 두면 값이 무엇인지 알아보기 쉽습니다. 이름을 지우고 Enter 키를 누르면 없어집니다.`;
+      return `이제 \`${r.name}\` 옆에 별칭 \`${a}\` 도 함께 나옵니다. C 코드의 변수 이름을 붙여 두면 값이 무엇인지 알아보기 쉽습니다. 자리가 좁으면 줄여서 보이고, 마우스를 올리면 다 보입니다.`;
     },
     targets: () => [pinnedReg(r.key)] },
   skip: async (t) => { withPin(t, r.key, ALIAS); },
