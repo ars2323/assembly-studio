@@ -399,7 +399,7 @@ export class Tutorial {
         h('p', {}, codeText((res ?? step).body(this))),
         h('div', { class: 'tut-buttons' }, ...buttons)),
       character(step.pose ?? 'haram', 76));
-    (card.querySelector('img.char') as HTMLElement).classList.add('tut-char');
+    card.querySelector('img.char')?.classList.add('tut-char'); // none when the brand has no characters
     this.lastLayout = '';
   }
 
