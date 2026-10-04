@@ -413,7 +413,6 @@ img.icon { filter: var(--icon-filter); }
 .asm .cells .cell.lead { font-weight: 600; }
 .asm .cells .cell.lead.idle { color: var(--text-2); }
 .asm .cells .cell.warn { color: var(--amber-text); }
-.asm .cells .num { margin-right: .3em; }
 .asm .asm-note { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--text-2); }
 /* The error list: the cells, what to do, the errors in one ruled box, the
    button; from the left, at the panel's own height. */
@@ -436,6 +435,8 @@ img.icon { filter: var(--icon-filter); }
 .asm .line:disabled { cursor: default; }
 .asm .msg { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; }
 .asm .msg .what { color: var(--text); }
+/* The assembler's own words, after the window's short ones: quieter. */
+.asm .msg .what .raw { margin-left: 8px; color: var(--muted); font-size: 12px; }
 .asm .msg .src { max-width: 100%; padding: 1px 7px; border-radius: 4px; background: var(--bg); color: var(--text-2); font-size: 12.5px; }
 .asm .msg .hint { color: var(--teal-text); font-size: 12.5px; }
 .asm .msg .hint .mono { color: var(--strong); }

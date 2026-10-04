@@ -1,4 +1,6 @@
-/* The message tables (src/renderer/app/messages/, core/lang.ts): every
+/* The message tables (src/renderer/app/messages/, core/lang.ts, and the
+   assembler's words: core/asm-messages.ts, core/near-miss.ts and their
+   RISC-V twins): every
    message is said in both languages, the same way (a string, the parts of
    a line, or a function of as many values), the English with no Hangul,
    and both name the same code (the `backticked` parts). */
@@ -6,6 +8,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { ASM_MESSAGES } from '../../src/core/asm-messages.ts';
+import { HINTS } from '../../src/core/near-miss.ts';
+import { RISCV_HINTS } from '../../src/isa/riscv/core/near-miss.ts';
+import { RARS_MESSAGES } from '../../src/isa/riscv/core/rars-messages.ts';
+import { ASSEMBLE, STATUS } from '../../src/renderer/app/messages/assemble.ts';
 import { DIALOGS } from '../../src/renderer/app/messages/dialogs.ts';
 import { INSPECTOR } from '../../src/renderer/app/messages/inspector.ts';
 import { SETTINGS } from '../../src/renderer/app/messages/settings.ts';
@@ -13,7 +20,8 @@ import { CARD, CHAPTERS, MIPS, RISCV, STEPS } from '../../src/renderer/app/messa
 import { WELCOME } from '../../src/renderer/app/messages/welcome.ts';
 import { brand } from '../../brands/generic/brand.ts';
 
-const TABLES = { WELCOME, DIALOGS, SETTINGS, INSPECTOR, CARD, CHAPTERS, STEPS, MIPS, RISCV, brandAbout: { about: brand.about } };
+const TABLES = { WELCOME, DIALOGS, SETTINGS, INSPECTOR, CARD, CHAPTERS, STEPS, MIPS, RISCV, brandAbout: { about: brand.about },
+  ASSEMBLE, STATUS, ASM_MESSAGES, RARS_MESSAGES, HINTS, RISCV_HINTS };
 
 type Said = string | (string | { key: string } | { click: string })[];
 // Every message in a table, by its path ("STEPS.pin.doing").
