@@ -106,7 +106,7 @@ export async function openAndAssemble(r: Running, file: string): Promise<void> {
 }
 
 // A narrow window shows the Editor and the Run side one at a time (the
-// Editor | Run tabs in the title bar): brings `which` forward.  Side by
+// Editor | Run tabs in the toolbar): brings `which` forward.  Side by
 // side there is nothing to do.
 export async function side(page: Page, which: 'Editor' | 'Run'): Promise<void> {
   const tab = page.getByRole('tab', { name: which, exact: true });
@@ -114,7 +114,7 @@ export async function side(page: Page, which: 'Editor' | 'Run'): Promise<void> {
 }
 
 // Run speed, through the control the width shows: the two radio buttons,
-// or (a narrow title bar) the one button that switches between them.
+// or (a narrow toolbar) the one button that switches between them.
 export async function setSpeed(page: Page, which: 'Instant' | '1 line/s'): Promise<void> {
   const radio = page.getByRole('radio', { name: which });
   if (await radio.isVisible()) { await radio.click(); return; }
