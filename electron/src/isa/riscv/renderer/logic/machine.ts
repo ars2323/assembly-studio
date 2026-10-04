@@ -4,6 +4,8 @@
 
 import { decode, formatName } from '../../core/decoder.ts';
 import { bin32Grouped, hex32, signedDec32 } from '../../../../core/format.ts';
+import { say, type Lang } from '../../../../core/lang.ts';
+import { STATUS } from '../../../../renderer/app/messages/assemble.ts';
 import { abiName, REGISTER_GROUPS } from '../../core/registers.ts';
 import type { Reason, TextWord } from '../../sim/protocol.ts';
 
@@ -124,25 +126,27 @@ export function stateAfter(reason: StopReason): RunState {
 
 // The status bar's first cell after a stop: what happened, and where.
 // `code` in backticks (set in the mono font).
-export function stopMessage(reason: StopReason | 'input', pc: string): string {
+export function stopMessage(reason: StopReason | 'input', pc: string, lang: Lang): string {
+  const s = STATUS.stop;
   switch (reason) {
-    case 'exit': return 'Exited';
-    case 'error': return 'Runtime error';
-    case 'breakpoint': return `Breakpoint at \`${pc}\``;
-    case 'input': return 'Waiting for input';
-    case 'stopped': return `Stopped at \`${pc}\``;
-    case 'limit': return `Stepped · PC \`${pc}\``;
+    case 'exit': return say(lang, s.exit);
+    case 'error': return say(lang, s.error);
+    case 'breakpoint': return say(lang, s.breakpoint, pc);
+    case 'input': return say(lang, s.input);
+    case 'stopped': return say(lang, s.stopped, pc);
+    case 'limit': return say(lang, s.limit, pc);
   }
 }
 
 // ...and the keys that go on from there, for the status bar's far end
 // (a key of '' is a hint without a key).
-export function stopKeys(reason: StopReason | 'input'): [string, string][] {
+export function stopKeys(reason: StopReason | 'input', lang: Lang): [string, string][] {
+  const k = STATUS.keys;
   switch (reason) {
-    case 'exit': return [['', 'Reset to run again']];
-    case 'error': return [['', 'See the Console · Reset to run again']];
-    case 'input': return [['Enter', 'in the Console'], ['Esc', 'Stop']];
-    case 'breakpoint': case 'stopped': return [['F5', 'Continue'], ['F10', 'Step']];
+    case 'exit': return [['', say(lang, k.again)]];
+    case 'error': return [['', say(lang, k.console)]];
+    case 'input': return [['Enter', say(lang, k.inConsole)], ['Esc', 'Stop']];
+    case 'breakpoint': case 'stopped': return [['F5', say(lang, k.resume)], ['F10', 'Step']];
     case 'limit': return [['F10', 'Step'], ['F5', 'Run']];
   }
 }

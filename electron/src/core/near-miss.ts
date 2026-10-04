@@ -1,31 +1,66 @@
-/* A guess at the name a student meant, for the error list's hint: on the
-   line the assembler could not read, a name a letter or two away from one
-   it knows -- .global for .globl, .asciz for .asciiz, srll for srl -- a
-   register that does not exist ($s10, $t10), or a register name without
-   its $ (t0).  The most common slips of a student who comes from GNU as
-   or MARS, which the core reports as "syntax error" and nothing more.
+/* What is wrong on the line the assembler could not read, for the error
+   list's hint: a first word that is no instruction or directive SPIM knows
+   (srll, .global, lii), a register that does not exist ($s10, $t10, $spp),
+   or a register name without its $ (t0) -- the most common slips, which
+   the core reports as "syntax error" and nothing more.
 
-   Where it looks: the statement's first word (an instruction or a
-   directive) and its operands' $-words (registers) and bare words that
-   are a register's name; labels in front of the statement, numbers,
-   strings and the comment are left alone.  An instruction is compared
-   with instructions only, a directive with directives, a register with
-   registers: a wrong guess is worse than none.
+   The hint says what is wrong, never what the student may have meant: no
+   "did you mean srl?".  A guess can be wrong, and the student is the one
+   to find the right word.  Facts about the names are fine: "the $t
+   registers are $t0-$t9".
 
-   What counts as near (nearMissRule): Damerau-Levenshtein distance 1 for
-   a name of up to five characters, 2 from six on; one candidate at that
-   distance, or, among those tied, the one sharing the longest prefix with
-   the word, then the longest suffix (.asciz: .asciiz over .ascii) -- still
-   tied, no guess.  A word of two characters or less is never guessed at
-   (too many names are one letter from it). */
+   Where it looks: the statements' first words (core/precheck.ts: the line
+   without its comment and strings, labels and equates), against the core's
+   own keyword table, case and all; their operands' $-words (registers);
+   and bare words that are a register's name.  A $-word that is no register
+   is named only when it is a letter or two from one ($spp): SPIM also
+   takes $-words as labels.  (nearest(): Damerau-Levenshtein distance 1
+   for a name of up to five characters, 2 from six on; a word of two
+   characters or less is never taken for a near one.)
 
-import { mipsDirectiveNames, mipsInstructionNames } from './mips-syntax.ts';
+   The words are said in either language (core/lang.ts); `code` in
+   backticks (the window sets it in the code font). */
+
+import { say, type Lang } from './lang.ts';
+import { isMipsDirective, isMipsInstruction } from './mips-syntax.ts';
+import { firstName, statements, withoutLabels } from './precheck.ts';
 import { generalRegisterName } from './registers.ts';
 
 export type NearMiss =
-  | { why: 'spelling'; kind: 'directive' | 'instruction' | 'register'; token: string; meant: string }
+  | { why: 'unknown'; kind: 'directive' | 'instruction'; token: string }
+  | { why: 'unknown-register'; token: string }
   | { why: 'no-such-register'; token: string; family: string; range: string }
-  | { why: 'missing-dollar'; token: string; meant: string };
+  | { why: 'missing-dollar'; token: string };
+
+/* The hints, in both languages.  Shared with RISC-V
+   (isa/riscv/core/near-miss.ts) where they say the same thing. */
+export const HINTS = {
+  unknown: {
+    instruction: { ko: (t: string) => `\`${t}\` 라는 명령은 없습니다.`, en: (t: string) => `There is no instruction \`${t}\`.` },
+    directive: { ko: (t: string) => `\`${t}\` 라는 지시어는 없습니다.`, en: (t: string) => `There is no directive \`${t}\`.` },
+  },
+  unknownRegister: { ko: (t: string) => `\`${t}\` 라는 레지스터는 없습니다.`, en: (t: string) => `There is no register \`${t}\`.` },
+  noSuchRegister: {
+    ko: (t: string, family: string, range: string) => `\`${t}\` 라는 레지스터는 없습니다. \`${family}\` 레지스터는 \`${range}\` 입니다.`,
+    en: (t: string, family: string, range: string) => `There is no register \`${t}\`. The \`${family}\` registers are \`${range}\`.`,
+  },
+  missingDollar: { ko: '레지스터 이름은 `$` 로 시작합니다.', en: 'Register names start with `$`.' },
+  // What a message's kind usually needs, when the line shows nothing more.
+  syntax: {
+    ko: '명령 이름, 레지스터 이름(`$t0` 처럼), 쉼표를 확인하세요.',
+    en: 'Check the instruction name, the register names (like `$t0`) and the commas.',
+  },
+  twice: { ko: '같은 이름의 Label 이 둘 있습니다. 하나의 이름을 바꾸세요.', en: 'Two labels have this name. Rename one of them.' },
+  shift: { ko: '시프트 양은 0 부터 31 까지입니다.', en: 'A shift amount is 0 to 31.' },
+  tooLarge: {
+    ko: '이 명령에 넣기에는 값이 너무 큽니다. 먼저 `li` 로 레지스터에 넣으세요.',
+    en: 'The value is too big for this instruction. Put it in a register with `li` first.',
+  },
+  undefined: {
+    ko: '쓰였지만 정의되지 않은 이름입니다. 철자와 `.globl` 을 확인하세요.',
+    en: 'This name is used but never defined. Check its spelling and `.globl`.',
+  },
+};
 
 const REGISTERS = Array.from({ length: 32 }, (_, i) => generalRegisterName(i));
 const FAMILIES: Record<string, [number, number]> = { t: [0, 9], s: [0, 7], a: [0, 3], v: [0, 1], k: [0, 1] };
@@ -56,85 +91,80 @@ const commonPrefix = (a: string, b: string): number => {
 const reverse = (s: string): string => [...s].reverse().join('');
 const commonSuffix = (a: string, b: string): number => commonPrefix(reverse(a), reverse(b));
 
-// The one name of `names` near `word`, or null.
-export function nearest(word: string, names: readonly string[]): string | null {
+/* Whether `word` is plainly a slip of one name of `names` (and not one of
+   them): one name at the nearest distance allowed, or, among those tied,
+   the one sharing the longest prefix with the word, then the longest
+   suffix -- still tied, it is not ($L1: $t1, $s1, $a1 ... alike, likely a
+   label).  The name itself is never shown: only that the word is no name. */
+export function nearAny(word: string, names: readonly string[]): boolean {
   const allowed = nearMissRule(word.length);
-  if (allowed === 0 || names.includes(word)) return null;
-  let best: { name: string; distance: number; prefix: number; suffix: number }[] = [];
+  if (allowed === 0 || names.includes(word)) return false;
+  let best: { distance: number; prefix: number; suffix: number }[] = [];
   for (const name of names) {
     const distance = editDistance(word, name);
     if (distance === 0 || distance > allowed) continue;
-    const entry = { name, distance, prefix: commonPrefix(word, name), suffix: commonSuffix(word, name) };
+    const entry = { distance, prefix: commonPrefix(word, name), suffix: commonSuffix(word, name) };
     if (best.length === 0 || distance < best[0].distance) best = [entry];
     else if (distance === best[0].distance) best.push(entry);
   }
-  if (best.length === 0) return null;
   for (const key of ['prefix', 'suffix'] as const) {
     const longest = Math.max(...best.map((b) => b[key]));
     best = best.filter((b) => b[key] === longest);
   }
-  return best.length === 1 ? best[0].name : null;
-}
-
-// The line without its comment and its strings, and without the labels in
-// front of the statement.
-function statementOf(line: string): string {
-  let s = line.replace(/"(?:[^"\\]|\\.)*"/g, '""');
-  const hash = s.indexOf('#');
-  if (hash >= 0) s = s.slice(0, hash);
-  return s.replace(/^\s*(?:[A-Za-z_.$][\w.$]*\s*:\s*)+/, '').trim();
+  return best.length === 1;
 }
 
 export function nearMiss(sourceLine: string): NearMiss | null {
-  const statement = statementOf(sourceLine);
-  if (statement === '') return null;
-  const words = statement.split(/[\s,()]+/).filter(Boolean);
-  const [first, ...operands] = words;
-  // The instruction or directive.
-  if (first.startsWith('.')) {
-    const meant = nearest(first, mipsDirectiveNames());
-    if (meant) return { why: 'spelling', kind: 'directive', token: first, meant };
-  } else if (/^[A-Za-z][\w.]*$/.test(first)) {
-    const meant = nearest(first.toLowerCase(), mipsInstructionNames());
-    if (meant) return { why: 'spelling', kind: 'instruction', token: first, meant };
-  }
-  // The registers among the operands.
-  for (const w of operands) {
-    if (w.startsWith('$')) {
-      if (REGISTERS.includes(w) || /^\$(?:[0-9]|[12][0-9]|3[01])$/.test(w) || /^\$f(?:[0-9]|[12][0-9]|3[01])$/.test(w)) continue;
-      const family = /^\$([a-z])(\d+)$/.exec(w);
-      if (family && family[1] in FAMILIES) {
-        const [lo, hi] = FAMILIES[family[1]];
-        const n = Number(family[2]);
-        if (n < lo || n > hi) return { why: 'no-such-register', token: w, family: `$${family[1]}`, range: `$${family[1]}${lo}–$${family[1]}${hi}` };
+  for (const s of statements(sourceLine)) {
+    const statement = withoutLabels(s);
+    if (statement === '') continue;
+    // The instruction or directive.
+    const first = firstName(statement);
+    if (first !== null && !(first.startsWith('.') ? isMipsDirective(first) : isMipsInstruction(first))) {
+      return { why: 'unknown', kind: first.startsWith('.') ? 'directive' : 'instruction', token: first };
+    }
+    // The registers among the operands.
+    const [, ...operands] = statement.replace(/"(?:[^"\\]|\\.)*"/g, '""').split(/[\s,()]+/).filter(Boolean);
+    for (const w of operands) {
+      if (w.startsWith('$')) {
+        if (REGISTERS.includes(w) || /^\$(?:[0-9]|[12][0-9]|3[01])$/.test(w) || /^\$f(?:[0-9]|[12][0-9]|3[01])$/.test(w)) continue;
+        const family = /^\$([a-z])(\d+)$/.exec(w);
+        if (family && family[1] in FAMILIES) {
+          const [lo, hi] = FAMILIES[family[1]];
+          const n = Number(family[2]);
+          if (n < lo || n > hi) return { why: 'no-such-register', token: w, family: `$${family[1]}`, range: `$${family[1]}${lo}–$${family[1]}${hi}` };
+        }
+        if (/^\$(\d+)$/.test(w)) return { why: 'no-such-register', token: w, family: '$0', range: '$0–$31' };
+        if (nearAny(w.toLowerCase(), REGISTERS)) return { why: 'unknown-register', token: w };
+      } else if (/^[a-z][a-z0-9]*$/.test(w) && REGISTERS.includes(`$${w}`)) {
+        return { why: 'missing-dollar', token: w };
       }
-      const number = /^\$(\d+)$/.exec(w);
-      if (number) return { why: 'no-such-register', token: w, family: '$0', range: '$0–$31' };
-      const meant = nearest(w.toLowerCase(), REGISTERS);
-      if (meant) return { why: 'spelling', kind: 'register', token: w, meant };
-    } else if (/^[a-z][a-z0-9]*$/.test(w) && REGISTERS.includes(`$${w}`)) {
-      return { why: 'missing-dollar', token: w, meant: `$${w}` };
     }
   }
   return null;
 }
 
-/* What to do about an assembler message, shown under it in the Assemble
-   panel.  For a syntax error, first the slip the line shows when there is
-   one to name (nearMiss above); then what the message's kind usually
-   needs.  `code` in backticks (the window sets it in the code font).
-   Nothing useful to add: ''. */
-export function assemblerHint(message: string, source: string): string {
-  if (/syntax error/i.test(message)) {
-    const near = nearMiss(source);
-    if (near?.why === 'spelling') return `No ${near.kind} \`${near.token}\`. Did you mean \`${near.meant}\`?`;
-    if (near?.why === 'no-such-register') return `No register \`${near.token}\`. The \`${near.family}\` registers are \`${near.range}\`.`;
-    if (near?.why === 'missing-dollar') return `Register names start with \`$\`: \`${near.token}\` → \`${near.meant}\`.`;
-    return 'Check the instruction name, the register names (like `$t0`) and the commas.';
+// What is wrong on a line, said in `lang`; null when the line shows nothing.
+export function nearMissHint(near: NearMiss | null, lang: Lang): string | null {
+  switch (near?.why) {
+    case 'unknown': return say(lang, HINTS.unknown[near.kind], near.token);
+    case 'unknown-register': return say(lang, HINTS.unknownRegister, near.token);
+    case 'no-such-register': return say(lang, HINTS.noSuchRegister, near.token, near.family, near.range);
+    case 'missing-dollar': return say(lang, HINTS.missingDollar);
+    default: return null;
   }
-  if (/defined for the second time|already defined/i.test(message)) return 'Two labels have this name. Rename one of them.';
-  if (/shift distance/i.test(message)) return 'A shift amount is 0 to 31.';
-  if (/too large|out of range|immediate/i.test(message)) return 'The value is too big for this instruction. Put it in a register with `li` first.';
-  if (/undefined|unknown/i.test(message)) return 'This name is used but never defined. Check its spelling and `.globl`.';
+}
+
+/* What to do about an assembler message, shown under it in the Assemble
+   panel.  For a syntax error, first what the line shows is wrong (nearMiss
+   above); then what the message's kind usually needs.  Nothing useful to
+   add: ''. */
+export function assemblerHint(message: string, source: string, lang: Lang): string {
+  if (/syntax error/i.test(message)) return nearMissHint(nearMiss(source), lang) ?? say(lang, HINTS.syntax);
+  if (/defined for the second time|already defined/i.test(message)) return say(lang, HINTS.twice);
+  if (/shift distance/i.test(message)) return say(lang, HINTS.shift);
+  if (/register number/i.test(message)) return '';
+  if (/too large|out of range|immediate/i.test(message)) return say(lang, HINTS.tooLarge);
+  if (/undefined/i.test(message)) return say(lang, HINTS.undefined);
   return '';
 }

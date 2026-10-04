@@ -9,38 +9,43 @@
                  (each error: its line, the message, the line's text, a hint),
                  a button to the first error's line
 
-   The first cell is the state, in its colour (cells.ts, app.css "cells").
-   The error list keeps the classes the tutorial points at (.notice h3,
-   .item, .row .btn). */
+   In the language in use (messages/assemble.ts); the window draws it again
+   when the language changes.  The first cell is the state, in its colour
+   (cells.ts, app.css "cells").  The error list keeps the classes the
+   tutorial points at (.notice h3, .item, .row .btn). */
 
-import { ago, cell, count, lead, plural } from '../cells.ts';
+import { ago, cell, count, lead } from '../cells.ts';
 import { code, codeText, h, icon, withHex } from '../dom.ts';
+import { tr } from '../i18n.ts';
+import { ASSEMBLE } from '../messages/assemble.ts';
 
-const ctrlS = () => h('kbd', {}, 'Ctrl+S');
+type Part = string | { key: string };
+const said = (parts: Part[]): (string | HTMLElement)[] => parts.map((p) => (typeof p === 'string' ? p : h('kbd', {}, p.key)));
 const saveCell = (note: string, warn: boolean) => (note ? cell(warn ? 'warn' : '', note) : null);
 
 export function freshState(saves: boolean, saveNote: string, saveWarn: boolean): HTMLElement {
   return h('div', { class: 'asm-state' },
-    h('div', { class: 'cells' }, lead('idle', 'Not assembled'), saveCell(saveNote, saveWarn)),
-    h('p', { class: 'asm-note' }, 'Press ', ctrlS(), ` to ${saves ? 'save and ' : ''}assemble. The result and any errors show up here.`));
+    h('div', { class: 'cells' }, lead('idle', tr(ASSEMBLE.notAssembled)), saveCell(saveNote, saveWarn)),
+    h('p', { class: 'asm-note' }, ...said(tr(ASSEMBLE.fresh, saves))));
 }
 
 export function busyState(): HTMLElement {
-  return h('div', { class: 'asm-state' }, h('div', { class: 'cells' }, lead('run', 'Assembling…')));
+  return h('div', { class: 'asm-state' }, h('div', { class: 'cells' }, lead('run', tr(ASSEMBLE.assembling))));
 }
 
 // Edits since are the Editor's dot (beside the file's name), not a note here.
 export function assembledState(o: { instructions: number; at: Date; saveNote: string; saveWarn: boolean }): HTMLElement {
   return h('div', { class: 'asm-state' },
-    h('div', { class: 'cells' }, lead('ok', 'Assembled'), cell('', count(o.instructions, 'instruction')),
+    h('div', { class: 'cells' }, lead('ok', tr(ASSEMBLE.assembled)), cell('', count(o.instructions, ASSEMBLE.instructions)),
       saveCell(o.saveNote, o.saveWarn), cell('time', ago(o.at))));
 }
 
 export interface AsmError {
   line: number;     // the Editor's, 0 if none
-  message: string;  // the assembler's own words
+  message: string;  // what is wrong, in the language in use (asm-messages.ts), or the assembler's own words
+  raw: string;      // the assembler's own words when `message` is not them; '' if none
   source: string;   // the line's text, '' if none
-  hint: string;     // what to do (near-miss.ts), `code` in backticks; '' if nothing
+  hint: string;     // what is wrong on the line (near-miss.ts), `code` in backticks; '' if nothing
 }
 
 export function errorList(o: {
@@ -52,15 +57,18 @@ export function errorList(o: {
   toEditor(): void;
 }): HTMLElement {
   const first = o.errors.find((e) => e.line > 0) ?? o.errors[0];
-  const go = h('button', { class: 'btn small goline', type: 'button' }, h('span', {}, first.line ? `Go to line ${first.line}` : 'Go to the Editor'), icon('arrow-right'));
+  const go = h('button', { class: 'btn small goline', type: 'button' },
+    h('span', {}, first.line ? tr(ASSEMBLE.goToLine, first.line) : tr(ASSEMBLE.toEditor)), icon('arrow-right'));
   go.addEventListener('click', () => (first.line ? o.goTo(first.line) : o.toEditor()));
   const items = o.errors.map((e) => {
-    const where = h('button', { class: 'linkbtn line', type: 'button', disabled: !e.line, title: e.line ? `Go to line ${e.line}` : undefined },
-      e.line ? `Line ${e.line}` : '');
+    const where = h('button', { class: 'linkbtn line', type: 'button', disabled: !e.line, title: e.line ? tr(ASSEMBLE.goToLine, e.line) : undefined },
+      e.line ? tr(ASSEMBLE.line, e.line) : '');
     where.addEventListener('click', () => { if (e.line) o.goTo(e.line); });
+    // The assembler's own words beside the window's: what its documentation and a search know.
+    const raw = e.raw && e.raw !== e.message ? h('span', { class: 'raw' }, withHex(e.raw)) : null;
     return h('div', { class: 'item' }, h('span', { class: 'mark', 'aria-hidden': 'true' }, '!'), where,
       h('span', { class: 'msg' },
-        h('span', { class: 'what' }, withHex(e.message)),
+        h('span', { class: 'what', title: raw ? tr(ASSEMBLE.engineSaid, e.raw) : undefined }, withHex(e.message), raw),
         e.source ? code(e.source, 'src') : null,
         e.hint ? h('span', { class: 'hint' }, codeText(e.hint)) : null));
   });
@@ -68,10 +76,9 @@ export function errorList(o: {
   // to the first.  With a program in the machine, it is still there.
   const n = o.errors.length;
   return h('div', { class: 'notice-host' }, h('div', { class: 'notice' }, h('div', { class: 'say' },
-    h('h3', { class: 'cells' }, lead('err', plural(n, 'error')), cell('', o.kept ? 'Last program kept' : 'Not assembled'),
+    h('h3', { class: 'cells' }, lead('err', tr(ASSEMBLE.errors, n)), cell('', tr(o.kept ? ASSEMBLE.kept : ASSEMBLE.notAssembled)),
       o.at ? cell('time', ago(o.at)) : null),
-    h('p', { class: 'asm-note' }, n > 1 ? 'Fix them from the top, then press ' : 'Fix the line below, then press ', ctrlS(), ' again.',
-      o.kept ? ` The ${o.narrow ? 'Run tab' : 'Run side'} still shows the last program that assembled.` : ''),
+    h('p', { class: 'asm-note' }, ...said(tr(ASSEMBLE.fix, n > 1)), o.kept ? tr(ASSEMBLE.keptNote, o.narrow) : ''),
     h('div', { class: 'items' }, ...items),
     h('div', { class: 'row' }, go))));
 }

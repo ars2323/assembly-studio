@@ -7,7 +7,7 @@ The plan and its stages are in `PLAN.md`.
 
 | Path | What |
 |---|---|
-| `CPU/` | The SPIM core. **Do not modify** |
+| `CPU/` | The SPIM core (upstream r764, checksums in `CPU/ORIGIN.md`). **Do not modify the sources** |
 | `probe/` | The RARS wrapper (`RarsProbe.java`). RARS itself is built from a pinned commit and **not modified** |
 | `electron/src` | The app (main, renderer, core, sim). MIPS lives in `core/ sim/ renderer/app/`; what is RISC-V only lives in `isa/riscv/` |
 | `electron/native` | The SPIM N-API addon |

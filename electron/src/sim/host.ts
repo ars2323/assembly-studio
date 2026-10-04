@@ -21,12 +21,17 @@ export const FATAL_EXIT_CODE = 70;
 export class SimulatorCrashed extends Error {
   readonly exit: ExitInfo;
   readonly fatal: string | null; // the core's own words, when it was a fatal_error()
+  // The line of the program the core was reading when it ended, if it ended
+  // while reading one (native/src/addon.cc, sayWhereReading()).
+  readonly line: number | null;
   constructor(exit: ExitInfo, cause: string) {
     const fatal = /SPIM core fatal error: (.*)/.exec(exit.stderr)?.[1]?.trim() ?? null;
     super(`${CRASH_MESSAGE} (${cause}${fatal ? `: ${fatal}` : ''})`);
     this.name = 'SimulatorCrashed';
     this.exit = exit;
     this.fatal = fatal;
+    const line = /SPIM core was reading line (\d+)/.exec(exit.stderr)?.[1];
+    this.line = line ? Number(line) : null;
   }
 }
 
