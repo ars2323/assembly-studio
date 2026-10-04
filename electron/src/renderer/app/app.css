@@ -841,26 +841,16 @@ body.arriving .work { animation: arrive .45s ease-out both; }
 .wback:hover { border-color: #fff; background: rgba(255,255,255,.09); }
 .wback:hover img { opacity: 1; }
 .wback:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
-/* A change of step: a discharge -- arcs jumping from the buttons to the die
-   frame and between the two, flickering and gone, the frame flaring with
-   them (panels/welcome.ts zap()) -- and the new buttons rising out of a
-   glow, one after the other.  Every one of these animations ends. */
-.wfx { position: absolute; inset: 0; pointer-events: none; overflow: hidden; border-radius: inherit;
-  --zap-core: #ffffff; --zap-glow: rgba(186,214,255,.75); }
-.wfx .zap { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.wfx .zap path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
-.wfx .zap .zglow { stroke: var(--zap-glow); stroke-width: 4.5; filter: blur(3px); }
-.wfx .zap .zcore { stroke: var(--zap-core); stroke-width: 1.4; }
-.wcard.surge::before { animation: wsurge .44s ease-out both; }
-@keyframes wsurge { 0% { border-color: var(--surge, rgba(225,236,255,1)); box-shadow: 0 0 14px var(--surge, rgba(186,214,255,.8)), inset 0 0 12px var(--surge, rgba(186,214,255,.5)); }
-  35% { border-color: var(--surge, rgba(210,228,255,.95)); }
-  100% { box-shadow: 0 0 0 transparent, inset 0 0 0 transparent; } }
-.actions.enter .action { animation: wenter .5s cubic-bezier(.2, .7, .2, 1) both; }
-.actions.enter .action:nth-child(2) { animation-delay: .08s; }
-/* The glow's colour is a variable, not a second set of keyframes, so a
-   switch of theme does not start the buttons coming in again. */
-@keyframes wenter { 0% { opacity: 0; transform: translateY(8px); box-shadow: 0 0 18px rgba(var(--wenter-rgb, 255,255,255),.55); }
-  60% { opacity: 1; box-shadow: 0 0 14px rgba(var(--wenter-rgb, 255,255,255),.35); } 100% { opacity: 1; transform: none; box-shadow: 0 0 0 rgba(var(--wenter-rgb, 255,255,255),0); } }
+/* A change of step: the buttons stay where they are and only what is on
+   them changes -- the words and icons fade out (.actions.out) and the new
+   ones fade in (.actions.enter), the second a beat after the first
+   (panels/welcome.ts show()).  Every one of these animations ends. */
+.action > * { transition: opacity .13s ease-in; }
+.actions.out .action > * { opacity: 0; }
+.actions.out { pointer-events: none; }
+.actions.enter .action > * { animation: wlabel .26s ease-out both; }
+.actions.enter .action:nth-child(2) > * { animation-delay: .06s; }
+@keyframes wlabel { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .wlogo, .wtitle, .wbody, .wcorner, .wisa { transition: none; } }
 
 /* ---- first screen by day (<html data-theme="light">) ----------------------
@@ -898,10 +888,6 @@ body.arriving .work { animation: arrive .45s ease-out both; }
 :root[data-theme="light"] .wback:hover { border-color: #16181d; background: rgba(30,34,42,.06); }
 :root[data-theme="light"] .wback:focus-visible { outline-color: #16181d; }
 :root[data-theme="light"] .wisa { color: rgba(22,24,29,.5); }
-/* The discharge in ink: a dark core in a steel-blue glow, the frame flaring blue. */
-:root[data-theme="light"] .wfx { --zap-core: #1d2b45; --zap-glow: rgba(70,105,160,.55); }
-:root[data-theme="light"] .wcard { --surge: rgba(70,105,160,.75); }
-:root[data-theme="light"] .actions { --wenter-rgb: 70,105,160; }
 /* The switch on the card, in the card's own colours. */
 :root[data-theme="light"] .wtheme .theme-switch { border-color: rgba(30,34,42,.24); background: #f1f2f4; }
 :root[data-theme="light"] .wtheme .theme-switch .ts-knob { background: #ffffff; border-color: rgba(30,34,42,.28);

@@ -25,7 +25,6 @@ import { h, icon, markImg } from '../dom.ts';
 import { currentTheme, onTheme, THEME_FADE_MS, themeSwitch } from '../theme.ts';
 import { CHIP_ATTR, startfield } from '../../startfield/index.ts';
 import { offsets, SEED, type SparkName, sparkAt } from './spark.ts';
-import { bolt, fork, pathOf, type Point } from './zap.ts';
 
 /** The product name on the package.  The seed the board is grown from is in
     spark.ts, with what else is derived from it. */
@@ -67,10 +66,8 @@ const wait = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
 
 // The name and the ISA step come up when the board is this far grown.
 const REVEAL_AT = 0.5;
-// The discharge on a change of step: when each flicker is drawn (ms), and when it is gone.
-const ZAP_FLICKERS = [0, 60, 115, 185, 265, 350];
-const ZAP_END = 440;
-const SVG = 'http://www.w3.org/2000/svg';
+// A change of step: the buttons stay, their words go out over this long and the new ones come in.
+const LABEL_OUT = 130;
 
 export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: boolean): void } {
   const calm = matchMedia('(prefers-reduced-motion: reduce)');
@@ -89,9 +86,23 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
      equals (the same border, ground and light); on the others the first is
      the one most of them want, and the hierarchy of the two -- border,
      words, ground, and the light each carries -- says which is which.
-     Every change of step is marked by a discharge (zap()). */
+     A change of step leaves the two buttons where they are -- every step has
+     two, in the same places -- and changes only what is on them: the words
+     fade out and the new ones in (show()). */
   let equal = false;                 // the two buttons carry the same light
+  let swapping = 0;
   const show = (step: 0 | 1 | 2, animate = true) => {
+    if (animate && !calm.matches && actions.childElementCount > 0) {
+      clearTimeout(swapping);
+      actions.classList.remove('enter');
+      actions.classList.add('out');
+      swapping = window.setTimeout(() => { actions.classList.remove('out'); build(step); enter(); }, LABEL_OUT);
+      return;
+    }
+    build(step);
+    if (animate) enter();
+  };
+  const build = (step: 0 | 1 | 2) => {
     if (step === 0) {
       actions.replaceChildren(
         action('MIPS', 'cpu', () => void choose('mips'), true),
@@ -112,7 +123,6 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
     corner.classList.toggle('on', step !== 0);
     isaTag.classList.toggle('on', step !== 0);
     isaTag.textContent = ISA_NAME[chosen];
-    if (animate) { enter(); zap(); }
     if (step === 2) (actions.firstElementChild as HTMLElement).focus();
   };
   // The ISA is only remembered here: nothing is loaded or switched yet.
@@ -144,13 +154,12 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
      rises and shrinks to its place and the name and the ISA step come up under it
      (reveal()).  A click on the card does it at once. */
   const title = h('span', { class: 'wtitle', 'data-text': WORDMARK }, WORDMARK);
-  const fx = h('div', { class: 'wfx', 'aria-hidden': 'true' });
   const card = h('div', { class: 'wcard', [CHIP_ATTR]: '' },
     h('div', { class: 'wstack' },
       markImg('wlogo'),
       title,
       h('div', { class: 'wbody' }, actions)),
-    corner, isaTag, h('div', { class: 'wtheme' }, themeSwitch()), fx);
+    corner, isaTag, h('div', { class: 'wtheme' }, themeSwitch()));
   // A switch of theme: the board cross-fades to the other look (start.setTheme),
   // over the same time the page's colours take (theme.ts).
   onTheme((t) => start.setTheme(t));
@@ -160,75 +169,18 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
     if (revealed) return;
     revealed = true;
     card.classList.remove('intro');
-    void wait(380).then(() => { enter(); zap(); });
+    void wait(380).then(enter);
   };
   card.addEventListener('click', reveal);
   show(picked ? (then === 'tutorial' ? 1 : 2) : 0, home && !calm.matches);
 
-  // The buttons come in (a short rise out of a white glow), the two one after the other.
+  // The words on the buttons come in (a fade), the two one after the other; the buttons themselves do not move.
   function enter(): void {
     if (calm.matches) return;
     actions.classList.remove('enter');
     void actions.offsetWidth;
     actions.classList.add('enter');
   }
-  /* Electricity: arcs jump from the buttons out to the die frame on either
-     side and across the gap between the two, flicker a few times -- a new
-     jagged path each time, not all of them at once -- and are gone; the die
-     frame flares with them (.wcard.surge).  Drawn on an SVG over the card,
-     by timers that end (no CSS animation that runs on, which the capture
-     tool would freeze half way). */
-  let zapTimers: number[] = [];
-  function zap(): void {
-    if (calm.matches) return;
-    for (const id of zapTimers) clearTimeout(id);
-    zapTimers = [];
-    card.classList.remove('surge');
-    void card.offsetWidth;
-    card.classList.add('surge');
-    const c = card.getBoundingClientRect();
-    const buttons = [...actions.querySelectorAll<HTMLElement>('.action')].map((b) => b.getBoundingClientRect());
-    if (c.width === 0 || buttons.length === 0) { fx.replaceChildren(); return; }
-    const frame = 21;                                   // the die frame's inner edge: the 2.5 px border, then .wcard::before (inset 18px, 1 px)
-    const rel = (r: DOMRect) => ({ l: r.left - c.left, r: r.right - c.left, t: r.top - c.top, b: r.bottom - c.top });
-    const ends = (): [Point, Point][] => {
-      const out: [Point, Point][] = [];
-      for (const r of buttons.map(rel)) {
-        const y = () => r.t + (0.25 + Math.random() * 0.5) * (r.b - r.t);
-        const y1 = y(), y2 = y();
-        out.push([[r.l, y1], [frame, y1 + (Math.random() - 0.5) * 50]]);
-        out.push([[r.r, y2], [c.width - frame, y2 + (Math.random() - 0.5) * 50]]);
-      }
-      if (buttons.length > 1) {
-        const [u, d] = [rel(buttons[0]), rel(buttons[1])];
-        const x = u.l + (0.15 + Math.random() * 0.7) * (u.r - u.l);
-        out.push([[x, u.b], [x + (Math.random() - 0.5) * 40, d.t]]);
-      }
-      return out;
-    };
-    const svg = document.createElementNS(SVG, 'svg');
-    svg.setAttribute('class', 'zap');
-    svg.setAttribute('viewBox', `0 0 ${c.width} ${c.height}`);
-    fx.replaceChildren(svg);
-    const flicker = (i: number): void => {
-      const paths: string[] = [];
-      for (const [a, b] of ends()) {
-        if (Math.random() > 0.85 - i * 0.08) continue;   // fewer of them as it dies down
-        const main = bolt(a, b, 0.32, 5, Math.random);
-        paths.push(pathOf(main));
-        if (Math.random() < 0.5) paths.push(pathOf(fork(main, Math.random)));
-      }
-      const d = paths.join('');
-      const glow = document.createElementNS(SVG, 'path'), core = document.createElementNS(SVG, 'path');
-      glow.setAttribute('class', 'zglow'); core.setAttribute('class', 'zcore');
-      glow.setAttribute('d', d); core.setAttribute('d', d);
-      svg.replaceChildren(glow, core);
-      svg.style.opacity = String(1 - (i / ZAP_FLICKERS.length) * 0.55);
-    };
-    ZAP_FLICKERS.forEach((ms, i) => zapTimers.push(window.setTimeout(() => flicker(i), ms)));
-    zapTimers.push(window.setTimeout(() => { svg.remove(); card.classList.remove('surge'); }, ZAP_END));
-  }
-
   /* The column centred by what can be SEEN, not by its boxes.  The flex
      column centres the boxes, and the mark is a picture whose own
      transparent margin is part of its box.  So: the ink's top and bottom --
