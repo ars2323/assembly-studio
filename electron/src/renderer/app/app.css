@@ -841,22 +841,20 @@ body.arriving .work { animation: arrive .45s ease-out both; }
 .wback:hover { border-color: #fff; background: rgba(255,255,255,.09); }
 .wback:hover img { opacity: 1; }
 .wback:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
-/* A change of step: a burst of white light over the buttons, sparks that
-   flare and fade around them (panels/welcome.ts sparkle()), and the new
-   buttons rising out of a white glow, one after the other.  Every one of
-   these animations ends. */
-.wfx { position: absolute; inset: 0; pointer-events: none; overflow: hidden; border-radius: inherit; }
-.wfx.burst::before { content: ''; position: absolute; inset: 18px;
-  background: radial-gradient(ellipse 60% 45% at 50% 66%, rgba(255,255,255,.30), rgba(255,255,255,0) 70%);
-  animation: wburst .6s ease-out both; }
-@keyframes wburst { 0% { opacity: 0; transform: scale(.9); } 25% { opacity: 1; } 100% { opacity: 0; transform: scale(1.08); } }
-.spark { position: absolute; width: var(--s); height: var(--s); margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2); border-radius: 50%;
-  background: #fff; box-shadow: 0 0 6px 2px rgba(255,255,255,.8); opacity: 0; animation: wspark .75s ease-out var(--d) both; }
-.spark::before, .spark::after { content: ''; position: absolute; left: 50%; top: 50%; width: calc(var(--s) * 5); height: 1px;
-  background: linear-gradient(90deg, rgba(255,255,255,0), #fff, rgba(255,255,255,0)); transform: translate(-50%, -50%); }
-.spark::after { transform: translate(-50%, -50%) rotate(90deg); }
-@keyframes wspark { 0% { opacity: 0; transform: scale(0) rotate(0deg); } 30% { opacity: 1; transform: scale(1.3) rotate(20deg); }
-  100% { opacity: 0; transform: scale(0) rotate(45deg) translateY(-8px); } }
+/* A change of step: a discharge -- arcs jumping from the buttons to the die
+   frame and between the two, flickering and gone, the frame flaring with
+   them (panels/welcome.ts zap()) -- and the new buttons rising out of a
+   glow, one after the other.  Every one of these animations ends. */
+.wfx { position: absolute; inset: 0; pointer-events: none; overflow: hidden; border-radius: inherit;
+  --zap-core: #ffffff; --zap-glow: rgba(186,214,255,.75); }
+.wfx .zap { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.wfx .zap path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.wfx .zap .zglow { stroke: var(--zap-glow); stroke-width: 4.5; filter: blur(3px); }
+.wfx .zap .zcore { stroke: var(--zap-core); stroke-width: 1.4; }
+.wcard.surge::before { animation: wsurge .44s ease-out both; }
+@keyframes wsurge { 0% { border-color: var(--surge, rgba(225,236,255,1)); box-shadow: 0 0 14px var(--surge, rgba(186,214,255,.8)), inset 0 0 12px var(--surge, rgba(186,214,255,.5)); }
+  35% { border-color: var(--surge, rgba(210,228,255,.95)); }
+  100% { box-shadow: 0 0 0 transparent, inset 0 0 0 transparent; } }
 .actions.enter .action { animation: wenter .5s cubic-bezier(.2, .7, .2, 1) both; }
 .actions.enter .action:nth-child(2) { animation-delay: .08s; }
 /* The glow's colour is a variable, not a second set of keyframes, so a
@@ -900,12 +898,9 @@ body.arriving .work { animation: arrive .45s ease-out both; }
 :root[data-theme="light"] .wback:hover { border-color: #16181d; background: rgba(30,34,42,.06); }
 :root[data-theme="light"] .wback:focus-visible { outline-color: #16181d; }
 :root[data-theme="light"] .wisa { color: rgba(22,24,29,.5); }
-/* The burst and the sparks: a steel-blue bloom and small ink glints. */
-:root[data-theme="light"] .wfx.burst::before {
-  background: radial-gradient(ellipse 60% 45% at 50% 66%, rgba(70,105,160,.16), rgba(70,105,160,0) 70%); }
-:root[data-theme="light"] .spark { background: #1d2b45; box-shadow: 0 0 5px 1px rgba(70,105,160,.45); }
-:root[data-theme="light"] .spark::before, :root[data-theme="light"] .spark::after {
-  background: linear-gradient(90deg, rgba(29,43,69,0), #1d2b45, rgba(29,43,69,0)); }
+/* The discharge in ink: a dark core in a steel-blue glow, the frame flaring blue. */
+:root[data-theme="light"] .wfx { --zap-core: #1d2b45; --zap-glow: rgba(70,105,160,.55); }
+:root[data-theme="light"] .wcard { --surge: rgba(70,105,160,.75); }
 :root[data-theme="light"] .actions { --wenter-rgb: 70,105,160; }
 /* The switch on the card, in the card's own colours. */
 :root[data-theme="light"] .wtheme .theme-switch { border-color: rgba(30,34,42,.24); background: #f1f2f4; }
