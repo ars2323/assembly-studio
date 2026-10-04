@@ -136,9 +136,11 @@ jobs:
           cp "$tmp/rars/rars.jar" "$stage/engine/rars.jar"
           cp -r "$tmp/rars/classes" "$stage/engine/classes"
 
-          release="$stage/engine/runtime/release"
-          version=$(tr -d '\r' < "$release" | sed -n 's/^JAVA_RUNTIME_VERSION="\(.*\)"$/\1/p')
-          vendor=$(tr -d '\r' < "$release" | sed -n 's/^IMPLEMENTOR="\(.*\)"$/\1/p')
+          # The jlinked runtime's own answer (its release file carries no
+          # JAVA_RUNTIME_VERSION / IMPLEMENTOR).
+          props=$("$stage/engine/runtime/bin/java" -XshowSettings:properties -version 2>&1 | tr -d '\r')
+          version=$(printf '%s\n' "$props" | sed -n 's/^ *java\.runtime\.version = //p')
+          vendor=$(printf '%s\n' "$props" | sed -n 's/^ *java\.vendor = //p')
           case "$version" in
             "$RUNTIME"|"$RUNTIME"-*) ;;
             *) echo "::error::the jlink runtime is '$version' ($vendor), engines.lock pins temurin_runtime_version=$RUNTIME"; exit 1 ;;
