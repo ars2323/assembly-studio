@@ -8,9 +8,12 @@
 /* ---- Registers ---------------------------------------------------------- */
 
 /* "x10 a0", "x8 s0/fp": a wider name column than MIPS's "$t0". */
-.rhead, .rrow { grid-template-columns: var(--rcols, 8.5ch 10.5ch 10.5ch 28.5ch minmax(0, 1fr)); }
-/* f registers: 64 bits in hex across Hex and Dec, the value (float or double) under Bin. */
-.rrow.fp .hex { grid-column: 2 / span 2; }
+.rhead, .rrow { grid-template-columns: var(--rcols, [rn] 8.5ch [hex] 10.5ch [dec] 10.5ch [bin] 28.5ch [tag rest] minmax(0, 1fr)); }
+/* f registers: 64 bits in hex across Hex and Dec (the grid's named lines,
+   panels/regtable.ts: whichever of them are shown), the value (float or
+   double) under Bin. */
+.rrow.fp .hex { grid-column: hex / bin; overflow: hidden; text-overflow: ellipsis; }
+.rrow.fp .bin { grid-column: bin; }
 .rrow.fp .dec { display: none; }
 .rrow.fp .bin { font-size: .9em; letter-spacing: 0; color: var(--muted); }
 
