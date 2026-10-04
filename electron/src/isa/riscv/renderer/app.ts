@@ -121,7 +121,6 @@ const breakpoints = new Set<number>();
 let sentLines = '';                     // the lines the engine last got (JSON)
 const labels = new LabelMap();          // the program's, for Data
 let resumeWith: 'run' | 'step' = 'run';
-let congratsShown = false;             // once a session
 let errors: { message: string; line: number; col: number }[] = [];
 let saveNote = '';     // what Ctrl+S did with the file: shown until the first step
 let saveWarn = false;  // ...and whether it is a warning (not saved)
@@ -253,13 +252,12 @@ const inspector = new Inspector();
 const consolePanel = new ConsolePanel();
 consolePanel.onInput = (line) => void giveInput(line);
 consolePanel.onToggle = () => layout();
-const congrats = h('div', { class: 'congrats', hidden: true });
 const regsHost = h('div', { class: 'regshost' });
 let registers: RegisterPanel | null = null;
 // Between Text/Data and the Inspector, a grip like the Console's.
 const centreGrip = h('div', { class: 'vgrip', role: 'separator', 'aria-orientation': 'horizontal', title: 'Drag to resize · double-click to reset' },
   h('span', { class: 'grip' }));
-const centre = h('div', { class: 'centre' }, text.root, centreGrip, inspector.root, congrats);
+const centre = h('div', { class: 'centre' }, text.root, centreGrip, inspector.root);
 // Registers over the Console on the left, Text/Data over the Inspector on
 // the right: both of those get the whole height (a lab PC has ~480 px).
 // Between Registers and the Console, a grip: drag to share the height,
@@ -1029,7 +1027,6 @@ async function assemble(source: string): Promise<boolean> {
   let after: Signal | null = null;
   note = '';
   exportNote = '';
-  congrats.hidden = true;
   // An assemble that takes a while says so in the Assemble panel.
   const slowAssemble = setTimeout(() => { assembling = true; renderAssemble(); }, 150);
   const failed = (list: typeof errors): false => {
@@ -1161,7 +1158,6 @@ async function go(call: () => Promise<RunReply>): Promise<RunReply | null> {
   busy = true;
   note = '';
   exportNote = '';
-  congrats.hidden = true;
   const before = lastRegs;
   let result: RunReply;
   try {
@@ -1193,7 +1189,6 @@ async function go(call: () => Promise<RunReply>): Promise<RunReply | null> {
       : 'Stopped while waiting for input and could not undo it · assemble again (Ctrl+S)';
     consolePanel.waitForInput(false);
     if (text.tab === 'data') void refreshData();
-    if (reason === 'exit' && !congratsShown && !tutorial.active) showCongrats();
     return result;
   } finally {
     busy = false;
@@ -1278,7 +1273,6 @@ async function restart(): Promise<void> {
   busy = true;
   note = '';
   exportNote = '';
-  congrats.hidden = true;
   [saveNote, saveWarn] = ['', false]; // Reset saves nothing
   try {
     if (runState === 'running' || runState === 'input') { slow?.cancel(); await api.stop().catch(() => {}); await waitWhileRunning(); }
@@ -1420,17 +1414,6 @@ async function refreshData(): Promise<void> {
   }
   const pointers = [2, 8, 3].map((n) => ({ name: ['', '', 'sp', 'gp', '', '', '', '', 'fp'][n], value: regs.x[n] >>> 0 }));
   text.data.show(sections, settings.dataBase, labels, pointers);
-}
-
-// ---- first successful run -------------------------------------------------------------------
-
-function showCongrats(): void {
-  congratsShown = true;
-  const close = h('button', { class: 'btn small', type: 'button' }, 'Close');
-  close.addEventListener('click', () => { congrats.hidden = true; });
-  congrats.replaceChildren(
-    h('div', { class: 'say' }, h('h3', {}, 'First run complete!'), h('p', {}, 'The program ran to the end.'), close));
-  congrats.hidden = false;
 }
 
 // ---- the caption buttons' patch -----------------------------------------------------------

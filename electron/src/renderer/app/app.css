@@ -793,9 +793,6 @@ img.icon { filter: var(--icon-filter); }
 .asm .notice .say .row { justify-content: flex-start; }
 /* Too short or too narrow for the character (the Console at a small window, the Inspector at 1093 px): the words alone. */
 @container (max-height: 156px) or (max-width: 380px) { .notice { padding: 8px 16px; gap: 0; } }
-.congrats { position: absolute; right: 16px; bottom: 16px; z-index: 6; display: flex; align-items: center; gap: 16px; padding: 12px 18px 12px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 24px rgba(var(--shadow-rgb), .14); }
-.congrats h3 { margin: 0 0 2px; font-size: 15px; color: var(--strong); }
-.congrats p { margin: 0 0 8px; color: var(--text-2); }
 
 /* ---- first screen: the card is the processor ----------------------------- */
 .welcome { display: contents; }
