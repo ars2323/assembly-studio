@@ -76,6 +76,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .titlebar button, .titlebar input, .titlebar select, .titlebar a { -webkit-app-region: no-drag; }
 .titlebar .brand { display: flex; align-items: center; gap: 8px; flex: none; }
+.titlebar .brand.home { -webkit-app-region: no-drag; cursor: pointer; border-radius: 6px; }
+.titlebar .brand.home:hover .appname { text-decoration: underline; }
 .titlebar .logo { height: 18px; width: auto; }
 .titlebar .appname { font-weight: 700; color: var(--strong); white-space: nowrap; letter-spacing: .1px; }
 .titlebar .file { color: var(--text-2); white-space: nowrap; overflow: hidden; flex: none;

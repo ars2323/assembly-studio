@@ -67,6 +67,7 @@ import { panelHead } from './ui.ts';
 const api = window.app;
 const UNTITLED = 'untitled.s';
 const APP_NAME = brand.name;
+const WINDOW_TITLE = `${brand.name} · MIPS`; // the ISA this window is for (?isa=)
 // Below this width (CSS px) the Editor and Run sides take turns.  A lab PC
 // (1366x768 at 125%) gives 1093: still side by side.  1366 at 150% gives
 // 910, and a half-screen window on a 1920 display 960: one at a time.
@@ -157,7 +158,7 @@ viewEditor.addEventListener('click', () => showView('editor'));
 viewRun.addEventListener('click', () => showView('run'));
 const viewSwitch = h('span', { class: 'seg viewswitch', role: 'tablist', hidden: true }, viewEditor, viewRun);
 const titlebar = h('header', { class: 'titlebar' },
-  h('span', { class: 'brand' },
+  h('span', { class: 'brand home', title: '처음 화면 (ISA 바꾸기)', role: 'button', tabindex: '0' },
     h('img', { class: 'logo', src: asset(brand.mark), alt: '' }),
     h('span', { class: 'appname' }, APP_NAME)),
   fileLabel,
@@ -170,12 +171,16 @@ const titlebar = h('header', { class: 'titlebar' },
     iconButton('Open file (Ctrl+O)', 'folder-open', () => void openFile()),
     bExport,
     bSettings));
+const homeButton = titlebar.querySelector<HTMLElement>('.brand')!;
+homeButton.addEventListener('click', () => void goHome());
+homeButton.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void goHome(); } });
 const status = h('footer', { class: 'status' });
 
 // ---- the first screen ------------------------------------------------------------
 
 const firstScreen = welcome({
   tutorial: () => void startTutorial(), newFile: () => void newFile(), openFile: () => void openFile(),
+  selectIsa: (isa) => api.selectIsa(isa),
 });
 const stageWelcome = h('div', { class: 'stage-welcome' }, firstScreen.root);
 
@@ -539,7 +544,7 @@ const assembleOptions = (a: Advanced) => ({
 // ---- chrome: title bar and status bar ----------------------------------------------------
 
 function renderChrome(): void {
-  document.title = open ? `${file.name}${dirty ? ' •' : ''} — ${APP_NAME}` : APP_NAME;
+  document.title = open ? `${file.name}${dirty ? ' •' : ''} — ${WINDOW_TITLE}` : WINDOW_TITLE;
   showFileName(FILE_MOST);
   const running = runState === 'running';
   const setBtn = (b: HTMLButtonElement, on: boolean, primary: boolean) => {
@@ -709,6 +714,19 @@ async function exportImage(): Promise<void> {
 // Before another file takes the Editor's place.  Unsaved changes are always
 // asked about; a new file is asked about even when everything is saved --
 // it empties the Editor, which a student does not expect from one click.
+// The title bar's mark and name: back to the first screen, where the ISA is
+// chosen.  The page is loaded again (?isa= the same: the engine stays);
+// unsaved changes are asked about first.
+async function goHome(): Promise<void> {
+  if (open && dirty && !(await ask({
+    title: '저장하지 않은 변경이 있습니다',
+    file: file.name,
+    body: '처음 화면으로 가면 저장하지 않은 내용은 사라집니다.',
+    ok: '버리고 계속', cancel: '돌아가기', danger: true,
+  }))) return;
+  location.replace(`?isa=mips`);
+}
+
 async function mayReplace(what: 'new' | 'open'): Promise<boolean> {
   if (!open) return true;
   if (dirty) {

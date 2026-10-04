@@ -71,7 +71,10 @@ declare global {
   interface Window { __startfield?: TestHook }
 }
 
-export function startfield(options: { seed: number }): Startfield {
+/* options.from (ms): where the opening starts -- a page loaded again in the
+   middle of the first screen (the ISA chosen: the window is reloaded for it)
+   comes back with the board as it was, not growing a second time. */
+export function startfield(options: { seed: number; from?: number }): Startfield {
   if (!document.getElementById(STYLE_ID)) {
     const style = document.createElement('style');
     style.id = STYLE_ID;
@@ -158,7 +161,7 @@ export function startfield(options: { seed: number }): Startfield {
   const frame = (now: number): void => {
     if (!started) { started = now; deltas.push(0); } else deltas.push(now - lastFrame);
     lastFrame = now;
-    paint(now - started);               // delta time, never a per-frame constant
+    paint(now - started + (options.from ?? 0)); // delta time, never a per-frame constant
     raf = requestAnimationFrame(frame); // the board below stops; this layer does not
   };
 

@@ -30,11 +30,24 @@ import { offsets, SEED, type SparkName, sparkAt } from './spark.ts';
 export const WORDMARK = brand.wordmark;
 export { SEED };
 
+export type Isa = 'mips' | 'riscv';
+export const ISA_NAME: Record<Isa, string> = { mips: 'MIPS', riscv: 'RISC-V' };
+
 export interface WelcomeEvents {
   tutorial(): void;
   newFile(): void;
   openFile(): void;
+  /** The window is for one ISA (the page's ?isa=); choosing the other
+      changes the engine and loads the page again (src/main/main.ts). */
+  selectIsa(isa: Isa): Promise<unknown>;
 }
+
+/* The page's ISA, and whether it was just chosen (?picked: the page was
+   loaded again for it, so the first screen goes on from the ISA's step and
+   the board does not grow a second time). */
+const query = new URLSearchParams(location.search);
+const pageIsa: Isa = query.get('isa') === 'riscv' ? 'riscv' : 'mips';
+const picked = query.has('picked');
 
 function action(label: string, ic: string, onClick: () => void, main = false): HTMLElement {
   const b = h('button', { class: `action${main ? ' main' : ''}`, type: 'button' }, icon(ic), h('b', {}, label));
@@ -44,27 +57,45 @@ function action(label: string, ic: string, onClick: () => void, main = false): H
 
 export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: boolean): void } {
   const actions = h('div', { class: 'actions' });
-  const back = h('button', { class: 'linkbtn back', type: 'button' }, '← 처음으로');
-  /* Straight to work first, the tutorial under it: the one most of them
-     want is the one at the top, and the hierarchy of the two -- border,
-     words, ground, and the light each carries -- says which is which. */
+  const back = h('button', { class: 'linkbtn back', type: 'button' });
+  let backTo = () => {};
+  back.addEventListener('click', () => backTo());
+  /* Three steps on one card: the ISA, then straight to work or the
+     tutorial, then a new file or one to open.  The first choice of each is
+     the one most of them want, at the top; the hierarchy of the two --
+     border, words, ground, and the light each carries -- says which is which. */
+  const choose = async (isa: Isa) => {
+    if (isa === pageIsa) { first(); return; }
+    actions.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+    await events.selectIsa(isa); // the page is replaced
+  };
+  const zero = () => {
+    actions.replaceChildren(
+      action('MIPS', 'cpu', () => void choose('mips'), true),
+      action('RISC-V', 'cpu', () => void choose('riscv')));
+    back.style.visibility = 'hidden';
+  };
   const first = () => {
     actions.replaceChildren(
       action('바로 시작', 'play', second, true),
       action('튜토리얼 보기', 'circle-question-mark', events.tutorial));
-    back.style.visibility = 'hidden';
+    back.textContent = `← ${ISA_NAME[pageIsa]} · ISA 다시 고르기`;
+    back.style.visibility = 'visible';
+    backTo = zero;
   };
   const second = () => {
     actions.replaceChildren(
       action('새 파일', 'file-plus', events.newFile, true),
       action('파일 열기', 'folder-open', events.openFile));
+    back.textContent = '← 처음으로';
     back.style.visibility = 'visible';
+    backTo = first;
     (actions.firstElementChild as HTMLElement).focus();
   };
-  back.addEventListener('click', first);
-  first();
+  if (picked) first(); else zero();
   // The seed is a constant: the same board every start, on every machine.
-  const start = startfield({ seed: SEED });
+  // After an ISA was chosen the board is already grown (20 s is past it).
+  const start = startfield({ seed: SEED, from: picked ? 20_000 : 0 });
 
   /* Four things, down the middle of the die frame: the mark, the product's
      name, and the two ways in.  The mark is the top bar's own file
