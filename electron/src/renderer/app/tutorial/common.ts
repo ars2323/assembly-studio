@@ -45,8 +45,8 @@ export const assemble = (): Step => ({
   id: 'assemble', kind: 'practice', file: 'tutorial.s', view: 'editor', keys: ['Ctrl+S'],
   title: () => 'Assemble: 코드를 기계어로',
   doing: () => [{ key: 'Ctrl+S' }, '또는', { click: 'Assemble' }],
-  body: () => '어셈블은 쓴 코드를 기계어로 바꾸는 일입니다. Assemble 버튼을 누르거나 Ctrl+S 키를 눌러 보세요. '
-    + '내 파일에서는 이 버튼이 Save & Assemble 이 되어 저장도 함께 합니다. 어셈블이 끝나면 결과를 짚어 드립니다.',
+  body: () => '어셈블은 쓴 코드를 기계어로 바꾸는 일입니다. 내 파일에서는 이 버튼이 Save & Assemble 이 되어 저장도 함께 합니다. '
+    + '어셈블해 보세요. 끝나면 결과를 짚어 드립니다.',
   targets: () => [button('assemble')],
   prepare: async (t) => { if (t.host.running()) await t.host.stop(); },
   done: (_t, s) => (s.kind === 'assembled' && s.ok ? 'next' : null),
@@ -173,8 +173,8 @@ export const run = (print: RegExp): Step => ({
   id: 'run', kind: 'practice', file: 'tutorial.s', keys: ['F5'],
   title: () => 'Run: 끝까지, 또는 빨간 점까지',
   doing: () => [{ key: 'F5' }, '또는', { click: 'Run' }],
-  body: () => 'Run 버튼(F5 키)은 한 줄씩이 아니라 프로그램을 쭉 실행합니다. 프로그램이 끝나거나 빨간 점을 만나면 멈춥니다. '
-    + 'F5 키를 눌러 보세요. 어디서 멈췄는지 알려 드립니다.',
+  body: () => 'Run 은 한 줄씩이 아니라 프로그램을 쭉 실행합니다. 프로그램이 끝나거나 빨간 점을 만나면 멈춥니다. '
+    + '실행해 보세요. 어디서 멈췄는지 알려 드립니다.',
   targets: () => [button('run')],
   prepare: async (t) => {
     await t.notFinished();
@@ -195,7 +195,7 @@ export const slow = (): Step => ({
   id: 'slow', kind: 'practice', file: 'tutorial.s', keys: ['F5'],
   title: () => 'Run speed: 천천히 실행',
   doing: () => [{ click: '1 line/s' }, '→', { key: 'F5' }, '→', { key: 'Esc' }],
-  body: () => 'Run speed 에서 1 line/s 를 고른 뒤 F5 키를 누르세요. 1초에 한 줄씩 실행되면서 PC 줄과 노란 줄이 옮겨 갑니다. '
+  body: () => 'Run speed 에서 1 line/s 를 고르고 실행하면 1초에 한 줄씩 실행되면서 PC 줄과 노란 줄이 옮겨 갑니다. '
     + '몇 줄 지켜본 뒤 Esc 키(또는 Stop 버튼)로 멈추면 다음으로 넘어갑니다.',
   targets: () => [$('.speedbox'), button('run')],
   // The Editor's lines are what to watch: the card keeps off them.
@@ -210,8 +210,8 @@ export const reset = (r: Reg): Step => ({
   id: 'reset', kind: 'practice', file: 'tutorial.s',
   title: () => 'Reset: 처음으로',
   doing: () => [{ click: 'Reset' }, '클릭'],
-  body: () => 'Reset 버튼은 마지막으로 어셈블한 프로그램을 처음 상태로 되돌립니다. 코드를 고쳤더라도 다시 어셈블하지는 않습니다(어셈블은 Ctrl+S). '
-    + 'Reset 버튼을 눌러 보세요. 무엇이 처음으로 돌아가는지 보여 드립니다.',
+  body: () => 'Reset 은 마지막으로 어셈블한 프로그램을 처음 상태로 되돌립니다. 코드를 고쳤더라도 다시 어셈블하지는 않습니다(어셈블은 Ctrl+S). '
+    + '눌러 보세요. 무엇이 처음으로 돌아가는지 보여 드립니다.',
   targets: () => [button('reset')],
   prepare: async (t) => { if (!t.host.assembled()) await t.host.assemble(); },
   done: (_t, s) => (s.kind === 'reset' ? 'next' : null),
@@ -230,7 +230,7 @@ export const console = (call: RegExp, say: string, printed: string): Step => ({
   id: 'console', kind: 'practice', file: 'tutorial.s', view: 'run', keys: ['F5'],
   title: () => '출력은 Console 패널에',
   doing: () => [{ key: 'F5' }, '끝날 때까지'],
-  body: (t) => `${t.host.narrow() ? '' : `${t.line(call)}행의 ${say} `}F5 키로 끝까지 실행해 보세요. 빨간 점에서 멈추면 F5 키를 한 번 더 누르면 됩니다. `
+  body: (t) => `${t.host.narrow() ? '' : `${t.line(call)}행의 ${say} `}끝까지 실행해 보세요. 빨간 점에서 멈추면 F5 키를 한 번 더 누르면 됩니다. `
     + '프로그램이 끝나면 출력이 어디에 나왔는지 보여 드립니다.',
   targets: (t) => [...(t.host.narrow() ? [] : [lines(t, t.line(call))]), $('.console')],
   prepare: async (t) => { await t.notFinished(); if (t.host.expandConsole()) t.did.push('console opened'); },
@@ -249,7 +249,7 @@ export const error = (): Step => ({
   title: (t) => (t.phase === 0 ? '오류가 나면' : 'Assemble 패널의 오류 목록'),
   doing: (t) => (t.phase === 0 ? [{ key: 'Ctrl+S' }, '또는', { click: 'Assemble' }] : [{ click: `Go to line ${t.host.errorLine() ?? ''} →` }]),
   body: (t) => (t.phase === 0
-    ? '이번에는 일부러 한 줄을 틀리게 쓴 예제를 열었습니다. Assemble 버튼(또는 Ctrl+S 키)을 눌러 보세요. 오류가 어디에 어떻게 나오는지 이어서 보여 드립니다.'
+    ? '이번에는 일부러 한 줄을 틀리게 쓴 예제를 열었습니다. 어셈블해 보세요. 오류가 어디에 어떻게 나오는지 이어서 보여 드립니다.'
     : `오류 수, 틀린 줄과 그 내용, 고치는 요령이 나옵니다. 아래의 Go to line ${t.host.errorLine() ?? ''} 버튼을 누르면 Editor 의 그 줄로 가고, 튜토리얼도 다음으로 넘어갑니다.`),
   targets: (t) => (t.phase === 0 ? [button('assemble')]
     : [textOf($('.asm .notice h3')), $('.asm .item'), $('.asm .row .btn')]),

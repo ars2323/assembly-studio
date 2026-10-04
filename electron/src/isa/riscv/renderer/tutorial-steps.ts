@@ -47,7 +47,7 @@ const step: Step = {
   title: () => 'Step: 한 줄 실행',
   doing: () => [{ key: 'F10' }, '또는', { click: 'Step' }],
   body: () => '왼쪽에 막대가 있는 줄이 PC 줄, 곧 다음에 실행할 줄입니다. 프로그램은 `main` 첫 줄에서 시작하고, 앞의 `li` 두 줄은 미리 실행해 두었습니다. '
-    + 'F10 키(또는 Step 버튼)를 눌러 이 줄을 실행해 보세요. 실행하면 무엇이 바뀌었는지 짚어 드립니다.',
+    + '이 줄을 실행해 보세요. 무엇이 바뀌었는지 짚어 드립니다.',
   targets: (t) => [button('step'), lines(t, t.line(ADD))],
   prepare: async (t) => { if (t.host.pc() !== t.addr(ADD) || !t.host.assembled()) await t.exactly(ADD); },
   reveal: (t) => t.host.revealLine(t.line(ADD)),

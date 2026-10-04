@@ -1,5 +1,5 @@
 /* Where the tutorial's card goes: next to what a step points at, never over
-   it (logic only; tutorial.ts draws).
+   it (logic only; tutorial/engine.ts draws).
 
    The first target is what the card is about.  Tried in order: right below
    it, then right above it -- the card's middle over the target's middle --
