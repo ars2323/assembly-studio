@@ -1,0 +1,25 @@
+# The engines' pins: what engines.yml builds the engine zip from, besides the
+# sources (CPU/, electron/native/, probe/src/).  Part of the input hash
+# (engines/hash.mjs): changing a line here makes a new engines-<hash> release.
+# One key=value per line; '#' starts a comment line.  Read by
+# engines/build-rars.sh and .github/workflows/engines.yml.
+
+# RARS 1.6 (RISC-V engine), built from source, never modified.
+# The released rars1_6.jar is not v1.6's source; the app ships the source build.
+rars_repo=https://github.com/TheThirdOne/rars.git
+rars_tag=v1.6
+rars_commit=7acf3254e84ab75fa612402b22fe915a2e00bdab
+# RARS and RarsProbe are compiled for Java 11 class files (javac --release 11,
+# through JDK_JAVAC_OPTIONS so RARS's build-jar.sh is not touched).
+javac_release=11
+
+# The JDK the jlink runtime is made from: Eclipse Temurin 21.0.12+1 (LTS).
+# temurin_java_version goes to actions/setup-java; the built runtime's
+# JAVA_RUNTIME_VERSION must be temurin_runtime_version, alone or followed by
+# '-' (21.0.12+1-LTS), or engines.yml fails.
+temurin_java_version=21.0.12
+temurin_runtime_version=21.0.12+1
+
+# The modules of the jlink runtime: the minimum RARS needs without being
+# changed (java.desktop cannot be left out).
+java_modules=java.base,java.prefs,java.desktop
