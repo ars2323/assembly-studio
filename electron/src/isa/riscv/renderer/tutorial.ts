@@ -78,7 +78,7 @@ export interface TutorialHost {
   tab(): 'text' | 'data';
   breakpointLines(): number[];
   setBreakpointLine(line: number, on: boolean): Promise<void>;
-  goToLine(line: number): void;             // what "N행으로 가기" does
+  goToLine(line: number): void;             // what "Go to line N" does
   errorLine(): number | null;
   expandConsole(): boolean;                 // true: it was folded
   revealLine(n: number): void;
@@ -750,7 +750,7 @@ export const STEPS: Step[] = [
     title: (t) => (t.phase === 0 ? '오류가 나면' : 'Assemble 패널'),
     body: (t) => (t.phase === 0
       ? '이번에는 일부러 한 줄을 틀리게 쓴 예제입니다. Assemble 버튼(또는 Ctrl+S 키)을 눌러 보세요. 오류가 어디에 어떻게 나오는지 이어서 보여 드립니다.'
-      : `편집기 아래 Assemble 패널에 무엇이 잘못됐는지와 할 일, 틀린 줄과 고치는 요령이 나옵니다. ${t.host.errorLine() ?? ''}행으로 가기 버튼을 누르면 Editor 패널의 그 줄로 가고, 튜토리얼도 다음으로 넘어갑니다.`),
+      : `편집기 아래 Assemble 패널에 무엇이 잘못됐는지와 할 일, 틀린 줄과 고치는 요령이 나옵니다. Go to line ${t.host.errorLine() ?? ''} 버튼을 누르면 Editor 패널의 그 줄로 가고, 튜토리얼도 다음으로 넘어갑니다.`),
     targets: (t) => (t.phase === 0 ? [button('assemble')]
       : [textOf($('.asm .notice h3')), textOf($('.asm .item')), $('.asm .row .btn')]),
     reveal: () => scrollIn($('.asm .row .btn')),
@@ -763,7 +763,7 @@ export const STEPS: Step[] = [
       const n = t.host.errorLine();
       if (n) t.host.goToLine(n);
     } },
-  // "N행으로 가기" took the student to the line: show them where they are (2.7.0; before, the
+  // "Go to line N" took the student to the line: show them where they are (2.7.0; before, the
   // tutorial went straight on to its end, which opened the first example again -- the jump
   // looked like the tutorial quitting).  The cursor is on the line, the line marked red.
   { kind: 'explain', file: 'tutorial-error.s', view: 'editor',
