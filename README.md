@@ -46,9 +46,13 @@ To uninstall, use Windows Settings › Apps.
 
 At launch, while the first screen opens, the program checks [Releases](../../releases) for a newer version (only
 the release marked Latest; trial pre-releases are never offered). If there is one, the first screen shows its
-download with a progress bar instead of the MIPS / RISC-V choice; when the download is complete, the program
-installs it silently and starts the new version. With no update, no connection or no answer within a few seconds,
-the first screen goes on as usual; a failed download is shown for a moment, then the first screen goes on.
+download with a progress bar instead of the MIPS / RISC-V choice, and says that the program will install it and
+start again by itself. When the download is complete, the window closes for a few seconds while the update installs
+silently, then the new version opens. With no update, no connection or no answer within a few seconds, the first
+screen goes on as usual; a failed download is shown for a moment, then the first screen goes on.
+
+![The first screen downloading an update, with its progress bar and the note that it restarts by itself](docs/images/update.png)
+*An update at launch: a few megabytes, then the program restarts by itself.*
 
 From 1.4.0, an update downloads only the parts of the installer that changed, usually a few megabytes rather than
 the whole installer. For this the installed program keeps a copy of its installer (about 130 MB) in
@@ -88,6 +92,7 @@ pre-releases either: `release.yml` builds every installer from them.
 | Go back to the start | **Reset**. It restarts the last assembled program; it does not assemble again |
 | Set or clear a breakpoint | Click the gutter to the left of the line numbers in the Editor |
 | Comment or uncomment lines | `Ctrl+/` (on an empty line, starts a comment) |
+| Indent | `Tab` inserts spaces to the next multiple of four; with lines selected, `Tab` and `Shift+Tab` indent and outdent them. `Enter` keeps the indentation of the line above |
 | Change the font size | `Ctrl` `+`, `Ctrl` `-`, `Ctrl` `0` (reset), or Settings |
 | Open a file | `Ctrl+O`, or the Open file button in the toolbar |
 | Start a new file | The New file button in the toolbar |
@@ -98,8 +103,9 @@ pre-releases either: `release.yml` builds every installer from them.
 
 - **Editor.** A code editor with syntax highlighting. A dot next to the file name in the Editor's header means there
   are unsaved changes.
-- **Assemble.** Below the Editor. It shows whether the program assembled and lists errors and warnings with their
-  line and a hint on how to fix them. **Go to line** moves the cursor to the line with the error.
+- **Assemble.** Below the Editor. One line says how the last assemble went ("Assembled · 30 instructions · Saved ·
+  just now"); below it, any errors and warnings with their line and a hint on how to fix them. **Go to line** moves
+  the cursor to the line with the error.
 
   ![The Assemble panel with an assembly error and the Go to line button](docs/images/errors.png)
   *An assembly error in the Assemble panel, with Go to line.*
@@ -113,15 +119,19 @@ pre-releases either: `release.yml` builds every installer from them.
   choose the radix of the values.
 - **Inspector.** Splits one instruction into its 32 bits, grouped into its fields, each with its name and meaning,
   and says what the instruction does in the same way for every use of it: the fields by name with this instruction's
-  register or number, for example "rt (`$a0`) … shamt (`2`) … rd (`$v0`)" (in the language you chose). Click an instruction in the Text tab to keep the Inspector on it; **Follow PC** (or
-  `Esc`) makes it follow the current instruction again.
+  register or number, for example "rt (`$a0`) … shamt (`2`) … rd (`$v0`)" (in the language you chose). Click an
+  instruction in the Text tab to keep the Inspector on it; **Follow PC** (or `Esc`) makes it follow the current
+  instruction again.
 - **Console.** The program's output, and the box for its input.
+- **Status bar.** Along the bottom of the window: the state and PC ("Stepped · PC 0x0040003c"), the steps run, the
+  registers the last step changed, and at the far end the keys that do something now, then the language and theme
+  switches.
 - **Light and dark.** The sun/moon switch at the bottom right (on the first screen, the card's bottom-right corner).
 - **Language.** The KO/EN switch beside it (on the first screen, the card's bottom-left corner), or Settings ›
   **Language**: Korean or English for the first screen, the tutorial, the instruction explanations, the assembler's
   errors and hints, the dialogs and the tutorial's example comments. The panels, buttons, the Assemble panel's state
-  and the status line are in English in both. It starts in the
-  system's language (Korean on a Korean system, English otherwise).
+  and the status bar are in English in both. It starts in the system's language (Korean on a Korean system, English
+  otherwise).
 - **Resizing.** Drag the border between two panels to resize them. Double-click a border to return to the default size.
 - **Settings.** The gear button in the toolbar:
   - **Font size**;
@@ -218,7 +228,7 @@ program, open **Settings › About · Licenses › Licenses**. The license files
 
 | Component | Version | License | Used for |
 |---|---|---|---|
-| Assembly Studio | 1.0.0 | BSD-3-Clause | This program |
+| Assembly Studio | 1.6.1 | BSD-3-Clause | This program |
 | SPIM | 9.1.24 | BSD-3-Clause (SPIM license) | MIPS engine |
 | RARS | 1.6 | MIT | RISC-V engine |
 | jEdit syntax package (inside RARS) | — | Permissive notice (see NOTICE) | Part of the unmodified RARS jar |
@@ -233,6 +243,7 @@ program, open **Settings › About · Licenses › Licenses**. The license files
 | CodeMirror, @lezer, and their dependencies | see NOTICE | MIT | Code editor |
 | iconv-lite, safer-buffer | 0.7.3, 2.1.2 | MIT | Reading and writing CP949 files |
 | node-addon-api | 8.9.2 | MIT | C++ binding of the SPIM addon |
+| electron-updater and its dependencies | 6.8.9, see NOTICE | MIT (semver, graceful-fs: ISC; sax: BlueOak-1.0.0) | Updates at launch |
 | flex | 2.6 | BSD-style (acknowledgement) | Generated SPIM's scanner |
 | GNU Bison | — | GPL-3.0-or-later with Bison exception | Generated SPIM's parser |
 | NSIS, electron-builder | — | Zlib, MIT | Installer and uninstaller |
