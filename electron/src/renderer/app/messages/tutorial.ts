@@ -216,10 +216,10 @@ export const STEPS = {
     result: {
       title: { ko: 'Inspector 가 이 명령에 머뭅니다', en: 'The Inspector stays on this instruction' },
       body: {
-        ko: '맨 앞 배지는 명령 형식으로, R‑type 은 레지스터끼리 계산하는 형식입니다. 그 아래 32칸이 명령의 비트이고, 더 아래에는 이 명령이 하는 일과 각 필드의 뜻이 나옵니다. '
+        ko: '맨 앞 배지는 명령 형식으로, R‑type 은 레지스터끼리 계산하는 형식입니다. 그 아래 32칸이 명령의 비트로, 칸 묶음마다 필드 이름과 그 뜻이 붙어 있습니다. 더 아래에는 이 명령이 하는 일이 나옵니다. '
           + '머리에 Pinned 가 붙었고, Follow PC 를 누르면 다시 PC 를 따라갑니다.',
         en: 'The badge in front is the instruction format; R‑type is the format for computing with registers. The 32 cells under it are the instruction\'s bits, '
-          + 'and further down, what the instruction does and what each field means. The head says Pinned; Follow PC makes it follow PC again.',
+          + 'each group with its field\'s name and what it means; further down, what the instruction does. The head says Pinned; Follow PC makes it follow PC again.',
       },
     },
   },

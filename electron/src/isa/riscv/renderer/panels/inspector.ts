@@ -25,7 +25,7 @@ import { code, codeText, h } from '../../../../renderer/app/dom.ts';
 import { notice } from '../../../../renderer/app/notice.ts';
 import { currentLang, onLang, tr } from '../../../../renderer/app/i18n.ts';
 import { INSPECTOR } from '../../../../renderer/app/messages/inspector.ts';
-import { bitGrid, explanation, fieldTable, inspectorHead, prose, type FieldView } from '../../../../renderer/app/panels/inspector.ts';
+import { bitGrid, explanation, inspectorHead, prose, type FieldView } from '../../../../renderer/app/panels/inspector.ts';
 import type { TextRow } from '../logic/machine.ts';
 import { headButton, panelHead, type Head } from '../../../../renderer/app/ui.ts';
 
@@ -91,8 +91,7 @@ export class Inspector {
     });
     const imm = immediateLine(d, parts, currentLang());
     this.body.replaceChildren(head, grid, ...(parts ? [immediateRow(parts)] : []),
-      explanation(explain(d, x, row.addr, currentLang()), d.name !== '', imm ? h('div', { class: 'note' }, prose(imm)) : null),
-      fieldTable(fields));
+      explanation(explain(d, x, row.addr, currentLang()), d.name !== '', imm ? h('div', { class: 'note' }, prose(imm)) : null));
   }
 
   private setMode(mode: 'pc' | number | null): void {
