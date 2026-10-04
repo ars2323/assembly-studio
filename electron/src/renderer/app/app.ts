@@ -1,7 +1,11 @@
 /* The window.
 
-     title bar   logo, name, file, the toolbar; the system's own caption
-                 buttons on the right (titleBarOverlay, src/main/main.ts)
+     title bar   the logo and the program's name in the middle; the
+                 system's own caption buttons on the right (titleBarOverlay,
+                 src/main/main.ts)
+     toolbar     Save & Assemble, Run, its speed, Step, Reset (and the
+                 Editor / Run tabs of a narrow window) from the left; the
+                 tools (Tutorial, New, Open, Settings) at the right end
      work        the first screen (welcome.ts), then Editor | Run side by
                  side: a splitter between them, either side can be folded;
                  under the Editor the Assemble panel (what the last assemble
@@ -21,14 +25,14 @@
    lines are no longer the program's), and Text alone shows where PC is.
 
    Narrow windows (under NARROW_PX CSS pixels) show one side at a time, with
-   Editor / Run tabs in the title bar.
+   Editor / Run tabs in the toolbar.
 
    Widths: the Run side first gets what Registers (Hex, Dec, Bin) and Text
    (Address, Encoding, Format, Instruction) need; the Editor takes 40% of
    the rest of the window, or less, never under 300 px (a lab PC: 1093 px in
-   all).  The title bar gives way in steps (fitTitlebar): key hints, the
-   buttons' icons, the speed as one button, last the program's name -- the
-   buttons keep their names.
+   all).  The toolbar gives way in steps (fitBars): key hints, the buttons'
+   icons, the speed as one button, tighter spacing -- the buttons keep their
+   names.
 
    Nothing is restored from an earlier run: the font size, the Data radix,
    Ctrl+/-, the splitter and the folds are this run's only (src/main/main.ts
@@ -122,7 +126,7 @@ let speed: 'fast' | 'slow' = 'fast';   // this session only
 let slow: { cancel(): void } | null = null; // a slow run going on
 let switchTo: 'fast' | 'slow' | null = null; // a run being switched to the other speed
 
-// ---- the title bar --------------------------------------------------------------
+// ---- the title bar and the toolbar -----------------------------------------------
 
 function button(label: string, ic: string, key: string, onClick: () => void): HTMLButtonElement {
   const b = h('button', { class: 'btn', type: 'button', title: key ? `${label} (${key})` : label }, icon(ic),
@@ -151,11 +155,13 @@ const speedSlow = h('button', { type: 'button', role: 'radio', title: 'Run one l
 speedFast.addEventListener('click', () => void setSpeed('fast'));
 speedSlow.addEventListener('click', () => void setSpeed('slow'));
 const speedSwitch = h('span', { class: 'seg speed', role: 'radiogroup', 'aria-label': 'Run speed' }, speedFast, speedSlow);
-// A narrow title bar: the same choice as one button that says what it is.
+// A narrow toolbar: the same choice as one button that says what it is.
 const speedOne = h('button', { class: 'btn speedone', type: 'button', title: 'Run speed (Instant / 1 line/s): click to switch' });
 speedOne.addEventListener('click', () => void setSpeed(speed === 'fast' ? 'slow' : 'fast'));
 const speedBox = h('span', { class: 'speedbox' }, h('span', { class: 'speedlabel' }, 'Run speed'), speedSwitch, speedOne);
-const toolbar = h('span', { class: 'toolbar' }, bAssemble, bRun, speedBox, bStep, bRestart);
+// A thin line between two groups of the toolbar.
+const divider = (cls = ''): HTMLElement => h('span', { class: `tsep${cls ? ` ${cls}` : ''}`, 'aria-hidden': 'true' });
+const runctl = h('span', { class: 'runctl' }, bAssemble, divider(), bRun, speedBox, bStep, divider(), bRestart);
 const bSettings = iconButton('Settings', 'settings', () => settingsBox.open());
 // The assembled program as an executable image (.hmx): only a brand with brand.hmx shows it.
 const bExport = iconButton('Export executable image (.hmx)', 'file-output', () => void exportImage());
@@ -164,19 +170,26 @@ const viewRun = h('button', { type: 'button', role: 'tab' }, 'Run');
 viewEditor.addEventListener('click', () => showView('editor'));
 viewRun.addEventListener('click', () => showView('run'));
 const viewSwitch = h('span', { class: 'seg viewswitch', role: 'tablist', hidden: true }, viewEditor, viewRun);
+// The title bar: the mark and the program's name, nothing else (it moves the window).
 const titlebar = h('header', { class: 'titlebar' },
   h('span', { class: 'brand home', title: 'Home (choose the ISA)', role: 'button', tabindex: '0' },
     markImg('logo'),
-    h('span', { class: 'appname' }, APP_NAME)),
-  toolbar,
+    h('span', { class: 'appname' }, APP_NAME)));
+// The toolbar under it: everything that is pressed.
+const tools = h('span', { class: 'tools' },
+  iconButton('Tutorial', 'circle-question-mark', () => void startTutorial()),
+  divider(),
+  iconButton('New file', 'file-plus', () => void newFile()),
+  iconButton('Open file (Ctrl+O)', 'folder-open', () => void openFile()),
+  bExport,
+  divider(),
+  bSettings);
+const toolbar = h('div', { class: 'toolbar', role: 'toolbar', 'aria-label': 'Toolbar' },
+  runctl,
+  divider('forview'),
   viewSwitch,
   h('span', { class: 'drag' }),
-  h('span', { class: 'tools' },
-    iconButton('Tutorial', 'circle-question-mark', () => void startTutorial()),
-    iconButton('New file', 'file-plus', () => void newFile()),
-    iconButton('Open file (Ctrl+O)', 'folder-open', () => void openFile()),
-    bExport,
-    bSettings));
+  tools);
 const homeButton = titlebar.querySelector<HTMLElement>('.brand')!;
 homeButton.addEventListener('click', () => void goHome());
 homeButton.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void goHome(); } });
@@ -263,7 +276,7 @@ const paneRun = h('div', { class: 'pane pane-run' }, runPanel, railRun);
 const split = h('div', { class: 'split' }, paneEditor, splitter, paneRun);
 const work = h('main', { class: 'work' }, stageWelcome, split);
 
-document.body.append(h('div', { class: 'app' }, titlebar, work, status));
+document.body.append(h('div', { class: 'app' }, titlebar, toolbar, work, status));
 
 let folded: 'none' | 'editor' | 'run' = 'none';
 function fold(side: 'editor' | 'run'): void { folded = side; layout(); }
@@ -353,7 +366,7 @@ function measure(): void {
   if (!registers) buildRegisters();
   void wasNarrow;
   layout();
-  fitTitlebar();
+  fitBars();
 }
 
 function buildRegisters(): void {
@@ -530,7 +543,7 @@ function applyFont(): void {
   text.fit();
   registers?.fit();
   editor.view.requestMeasure();
-  fitTitlebar(); // the bar's words grow with the font: fit again (before 2.7.0 it kept the default font's steps)
+  fitBars(); // the bars' words grow with the font: fit again (before 2.7.0 it kept the default font's steps)
 }
 
 // ---- settings and about -----------------------------------------------------------
@@ -567,7 +580,7 @@ const assembleOptions = (a: Advanced) => ({
   handler: a.handler.kind === 'default' ? undefined : a.handler.kind === 'none' ? null : a.handler.text,
 });
 
-// ---- chrome: title bar and status bar ----------------------------------------------------
+// ---- chrome: the bars --------------------------------------------------------------------
 
 function renderChrome(): void {
   document.title = open ? `${file.name}${dirty ? ' •' : ''} — ${WINDOW_TITLE}` : APP_NAME; // the first screen is no ISA's yet
@@ -591,7 +604,7 @@ function renderChrome(): void {
   speedFast.setAttribute('aria-checked', String(speed === 'fast'));
   speedSlow.setAttribute('aria-checked', String(speed === 'slow'));
   speedOne.replaceChildren(h('span', { class: 'label' }, h('span', { class: 'pre' }, 'Speed: '), speed === 'fast' ? 'Instant' : '1 line/s'));
-  // No file, nothing to run: the first screen has no toolbar.
+  // No file, nothing to run: the first screen has no toolbar (and no row for it: app.css).
   toolbar.hidden = !open;
   // The file's name, and beside it a dot while it has changes not saved (as an editor's tab shows it).
   editorHead.setMeta(open ? h('span', {}, code(file.name),
@@ -599,7 +612,7 @@ function renderChrome(): void {
     ` · ${file.format?.encoding ?? 'UTF-8'} · ${file.format?.lineEnd ?? 'LF'}`) : '');
   layout();
   renderStatus();
-  fitTitlebar();
+  fitBars();
 }
 
 // The file's name in the title bar, at most `cols` columns (logic/names.ts);
@@ -615,64 +628,58 @@ function showFileName(cols: number): void {
 // The Assemble button's name says what it does: Save & Assemble -- Ctrl+S
 // saves the file (a new one asks where to) and assembles it -- but only
 // Assemble for the tutorial's examples, which are never saved (the status
-// bar says so), and in a title bar too narrow for the long name (the
+// bar says so), and in a toolbar too narrow for the long name (the
 // "short" step below; the tooltip still says Save & Assemble).
 const saves = (): boolean => !file.example;
 const assembleName = (short: boolean): string => (saves() && !short ? 'Save & Assemble' : 'Assemble');
 function nameAssemble(): void {
-  (bAssemble.querySelector('.label') as HTMLElement).textContent = assembleName(titlebar.classList.contains('short'));
+  (bAssemble.querySelector('.label') as HTMLElement).textContent = assembleName(toolbar.classList.contains('short'));
   bAssemble.title = saves() ? 'Save & Assemble (Ctrl+S)' : 'Assemble (Ctrl+S): examples are not saved';
 }
 
-// The title bar gives way one step at a time, as far as it has to: the key
+// The toolbar gives way one step at a time, as far as it has to: the key
 // hints, the buttons' icons (their names stay), Save & Assemble's "Save &",
-// the speed as one button, tighter spacing, the file's name (down to
-// FILE_LEAST columns), the program's name (the logo stays) -- the file's
-// name then takes back what the program's name left -- and, a big font in
-// a narrow window, the buttons' names (their icons back; TITLE_LAST), then
-// their icons' size.  Every button keeps its border.  All measured: the
-// font takes room at any width, so the font's changes fit it again too.
-// It fits when its last item ends before the padding kept for the system's
-// caption buttons (scrollWidth does not count what spills into padding).
-const TITLE_STEPS = ['nokeys', 'noicons', 'short', 'onespeed', 'tighter'] as const;
-const TITLE_LAST = ['iconsonly', 'smallicons'] as const;
-const tools = titlebar.querySelector('.tools') as HTMLElement;
-function fitTitlebar(): void {
-  const end = () => titlebar.getBoundingClientRect().right - parseFloat(getComputedStyle(titlebar).paddingRight);
-  const brandEl = titlebar.querySelector('.brand') as HTMLElement;
-  /* It fits when the tools end before the caption buttons' room and the
-     centred mark and name sit clear of the toolbar on their left and of the
-     tools on their right. */
-  const fits = () => {
-    const t = tools.getBoundingClientRect();
-    if (t.right > end() + 0.5) return false;
-    if (titlebar.classList.contains('nobrand')) return true;
-    const b = brandEl.getBoundingClientRect();
-    const left = Math.max(toolbar.getBoundingClientRect().right, viewSwitch.hidden ? 0 : viewSwitch.getBoundingClientRect().right);
-    return left <= b.left - 12 && b.right <= t.left - 12;
-  };
-  titlebar.classList.remove('noapp', 'nobrand', ...TITLE_LAST);
-  for (let level = 0; level <= TITLE_STEPS.length; level += 1) {
-    TITLE_STEPS.forEach((step, k) => titlebar.classList.toggle(step, k < level));
+// the speed as one button, tighter spacing, and, a big font in a narrow
+// window, the buttons' names (their icons back; TOOL_LAST), then their
+// icons' size.  Every button keeps its border.  All measured: the font
+// takes room at any width, so the font's changes fit it again too.  It
+// fits when the tools end inside its padding (scrollWidth does not count
+// what spills into padding).
+// The title bar holds the mark and the name alone: only a window too
+// narrow for them beside the caption buttons loses the name, then the mark.
+const TOOL_STEPS = ['nokeys', 'noicons', 'short', 'onespeed', 'tighter'] as const;
+const TOOL_LAST = ['iconsonly', 'smallicons'] as const;
+function fitBars(): void {
+  fitBrand();
+  const end = () => toolbar.getBoundingClientRect().right - parseFloat(getComputedStyle(toolbar).paddingRight);
+  const fits = () => tools.getBoundingClientRect().right <= end() + 0.5;
+  toolbar.classList.remove(...TOOL_LAST);
+  for (let level = 0; level <= TOOL_STEPS.length; level += 1) {
+    TOOL_STEPS.forEach((step, k) => toolbar.classList.toggle(step, k < level));
     nameAssemble();
+    if (toolbar.hidden || fits()) return;
+  }
+  for (let level = 1; level <= TOOL_LAST.length; level += 1) {
+    TOOL_LAST.forEach((step, k) => toolbar.classList.toggle(step, k < level));
     if (fits()) return;
   }
-  // Then the program's name (the mark stays), the buttons' names, their
-  // icons' size, and last the mark itself.
+}
+function fitBrand(): void {
+  // The centred mark and name end before the room kept for the caption buttons.
+  const end = () => titlebar.getBoundingClientRect().right - parseFloat(getComputedStyle(titlebar).paddingRight);
+  const fits = () => homeButton.getBoundingClientRect().right <= end() + 0.5;
+  titlebar.classList.remove('noapp', 'nobrand');
+  if (fits()) return;
   titlebar.classList.add('noapp');
   if (fits()) return;
-  for (let level = 1; level <= TITLE_LAST.length; level += 1) {
-    TITLE_LAST.forEach((step, k) => titlebar.classList.toggle(step, k < level));
-    if (fits()) return;
-  }
   titlebar.classList.add('nobrand');
 }
-window.addEventListener('resize', () => fitTitlebar());
+window.addEventListener('resize', () => fitBars());
 // The room kept for the caption buttons (the padding's env(titlebar-area-*))
 // is updated after the resize and the layout: fit again then, or a window
-// made wider keeps the title bar it had when narrow.
+// made wider keeps the name it had lost when narrow.
 (navigator as unknown as { windowControlsOverlay?: EventTarget }).windowControlsOverlay
-  ?.addEventListener('geometrychange', () => fitTitlebar());
+  ?.addEventListener('geometrychange', () => fitBars());
 
 // The status bar: cells (cells.ts), the state first -- what the machine
 // did last and where PC is -- then the steps, the registers it changed,

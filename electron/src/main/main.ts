@@ -42,7 +42,7 @@ export type { ImageJob } from './engine-mips.ts';
 
 app.setName(brand.name);
 // The top bar's height in the window (src/renderer/app/app.css --titlebar).
-const TITLE_BAR_HEIGHT = 40;
+const TITLE_BAR_HEIGHT = 36;
 // The Start menu shortcut carries this id (tools/package.ts appId): the window groups with it.
 if (process.platform === 'win32') app.setAppUserModelId(brand.appId);
 // ---- this run's profile folder, and nothing else on disk --------------------
@@ -117,8 +117,8 @@ async function main(): Promise<void> {
     show: false,
     title: brand.name,
     backgroundColor: WINDOW_COLOURS.background,
-    // No system title bar: the window's own top bar carries the logo, the
-    // file and the toolbar.  The caption buttons stay the system's own
+    // No system title bar: the window's own top bar carries the logo and the
+    // name (the toolbar is a row under it).  The caption buttons stay the system's own
     // (titleBarOverlay), so Windows 11's snap layouts -- the flyout on the
     // maximise button -- keep working, as do double-click to maximise and
     // dragging to the top edge on the bar's drag region.

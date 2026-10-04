@@ -439,8 +439,9 @@ export class Tutorial {
       });
     }));
     const size = { width: this.card.offsetWidth, height: this.card.offsetHeight };
-    // Below the title bar: the card never hides the toolbar.
-    const view = { left: 0, top: ($('.titlebar')?.getBoundingClientRect().bottom ?? 0), right: w, bottom: hh };
+    // Below the toolbar (the title bar when there is none): the card never hides a button.
+    const bars = $('.toolbar:not([hidden])') ?? $('.titlebar');
+    const view = { left: 0, top: (bars?.getBoundingClientRect().bottom ?? 0), right: w, bottom: hh };
     // Right below the first target, else above, else beside it
     // (logic/placement.ts): off every target and what the step keeps off;
     // failing that, off the targets alone; never over a target's box.  The
@@ -473,11 +474,11 @@ export class Tutorial {
 }
 
 // What is lit whole around the targets: the panel each is in -- or, for a
-// toolbar button, the title bar; for the status bar's words, the status bar.
+// toolbar button, the toolbar; for the status bar's words, the status bar.
 function litAreas(owners: Element[]): Rect[] {
   const areas = new Set<Element>();
   for (const o of owners) {
-    const area = o.closest('.panel, .titlebar, .status');
+    const area = o.closest('.panel, .toolbar, .titlebar, .status');
     if (area) areas.add(area);
   }
   return [...areas].map((a) => { const r = a.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; });
