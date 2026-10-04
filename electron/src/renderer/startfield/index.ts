@@ -41,6 +41,9 @@ export interface Startfield {
   /** Called with the moment of the opening, every frame the board draws.
       Returns the undo.  Nothing is called once show(false) has been. */
   onFrame(listener: (t: number) => void): () => void;
+  /** When the board has finished growing, in ms of the opening (Infinity
+      until it has been laid out). */
+  grownAt(): number;
   destroy(): void;
 }
 
@@ -242,6 +245,7 @@ export function startfield(options: { seed: number; from?: number }): Startfield
 
   return {
     root,
+    grownAt: () => geo?.grownMs ?? Infinity,
     show(on: boolean) {
       if (on === shown) return;
       shown = on;

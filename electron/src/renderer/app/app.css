@@ -565,15 +565,23 @@ img.icon { filter: var(--icon-filter); }
    every window size.  The three gaps between the four blocks are named here,
    where the column is, rather than spread over the blocks themselves. */
 .wstack { position: absolute; inset: 18px; display: flex; flex-direction: column; justify-content: center; align-items: center;
-  --gap-name: 14px; --gap-ways: 40px; --gap-between: 12px;
+  --gap-name: 18px; --gap-ways: 36px; --gap-between: 12px;
   transform: translateY(var(--ink-shift, 0px)); } /* what is seen centred, not the boxes (panels/welcome.ts) */
 /* The mark, large, in its own colours: the university's rules forbid
    recolouring it. */
-.wlogo { height: 60px; width: auto; margin: 0 auto; }
+.wlogo { height: 60px; width: auto; margin: 0 auto; transform-origin: 50% 50%;
+  transition: transform 1s cubic-bezier(.2, .7, .2, 1); }
+/* The first start: the mark alone, twice its size, in the frame's middle
+   (--intro-dy, panels/welcome.ts) while the board grows; then it rises and
+   shrinks to its place and the name and the buttons come up under it. */
+.wcard.intro .wlogo { transform: translateY(var(--intro-dy, 0px)) scale(2.1); }
+.wtitle, .wbody { transition: opacity .7s ease .4s, transform .7s cubic-bezier(.2, .7, .2, 1) .4s; }
+.wcard.intro .wtitle, .wcard.intro .wbody { opacity: 0; transform: translateY(12px); pointer-events: none; }
+.wcard.intro { cursor: pointer; }
 /* The product's name.  Its glyphs are white; the light that runs across it
    is the layer over them (.wtitle::after), which is why the fill is a
    gradient at all. */
-.wtitle { position: relative; margin-top: var(--gap-name); font-size: 20px; letter-spacing: .01em; white-space: nowrap;
+.wtitle { position: relative; margin-top: var(--gap-name); font-size: 28px; font-weight: 700; letter-spacing: -.01em; line-height: 1.2; white-space: nowrap;
   background-image: linear-gradient(90deg, #fff, #fff); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .wtitle::after {
   content: attr(data-text); position: absolute; left: 0; top: 0; white-space: nowrap; pointer-events: none;
@@ -620,8 +628,37 @@ img.icon { filter: var(--icon-filter); }
 .action:hover { border-color: #fff; background: rgba(255,255,255,.09); }
 .action:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .action img { width: 18px; height: 18px; opacity: .85; flex: none; filter: brightness(0) invert(1); }
-.wbody .back { display: block; margin-top: 14px; font-size: 12px; height: 18px; color: #8a8a8a; text-align: center; }
-.wbody .back:hover { color: #fff; }
+.wbody .back { display: none; }
+/* The way back: an arrow in the die frame's top-left corner, on the steps after the first. */
+.wback { position: absolute; top: 28px; left: 28px; z-index: 1; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+  border: 1px solid rgba(255,255,255,.22); border-radius: 6px; background: transparent; visibility: hidden; opacity: 0; transition: opacity .3s ease; }
+.wback.on { visibility: visible; opacity: 1; }
+.wcard.intro .wback { visibility: hidden; opacity: 0; }
+.wback img { width: 16px; height: 16px; filter: brightness(0) invert(1); opacity: .8; }
+.wback:hover { border-color: #fff; background: rgba(255,255,255,.09); }
+.wback:hover img { opacity: 1; }
+.wback:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+/* A change of step: a burst of white light over the buttons, sparks that
+   flare and fade around them (panels/welcome.ts sparkle()), and the new
+   buttons rising out of a white glow, one after the other.  Every one of
+   these animations ends. */
+.wfx { position: absolute; inset: 0; pointer-events: none; overflow: hidden; border-radius: inherit; }
+.wfx.burst::before { content: ''; position: absolute; inset: 18px;
+  background: radial-gradient(ellipse 60% 45% at 50% 66%, rgba(255,255,255,.30), rgba(255,255,255,0) 70%);
+  animation: wburst .6s ease-out both; }
+@keyframes wburst { 0% { opacity: 0; transform: scale(.9); } 25% { opacity: 1; } 100% { opacity: 0; transform: scale(1.08); } }
+.spark { position: absolute; width: var(--s); height: var(--s); margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2); border-radius: 50%;
+  background: #fff; box-shadow: 0 0 6px 2px rgba(255,255,255,.8); opacity: 0; animation: wspark .75s ease-out var(--d) both; }
+.spark::before, .spark::after { content: ''; position: absolute; left: 50%; top: 50%; width: calc(var(--s) * 5); height: 1px;
+  background: linear-gradient(90deg, rgba(255,255,255,0), #fff, rgba(255,255,255,0)); transform: translate(-50%, -50%); }
+.spark::after { transform: translate(-50%, -50%) rotate(90deg); }
+@keyframes wspark { 0% { opacity: 0; transform: scale(0) rotate(0deg); } 30% { opacity: 1; transform: scale(1.3) rotate(20deg); }
+  100% { opacity: 0; transform: scale(0) rotate(45deg) translateY(-8px); } }
+.actions.enter .action { animation: wenter .5s cubic-bezier(.2, .7, .2, 1) both; }
+.actions.enter .action:nth-child(2) { animation-delay: .08s; }
+@keyframes wenter { 0% { opacity: 0; transform: translateY(8px); box-shadow: 0 0 18px rgba(255,255,255,.55); }
+  60% { opacity: 1; box-shadow: 0 0 14px rgba(255,255,255,.35); } 100% { opacity: 1; transform: none; box-shadow: 0 0 0 rgba(255,255,255,0); } }
+@media (prefers-reduced-motion: reduce) { .wlogo, .wtitle, .wbody, .wback { transition: none; } }
 /* The bars on the first screen (body.first-screen, app.ts): the board shows
    through them, white words and icons, no dividing lines.  Nothing is
    blurred -- the board behind is flat, so a backdrop-filter would cost a

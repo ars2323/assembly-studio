@@ -48,6 +48,8 @@ export interface WelcomeEvents {
 const query = new URLSearchParams(location.search);
 const pageIsa: Isa = query.get('isa') === 'riscv' ? 'riscv' : 'mips';
 const picked = query.has('picked');
+// ?home: back from the work screen (the title bar's mark): the ISA step at once, the board grown, no opening.
+const home = query.has('home');
 
 function action(label: string, ic: string, onClick: () => void, main = false): HTMLElement {
   const b = h('button', { class: `action${main ? ' main' : ''}`, type: 'button' }, icon(ic), h('b', {}, label));
@@ -55,75 +57,122 @@ function action(label: string, ic: string, onClick: () => void, main = false): H
   return b;
 }
 
+const wait = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
+
 export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: boolean): void } {
+  const calm = matchMedia('(prefers-reduced-motion: reduce)');
   const actions = h('div', { class: 'actions' });
-  const back = h('button', { class: 'linkbtn back', type: 'button' });
+  // The way back: an arrow in the die frame's top-left corner, on the steps after the first.
+  const back = h('button', { class: 'wback', type: 'button', title: '뒤로', 'aria-label': '뒤로' }, icon('arrow-left'));
   let backTo = () => {};
   back.addEventListener('click', () => backTo());
+
   /* Three steps on one card: the ISA, then straight to work or the
-     tutorial, then a new file or one to open.  The first choice of each is
-     the one most of them want, at the top; the hierarchy of the two --
-     border, words, ground, and the light each carries -- says which is which. */
+     tutorial, then a new file or one to open.  On the ISA step the two are
+     equals (the same border, ground and light); on the others the first is
+     the one most of them want, and the hierarchy of the two -- border,
+     words, ground, and the light each carries -- says which is which.
+     Every change of step is marked by a burst of white light (sparkle()). */
+  let equal = false;                 // the two buttons carry the same light
+  const show = (step: 0 | 1 | 2, animate = true) => {
+    if (step === 0) {
+      actions.replaceChildren(
+        action('MIPS', 'cpu', () => void choose('mips'), true),
+        action('RISC-V', 'cpu', () => void choose('riscv'), true));
+      backTo = () => {};
+    } else if (step === 1) {
+      actions.replaceChildren(
+        action('바로 시작', 'play', () => show(2), true),
+        action('튜토리얼 보기', 'circle-question-mark', events.tutorial));
+      backTo = () => show(0);
+    } else {
+      actions.replaceChildren(
+        action('새 파일', 'file-plus', events.newFile, true),
+        action('파일 열기', 'folder-open', events.openFile));
+      backTo = () => show(1);
+    }
+    equal = step === 0;
+    back.classList.toggle('on', step !== 0);
+    if (animate) { enter(); sparkle(); }
+    if (step === 2) (actions.firstElementChild as HTMLElement).focus();
+  };
   const choose = async (isa: Isa) => {
-    if (isa === pageIsa) { first(); return; }
+    if (isa === pageIsa) { show(1); return; }
     actions.querySelectorAll('button').forEach((b) => { b.disabled = true; });
-    await events.selectIsa(isa); // the page is replaced
+    sparkle();
+    if (!calm.matches) await wait(320);  // the light first, then the page is replaced
+    await events.selectIsa(isa);
   };
-  const zero = () => {
-    actions.replaceChildren(
-      action('MIPS', 'cpu', () => void choose('mips'), true),
-      action('RISC-V', 'cpu', () => void choose('riscv')));
-    back.style.visibility = 'hidden';
-  };
-  const first = () => {
-    actions.replaceChildren(
-      action('바로 시작', 'play', second, true),
-      action('튜토리얼 보기', 'circle-question-mark', events.tutorial));
-    back.textContent = `← ${ISA_NAME[pageIsa]} · ISA 다시 고르기`;
-    back.style.visibility = 'visible';
-    backTo = zero;
-  };
-  const second = () => {
-    actions.replaceChildren(
-      action('새 파일', 'file-plus', events.newFile, true),
-      action('파일 열기', 'folder-open', events.openFile));
-    back.textContent = '← 처음으로';
-    back.style.visibility = 'visible';
-    backTo = first;
-    (actions.firstElementChild as HTMLElement).focus();
-  };
-  if (picked) first(); else zero();
+
   // The seed is a constant: the same board every start, on every machine.
   // After an ISA was chosen the board is already grown (20 s is past it).
-  const start = startfield({ seed: SEED, from: picked ? 20_000 : 0 });
+  const start = startfield({ seed: SEED, from: picked || home ? 20_000 : 0 });
 
-  /* Four things, down the middle of the die frame: the mark, the product's
-     name, and the two ways in.  The mark is the top bar's own file
-     (brand.mark, a vector, so it is sharp at any size) in its own colours. */
+  /* The mark, the product's name, and the two ways in, down the middle of
+     the die frame.  The mark is the top bar's own file (brand.mark, a
+     vector, so it is sharp at any size) in its own colours.
+     At the first start the card holds the mark alone, large, while the board
+     grows around it (.wcard.intro); when the board has grown the mark rises
+     and shrinks to its place and the name and the ISA step come up under it
+     (reveal()).  A click on the card does it at once. */
   const title = h('span', { class: 'wtitle', 'data-text': WORDMARK }, WORDMARK);
+  const fx = h('div', { class: 'wfx', 'aria-hidden': 'true' });
   const card = h('div', { class: 'wcard', [CHIP_ATTR]: '' },
     h('div', { class: 'wstack' },
       h('img', { class: 'wlogo', src: asset(brand.mark), alt: '' }),
       title,
-      h('div', { class: 'wbody' }, actions, back)));
+      h('div', { class: 'wbody' }, actions)),
+    back, fx);
+  let revealed = picked || home || calm.matches;
+  if (!revealed) card.classList.add('intro');
+  const reveal = () => {
+    if (revealed) return;
+    revealed = true;
+    card.classList.remove('intro');
+    void wait(380).then(() => { enter(); sparkle(); });
+  };
+  card.addEventListener('click', reveal);
+  show(picked ? 1 : 0, (picked || home) && !calm.matches);
+
+  // The buttons come in (a short rise out of a white glow), the two one after the other.
+  function enter(): void {
+    if (calm.matches) return;
+    actions.classList.remove('enter');
+    void actions.offsetWidth;
+    actions.classList.add('enter');
+  }
+  /* A burst of white light over the buttons, and a few sparks that flare
+     and fade around them.  CSS animations that end (no infinite one: the
+     capture tool freezes them); the sparks are removed with the next burst. */
+  function sparkle(): void {
+    if (calm.matches) return;
+    fx.replaceChildren();
+    fx.classList.remove('burst');
+    void fx.offsetWidth;
+    fx.classList.add('burst');
+    const c = card.getBoundingClientRect();
+    const a = actions.getBoundingClientRect();
+    if (c.width === 0 || a.width === 0) return;
+    for (let i = 0; i < 16; i += 1) {
+      const x = a.left - c.left - 24 + Math.random() * (a.width + 48);
+      const y = a.top - c.top - 22 + Math.random() * (a.height + 44);
+      const size = 2 + Math.random() * 3;
+      fx.append(h('span', { class: 'spark', style: `left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;--s:${size.toFixed(1)}px;--d:${Math.round(Math.random() * 260)}ms` }));
+    }
+  }
 
   /* The column centred by what can be SEEN, not by its boxes.  The flex
-     column centres the boxes, and a box can hold nothing visible: on the first
-     step the way back ("← 처음으로", visibility: hidden, 14 + 18 px) is under
-     the buttons, so the boxes were centred and the ink sat 15.6 px high --
-     72 px above it and 103 below inside the die frame at 1920x1080, 1.43 : 1.
-     And the mark is a picture: its own transparent margin is part of its box.  So: the
-     ink's top and bottom -- the mark's from its alpha, the name's and the two
-     buttons' from their boxes -- measured inside the column, and the column
-     moved by what puts their middle on the die frame's.  Measured relative to
-     the column itself, so the move already made does not enter it.  The way
-     back is left out on both steps, and a step does not centre again: counted
-     when it shows, the second step moved everything up 15 px, and measured
-     again at the step, 1 px (rounding); the screen keeps its shape from one
-     step to the other.  The steps hold the same
-     ink -- the mark, the name, two buttons of one height -- so the move made
-     for the first is the second's (the ISA step too). */
-  const stack = card.firstElementChild as HTMLElement;
+     column centres the boxes, and the mark is a picture whose own
+     transparent margin is part of its box.  So: the ink's top and bottom --
+     the mark's from its alpha, the name's and the two buttons' from their
+     boxes -- measured inside the column, and the column moved by what puts
+     their middle on the die frame's.  Measured by offsets, so neither the
+     move already made nor the intro's transforms enter it.  A step does not
+     centre again: every step holds the same ink (the mark, the name, two
+     buttons of one height), so the move made for one is the others'.
+     The same measure gives the intro its start: how far the mark is from
+     the frame's middle (--intro-dy). */
+  const stack = card.querySelector<HTMLElement>('.wstack')!;
   const logo = stack.querySelector<HTMLImageElement>('.wlogo')!;
   let logoInk: { top: number; bottom: number } | null = null;   // fractions of the mark's height
   const measureLogo = (): void => {
@@ -141,20 +190,25 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
     if (top >= 0) logoInk = { top: top / c.height, bottom: bottom / c.height };
   };
   const centre = (): void => {
-    const box = stack.getBoundingClientRect();
-    if (box.height === 0) return;                              // not on the screen
+    const height = stack.clientHeight;
+    if (height === 0) return;                                  // not on the screen
     let top = Infinity, bottom = -Infinity;
-    const ink = (t: number, b: number): void => { top = Math.min(top, t - box.top); bottom = Math.max(bottom, b - box.top); };
-    const l = logo.getBoundingClientRect();
-    ink(l.top + l.height * (logoInk?.top ?? 0), l.top + l.height * (logoInk?.bottom ?? 1));
+    const ink = (t: number, b: number): void => { top = Math.min(top, t); bottom = Math.max(bottom, b); };
+    // Offsets add up to the column's own (a transformed box in between is an offset parent too).
+    const topIn = (el: HTMLElement): number => {
+      let y = 0;
+      for (let e: Element | null = el; e && e !== stack; e = (e as HTMLElement).offsetParent) y += (e as HTMLElement).offsetTop;
+      return y;
+    };
+    const lt = topIn(logo), lh = logo.offsetHeight;
+    ink(lt + lh * (logoInk?.top ?? 0), lt + lh * (logoInk?.bottom ?? 1));
     for (const el of [title, ...actions.children] as HTMLElement[]) {
-      const cs = getComputedStyle(el);
-      if (cs.visibility === 'hidden' || cs.display === 'none') continue;
-      const r = el.getBoundingClientRect();
-      if (r.height > 0) ink(r.top, r.bottom);
+      if (el.offsetHeight > 0) ink(topIn(el), topIn(el) + el.offsetHeight);
     }
     if (top === Infinity) return;
-    stack.style.setProperty('--ink-shift', `${Math.round(box.height / 2 - (top + bottom) / 2)}px`);
+    const shift = Math.round(height / 2 - (top + bottom) / 2);
+    stack.style.setProperty('--ink-shift', `${shift}px`);
+    logo.style.setProperty('--intro-dy', `${Math.round(height / 2 - (lt + lh / 2 + shift))}px`);
   };
   logo.addEventListener('load', () => { measureLogo(); centre(); });
   void document.fonts?.ready.then(centre);
@@ -179,13 +233,13 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
   /* Turned down, nothing of it runs: the board draws its finished state once
      and the card is left at rest, not frozen half way through a pass.  A
      time before the opening is a time nothing is lit at. */
-  const calm = matchMedia('(prefers-reduced-motion: reduce)');
   start.onFrame((t) => {
-    const now = calm.matches ? -1 : t;
+    if (!revealed && t >= start.grownAt() + 250) reveal();
+    const now = calm.matches || !revealed ? -1 : t;
     put(title, 'title', now);
     const buttons = actions.querySelectorAll<HTMLElement>('.action');
     put(buttons[0] ?? null, 'primary', now);
-    put(buttons[1] ?? null, 'secondary', now);
+    put(buttons[1] ?? null, equal ? 'primary' : 'secondary', now);
   });
 
   return {
