@@ -7,7 +7,13 @@
 
    themeSwitch(): the sun-and-moon switch, on the first screen's card and at
    the right end of the status line.  Every switch on the page follows the
-   one that was pressed ('themechange' on window). */
+   one that was pressed ('themechange' on window).
+
+   The change is not a cut: for THEME_FADE_MS <html> carries .theme-fade,
+   under which every colour on the page eases from the old theme's to the
+   new one's (app.css); what the page cannot transition by CSS follows the
+   same clock (the caption buttons' patch, app.ts; the mark, dom.ts; the
+   board, startfield). */
 
 import { h, icon } from './dom.ts';
 
@@ -16,8 +22,18 @@ const KEY = 'studio-theme';
 
 export const currentTheme = (): Theme => (document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
 
+export const THEME_FADE_MS = 500; // app.css html.theme-fade
+let fading = 0;
+
 export function setTheme(theme: Theme): void {
-  document.documentElement.dataset.theme = theme;
+  const root = document.documentElement;
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    root.classList.add('theme-fade');
+    void root.offsetWidth; // the transitions in place before the colours change
+    clearTimeout(fading);
+    fading = window.setTimeout(() => root.classList.remove('theme-fade'), THEME_FADE_MS + 50);
+  }
+  root.dataset.theme = theme;
   try { sessionStorage.setItem(KEY, theme); } catch { /* no storage: this page only */ }
   void (window as unknown as { app?: { setTheme?(t: Theme): Promise<void> } }).app?.setTheme?.(theme);
   window.dispatchEvent(new CustomEvent<Theme>('themechange', { detail: theme }));

@@ -55,8 +55,8 @@ import type { ErrorItem, RunReply } from '../sim/protocol.ts';
 import { api, type AboutInfo } from './api.ts';
 import { brand } from '../../../brand.ts';
 import { asset, character, code, codeText, h, icon, markImg, monoCh, withHex } from '../../../renderer/app/dom.ts';
-import { onTheme, themeSwitch } from '../../../renderer/app/theme.ts';
-import { captionPatch, palette } from '../../../renderer/app/logic/overlay.ts';
+import { onTheme, THEME_FADE_MS, themeSwitch } from '../../../renderer/app/theme.ts';
+import { captionPatch, mixPalette, palette } from '../../../renderer/app/logic/overlay.ts';
 import { WINDOW_COLOURS } from '../../../main/theme.ts';
 import { notice } from '../../../renderer/app/notice.ts';
 import { createEditor } from '../../../renderer/app/editor.ts';
@@ -1422,7 +1422,19 @@ function updateOverlay(): void {
   overlayNow = `${p.color} ${p.symbolColor}`;
   void api.setOverlay(p);
 }
-onTheme(() => { colours = palette(getComputedStyle(document.documentElement)); overlayNow = ''; updateOverlay(); });
+// The patch follows the page's fade (theme.ts), frame by frame, from the colours it has to the new theme's.
+let paletteFade = 0;
+onTheme(() => {
+  const from = colours, to = palette(getComputedStyle(document.documentElement)), start = performance.now();
+  cancelAnimationFrame(paletteFade);
+  const frame = (now: number) => {
+    const t = Math.min(1, (now - start) / THEME_FADE_MS);
+    colours = mixPalette(from, to, t * t * (3 - 2 * t));
+    updateOverlay();
+    if (t < 1) paletteFade = requestAnimationFrame(frame);
+  };
+  paletteFade = requestAnimationFrame(frame);
+});
 new MutationObserver(updateOverlay).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'open'] });
 updateOverlay(); // the first screen is up before anything is watched
 
