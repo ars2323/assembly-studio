@@ -18,7 +18,15 @@
    card: the card is opaque, so that canvas would have to cover the buttons,
    and its pixels and the buttons' boxes would part company at every font
    load and every resize.  An element's own box cannot come adrift from
-   itself. */
+   itself.
+
+   An update (src/main/updater.ts): at the real first start of a run the
+   check is asked for at once, and the reveal waits for its answer (at most
+   about 6 s).  With a newer release, the card shows that instead of the ISA
+   step -- the update's version, a progress bar, the percentage and the
+   megabytes -- then "Installing update…" for a moment, and the program
+   quits, installs it and starts the new version.  No update, no answer, or
+   a failed download: the ISA step, as ever. */
 
 import { brand } from '../../../brand.ts';
 import { h, icon, markImg } from '../dom.ts';
@@ -27,6 +35,8 @@ import { langSwitch, onLang, tr } from '../i18n.ts';
 import { WELCOME } from '../messages/welcome.ts';
 import { CHIP_ATTR, startfield } from '../../startfield/index.ts';
 import { offsets, SEED, type SparkName, sparkAt } from './spark.ts';
+import { progressFill, progressText, type Progress } from '../logic/update-progress.ts';
+import type { UpdateCheck } from '../../../main/updater.ts';
 
 /** The product name on the package.  The seed the board is grown from is in
     spark.ts, with what else is derived from it. */
@@ -71,6 +81,62 @@ const wait = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
 const REVEAL_AT = 0.5;
 // A change of step: the buttons stay, their words go out over this long and the new ones come in.
 const LABEL_OUT = 130;
+// The update: the check is asked for once per run (sessionStorage, which a
+// page loaded again keeps), and not waited for longer than this -- past the
+// main process's own limit (updater.ts CHECK_TIMEOUT_MS).
+const UPDATE_KEY = 'studio-update-checked';
+const UPDATE_WAIT = 6_500;
+// "Installing update…" is on the card this long before the program quits to install it.
+const INSTALL_AFTER = 1_000;
+// A failed download: its message is on the card this long, then the ISA step comes up.
+const FAILED_FOR = 2_200;
+
+/* Whether this page should ask: the real first start only -- not a page
+   loaded for the other ISA (?then) or back from the work screen (?home) --
+   and once per run. */
+function firstLoad(): boolean {
+  if (picked || home) return false;
+  try {
+    if (sessionStorage.getItem(UPDATE_KEY)) return false;
+    sessionStorage.setItem(UPDATE_KEY, '1');
+  } catch { /* no storage: this page asks */ }
+  return true;
+}
+
+/* What the card shows instead of the ISA step while an update comes in: the
+   version, a slim bar, the percentage and the megabytes; then that it is
+   being installed; or that it failed.  As high as the step's two buttons,
+   in their place, so the mark and the name above it do not move. */
+function updatePanel(): { root: HTMLElement; start(version: string): void; progress(p: Progress): void; installing(): void; failed(): void } {
+  const line = h('div', { class: 'wupd-line' });
+  const fill = h('i', {});
+  const bar = h('div', { class: 'wupd-bar', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100' }, fill);
+  const percent = h('span', {});
+  const size = h('span', {});
+  const root = h('div', { class: 'wupd', role: 'status', 'aria-live': 'polite' }, line, bar, h('div', { class: 'wupd-meta' }, percent, size));
+  let version = '';
+  let state: 'downloading' | 'installing' | 'failed' = 'downloading';
+  let last: Progress = { percent: 0, transferred: 0, total: 0 };
+  const draw = () => {
+    line.textContent = state === 'downloading' ? tr(WELCOME.update.downloading, version)
+      : state === 'installing' ? tr(WELCOME.update.installing) : tr(WELCOME.update.failed);
+    const at = state === 'installing' ? 100 : progressFill(last);
+    fill.style.width = `${at}%`;
+    bar.setAttribute('aria-valuenow', String(at));
+    const text = progressText(state === 'installing' ? { ...last, percent: 100, transferred: last.total } : last);
+    percent.textContent = text.percent;
+    size.textContent = text.size;
+    root.dataset.state = state;
+  };
+  onLang(draw);
+  return {
+    root,
+    start(v) { version = v; draw(); },
+    progress(p) { if (state === 'downloading') { last = p; draw(); } },
+    installing() { state = 'installing'; draw(); },
+    failed() { state = 'failed'; draw(); },
+  };
+}
 
 export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: boolean): void } {
   const calm = matchMedia('(prefers-reduced-motion: reduce)');
@@ -171,23 +237,71 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
      rises and shrinks to its place and the name and the ISA step come up under it
      (reveal()).  A click on the card does it at once. */
   const title = h('span', { class: 'wtitle', 'data-text': WORDMARK }, WORDMARK);
+  const update = updatePanel();
   const card = h('div', { class: 'wcard', [CHIP_ATTR]: '' },
     h('div', { class: 'wstack' },
       markImg('wlogo'),
       title,
-      h('div', { class: 'wbody' }, actions)),
+      h('div', { class: 'wbody' }, actions, update.root)),
     corner, isaTag, h('div', { class: 'wlang' }, langSwitch()), version, h('div', { class: 'wtheme' }, themeSwitch()));
   // A switch of theme: the board cross-fades to the other look (start.setTheme),
   // over the same time the page's colours take (theme.ts).
   onTheme((t) => start.setTheme(t));
   let revealed = picked || home || calm.matches;
   if (!revealed) card.classList.add('intro');
+  /* The update check, asked for at once; the reveal waits for its answer.
+     Turned down (no opening), the ISA step is there at once and an update
+     found takes its place if the user is still on it. */
+  let answer: UpdateCheck | null = null;
+  const asking = firstLoad() && window.app?.checkUpdate;
+  if (asking) {
+    void Promise.race([
+      window.app.checkUpdate().catch((): UpdateCheck => ({ available: false })),
+      wait(UPDATE_WAIT).then((): UpdateCheck => ({ available: false })),
+    ]).then((a) => {
+      answer = a;
+      if (wanted) reveal();
+      else if (revealed && a.available && now === 0) updating(a.version ?? '');
+    });
+  } else {
+    answer = { available: false };
+  }
+  let wanted = false;
   const reveal = () => {
     if (revealed) return;
+    wanted = true;
+    if (!answer) return;              // the check's answer first
     revealed = true;
     card.classList.remove('intro');
-    void wait(380).then(enter);
+    if (answer.available) updating(answer.version ?? '');
+    else void wait(380).then(enter);
   };
+  /* An update instead of the ISA step: downloaded with its progress on the
+     card, then installed (the program quits and the new version starts).
+     A failure: its message for a moment, then the ISA step. */
+  function updating(version: string): void {
+    card.classList.add('updating');
+    update.start(version);
+    centre();
+    window.app.onUpdateProgress((p) => update.progress(p));
+    window.app.onUpdateReady(() => {
+      update.installing();
+      void wait(INSTALL_AFTER).then(() => window.app.installUpdate());
+    });
+    let failed = false;
+    window.app.onUpdateError((message) => {
+      if (failed) return;
+      failed = true;
+      console.error('update:', message);
+      update.failed();
+      void wait(FAILED_FOR).then(() => {
+        card.classList.remove('updating');
+        centre();
+        enter();
+      });
+    });
+    void window.app.downloadUpdate();
+  }
   card.addEventListener('click', reveal);
   show(picked ? (then === 'tutorial' ? 1 : 2) : 0, home && !calm.matches);
 
@@ -239,7 +353,7 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
     };
     const lt = topIn(logo), lh = logo.offsetHeight;
     ink(lt + lh * (logoInk?.top ?? 0), lt + lh * (logoInk?.bottom ?? 1));
-    for (const el of [title, ...actions.children] as HTMLElement[]) {
+    for (const el of [title, ...actions.children, update.root] as HTMLElement[]) {
       if (el.offsetHeight > 0) ink(topIn(el), topIn(el) + el.offsetHeight);
     }
     if (top === Infinity) return;
