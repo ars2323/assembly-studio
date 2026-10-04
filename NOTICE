@@ -1,0 +1,205 @@
+Assembly Studio — notices
+=========================
+
+This project's own license is in LICENSE (BSD 3-Clause). The components below
+keep their own licenses.
+
+  1. SPIM                              the MIPS simulator engine (BSD)
+  2. RARS and JSoftFloat               the RISC-V simulator engine (MIT)
+  3. Eclipse Temurin (OpenJDK) 21      the Java runtime the RISC-V engine runs on
+  4. Electron, Chromium and Node.js    the program's window
+  5. Pretendard, D2Coding              fonts (SIL Open Font License 1.1)
+  6. Lucide                            icons (ISC / MIT)
+  7. Other components                  build tools, npm packages
+  8. Brand assets                      marks that only some builds carry
+  9. Trademarks
+
+
+1. SPIM
+-------
+
+The MIPS32 simulator SPIM 9.1.24 (SVN r764), by James R. Larus
+(https://spimsimulator.sourceforge.net/). Its simulator core (CPU/) is used
+unmodified and built into the program's native addon (spim.node).
+
+SPIM is Copyright (c) 1990-2023, by James R. Larus.
+All rights reserved.
+
+SPIM is distributed under a BSD license:
+
+     Redistribution and use in source and binary forms, with or without modification, are
+     permitted provided that the following conditions are met:
+
+         Redistributions of source code must retain the above copyright notice, this list of
+         conditions and the following disclaimer.
+
+         Redistributions in binary form must reproduce the above copyright notice, this list of
+         conditions and the following disclaimer in the documentation and/or other materials
+         provided with the distribution.
+
+         Neither the name of the James R. Larus nor the names of its contributors may be used to
+         endorse or promote products derived from this software without specific prior written
+         permission.
+
+     THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS
+     OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+     MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+     COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+     EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+     SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+     HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
+     TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+     SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+2. RARS and JSoftFloat
+----------------------
+
+RARS 1.6, built unmodified from its tag v1.6 (commit 7acf3254), with
+JSoftFloat inside it; installed as resources/engine/rars.jar. The engine
+around it (resources/engine/classes, this project's own) talks to it through
+its Java API. Their notices, as they come with them:
+
+-------------------------------------------------------------------------------
+RARS -- RISC-V Assembler and Runtime Simulator
+https://github.com/TheThirdOne/rars  (v1.6, commit 7acf3254e84ab75fa612402b22fe915a2e00bdab)
+-------------------------------------------------------------------------------
+
+Copyright (c) 2003-2013,  Pete Sanderson and Kenneth Vollmar
+
+Developed by Pete Sanderson (psanderson@otterbein.edu)
+and Kenneth Vollmar (kenvollmar@missouristate.edu)
+
+Permission is hereby granted, free of charge, to any person obtaining 
+a copy of this software and associated documentation files (the 
+"Software"), to deal in the Software without restriction, including 
+without limitation the rights to use, copy, modify, merge, publish, 
+distribute, sublicense, and/or sell copies of the Software, and to 
+permit persons to whom the Software is furnished to do so, subject 
+to the following conditions:
+
+The above copyright notice and this permission notice shall be 
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, 
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF 
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR 
+ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF 
+CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION 
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+(MIT license, http://www.opensource.org/licenses/mit-license.html)
+
+-------------------------------------------------------------------------------
+JSoftFloat (bundled inside RARS)
+https://github.com/thethirdone/jsoftfloat
+-------------------------------------------------------------------------------
+
+MIT License
+
+Copyright (c) 2017 Benjamin Landers
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+3. Eclipse Temurin (OpenJDK) 21
+-------------------------------
+
+The Java runtime in resources/engine/runtime/: Eclipse Temurin 21.0.12+1
+(https://adoptium.net), reduced by jlink to the modules the engine needs
+(java.base, java.prefs, java.desktop and what they require).  OpenJDK is
+under the GNU General Public License version 2 with the Classpath Exception
+(GPL-2.0 WITH Classpath-exception-2.0), (c) Oracle and/or its affiliates and
+other contributors.  The license texts and the notices of the libraries it
+includes are installed with it, in resources/engine/runtime/legal/ (one
+folder per module).  Its source is at https://github.com/adoptium/jdk21u.
+
+
+4. Electron, Chromium and Node.js
+---------------------------------
+
+Electron (MIT License, (c) Electron contributors, (c) GitHub Inc.), which
+contains Chromium (BSD-style licenses, (c) The Chromium Authors, with the
+many libraries Chromium includes) and Node.js (MIT License, (c) Node.js
+contributors, with the libraries Node.js includes).
+
+Their license texts ship with every build, next to the executable:
+  LICENSE.electron.txt     Electron's license
+  LICENSES.chromium.html   Chromium's credits: the licenses of Chromium,
+                           Node.js and the libraries they include
+The program's About > Licenses opens the latter.
+
+
+5. Pretendard and D2Coding
+--------------------------
+
+Pretendard, (c) 2021 Kil Hyung-jin (https://github.com/orioncactus/pretendard),
+and D2Coding, (c) NAVER Corporation (https://github.com/naver/d2codingfont),
+both under the SIL Open Font License 1.1.
+  electron/src/renderer/assets/fonts/  (Pretendard subset and D2Coding,
+                                        converted to WOFF2; the licenses are there)
+
+
+6. Lucide
+---------
+
+Lucide icons, (c) Lucide Contributors (https://lucide.dev), under the ISC
+License; the parts derived from Feather, (c) Cole Bemis, under the MIT License.
+  electron/src/renderer/assets/icons/lucide/  (license: LICENSE.txt there)
+
+
+7. Other components
+-------------------
+
+SPIM's parser and scanner are generated from CPU/parser.y and CPU/scanner.l by
+GNU Bison (whose special exception applies to the generated parser) and flex
+(whose license puts no condition on generated scanners); acknowledged in
+electron/native/LICENSE.flex.txt.
+
+The npm packages bundled into the program's JavaScript (CodeMirror and its
+dependencies, iconv-lite, safer-buffer) and node-addon-api (compiled into the
+addon), all under the MIT License. Their list and license texts are generated
+at build time (electron/tools/licenses.ts) and shown in About > Licenses.
+
+
+8. Brand assets
+---------------
+
+The program is built for one brand at a time (electron/brands/<id>/). Only
+that brand's assets go into the build.
+
+  generic   this project's own mark and icon, under this project's license.
+  hallym    the Hallym University symbol, logotype, emblem and signature, and
+            the university's characters Haram (하람) and Hari (하리), which
+            belong to Hallym University. They are not covered by this
+            project's license or by any license in this file, and may not be
+            taken from this repository or from the programs and used
+            separately (electron/brands/hallym/assets/README.md). Anyone who
+            forks or redistributes this project must leave them out (build
+            the generic brand), unless Hallym University has given its own
+            permission. This software is not an official product of Hallym
+            University.
+
+
+9. Trademarks
+-------------
+
+MIPS is a trademark of MIPS. RISC-V is a trademark of RISC-V International.
+This software is not affiliated with, nor endorsed by, either.

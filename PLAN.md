@@ -1,18 +1,17 @@
 # Assembly Studio — 계획
 
 MIPS 와 RISC-V 를 한 앱에서. 실행하면 ISA 를 고르고, 고른 ISA 의 엔진을 띄운다.
-화면 구성은 Hallym MIPS Simulator 2.8.1 을 그대로 쓰고, 색만 시작 화면(회로판)의 느낌으로 바꾼다.
+화면 구성(버튼 위치, 패널, 크기, 동작)은 지금 것을 그대로 쓰고, 색만 시작 화면(회로판)의 느낌으로 바꾼다.
 범용판을 먼저 끝까지 만들고, 그다음 브랜드만 바꾼 한림대판을 만든다.
 
-## 1. 출처
+## 1. 구성 요소
 
-| 무엇 | 저장소 | 커밋 |
-|---|---|---|
-| 앱 바탕(Electron UI), SPIM 코어(`CPU/`), 애드온(`native/`) | `ars2323/hallym-mips-simulator` v2.8.1 | `f54b5775258d52d1be6a95bd5d4718b080a9551c` |
-| RARS 래퍼(`probe/`), RISC-V 엔진 경계(`sim/`), RISC-V ISA 모듈 | `ars2323/hallym-riscv-simulator` v1.0.0 | `234917471c3e66df08b0fe2b006b31ba643ea768` |
-
-이력은 들여오지 않고, 위 커밋에서 복사한다. 원래 이력은 두 저장소에 남는다.
-두 저장소는 한림대판 첫 릴리스 뒤에 archive 한다. Qt 판(1.x)은 가져오지 않는다.
+| 무엇 | 어디 |
+|---|---|
+| 앱(Electron UI) | `electron/src` |
+| SPIM 코어와 그 애드온 | `CPU/`, `electron/native/` |
+| RARS 래퍼 | `probe/` (RARS 1.6 은 고정 커밋에서 빌드, 저장소에 넣지 않음) |
+| 엔진 빌드·배포 | `engines/`, `.github/workflows/` |
 
 ## 2. 확정된 결정
 
@@ -24,7 +23,7 @@ MIPS 와 RISC-V 를 한 앱에서. 실행하면 ISA 를 고르고, 고른 ISA �
 | 범용판 이름 | `Assembly Studio`, 실행 파일 `AssemblyStudio` |
 | UI 언어 | 한국어 (지금과 같음: 이름은 영어, 학생에게 하는 문장은 한국어) |
 | 범용판 로고 | 시안 2~3개 중에서 고른다 |
-| 화면 | 버튼 위치, 패널 배치, 크기, 동작은 MIPS 2.8.1 그대로. 색만 바꾼다 (§4) |
+| 화면 | 버튼 위치, 패널 배치, 크기, 동작은 지금 그대로. 색만 바꾼다 (§4) |
 | 테마 범위 | 두 판이 같은 다크 테마를 쓴다. 한림대판은 로고, 이름, 튜토리얼 캐릭터, `.hmx` 내보내기만 다르다 |
 | 색 정책 | 구조는 흑백. 오류, 방금 바뀐 값, 형식 배지처럼 뜻이 있는 곳만 채도 낮춘 색. 최종은 S2 시안에서 |
 | 버전, 릴리스 | 1.0.0 부터. 태그 하나에 두 판의 설치본을 함께 올린다 (한림대판은 H2 부터) |
@@ -35,14 +34,14 @@ MIPS 와 RISC-V 를 한 앱에서. 실행하면 ISA 를 고르고, 고른 ISA �
 ```
 CPU/                    SPIM 코어 — 수정 금지
 probe/                  RarsProbe.java 와 setup.sh — RARS 는 고정 커밋에서 빌드, 저장소에 넣지 않음
-brands/
+electron/brands/
   generic/              brand.ts (이름, appId, 워드마크, About 문구), 로고, 아이콘, 설치 관리자 그림
   hallym/               같은 구성 + 한림 마크, 튜토리얼 캐릭터 (S0 에서 옮겨 보관, H1 부터 빌드)
 electron/
   native/               SPIM N-API 애드온
   src/
-    engine/mips/        MIPS 판 sim/ 그대로 (worker, host, transport, protocol)
-    engine/riscv/       RISC-V 판 sim/ 그대로 (JVM transport, host, protocol)
+    engine/mips/        SPIM 엔진 경계 (worker, host, transport, protocol)
+    engine/riscv/       RARS 엔진 경계 (JVM transport, host, protocol)
     isa/mips/           decoder, op-table, registers, syntax, explain, near-miss, machine 묶음, 튜토리얼, 예제
     isa/riscv/          같은 구성
     main/ renderer/     공통: 첫 화면, 패널, 편집기, 레이아웃. ISA·브랜드는 모듈로 받는다
@@ -85,10 +84,10 @@ electron/
 
 | 단계 | 내용 | 확인 |
 |---|---|---|
-| **S0 가져오기** | §1 의 MIPS 커밋에서 `electron/src`, `native/`, `CPU/`, 패키징을 가져온다. 이름을 Assembly Studio 로, 브랜드 계층을 나누고 한림 자산을 `brands/hallym/` 에 보관. `CLAUDE.md`, `engines.yml` | 실행되는지 |
+| **S0 가져오기** | 앱, `CPU/`, 애드온, 패키징을 들인다. 이름을 Assembly Studio 로, 브랜드 계층을 나누고 한림 자산을 `electron/brands/hallym/` 에 보관. `CLAUDE.md`, `engines.yml` | 실행되는지 |
 | **S1 토큰 정리** | 색 값 84곳과 `main.ts` 의 색을 토큰으로. 토큰 이름을 뜻으로 | 캡처 한 장 |
 | **S2 다크 테마** | 시안 두 안(형식 배지·강조) → **검토 ①** → 적용 | 1280 캡처 한 장, 910 한 장 |
-| **S3 RISC-V 엔진** | §1 의 RISC-V 커밋에서 `probe/`, `sim/`, ISA 모듈. RISC-V 쪽 CSS 는 새 토큰으로 옮겨 넣는다. `--isa` | 가져온 core 단위 테스트, 실행되는지 |
+| **S3 RISC-V 엔진** | `probe/`, RARS 엔진 경계, RISC-V ISA 모듈. RISC-V 쪽 CSS 는 새 토큰으로 옮겨 넣는다. `--isa` | 가져온 core 단위 테스트, 실행되는지 |
 | **S4 ISA 선택** | 첫 화면 0단계, 고른 뒤 엔진 시작, "처음으로" 에서 전환. 제목, About, 파일 필터가 ISA 를 따른다. 시험용 설치본(pre-release) | **검토 ②** |
 | **S5 범용판 마무리** | 이름, 로고(시안 두 개 중 선택), 아이콘, About, 캐릭터 없는 튜토리얼, 사용 안내 | 캡처 |
 | **S6 범용판 1.0.0** | 설치본 발행 | **검토 ③** |
@@ -98,13 +97,13 @@ electron/
 | 단계 | 내용 |
 |---|---|
 | **H1** | `brands/hallym` 완성: 한림 로고, 이름, 튜토리얼 캐릭터, 설치 관리자 그림, `.hmx` 내보내기. 코드는 건드리지 않는다 |
-| **H2** | 두 판을 함께 빌드해 발행. appId 와 설치 경로가 달라 한 PC 에 함께 설치된다. 그 뒤 두 원래 저장소를 archive |
+| **H2** | 두 판을 함께 빌드해 발행. appId 와 설치 경로가 달라 한 PC 에 함께 설치된다. |
 
 S2(색)를 S3(RISC-V)보다 먼저 한다: MIPS 하나일 때 바꾸면 한 번에 끝나고, RISC-V 쪽 CSS 는 들여올 때 새 토큰으로 쓰면 된다.
 
 ## 6. 검증, CI, 배포
 
-엔진은 두 원래 저장소에서 이미 검증되어 배포된 것을 고치지 않고 쓰고, 화면 구성도 그대로다. 그래서 검증은 최소로 한다.
+엔진(SPIM, RARS)은 이미 검증된 것을 고치지 않고 쓰고, 화면 구성도 그대로다. 그래서 검증은 최소로 한다.
 
 **가져오는 테스트:** ISA core 의 단위 테스트(decoder, format, registers 등 — 빠르고, 파일을 옮기다 깨진 import 를 잡는다)만.
 **가져오지 않는 것:** e2e 스위트, Qt 골든, 뮤턴트, 폭별 측정, 설치 관리자·IME·업그레이드 검사, 탐침 검사, 그 도구들.
@@ -124,7 +123,7 @@ S2(색)를 S3(RISC-V)보다 먼저 한다: MIPS 하나일 때 바꾸면 한 번�
 ## 7. 지킬 것
 
 - `CPU/` 와 RARS 는 고치지 않는다. 고쳐야만 되는 일이 나오면 멈추고 보고한다.
-- 화면 구성(버튼 위치, 패널, 크기, 동작)은 MIPS 2.8.1 과 같다. 바꾸는 것은 색뿐이다.
+- 화면 구성(버튼 위치, 패널, 크기, 동작)은 지금과 같다. 바꾸는 것은 색뿐이다.
 - 색은 토큰으로만.
 - 범용판 산출물에 한림 이름이나 자산이 없어야 한다.
 - 커밋은 작게, 한 목적씩. 단계마다 push 한다.
@@ -133,7 +132,7 @@ S2(색)를 S3(RISC-V)보다 먼저 한다: MIPS 하나일 때 바꾸면 한 번�
 
 | 위험 | 대응 |
 |---|---|
-| 설치본 크기 — JVM 런타임 때문에 140MB 안팎 | 감수. jlink 모듈은 RISC-V 판이 잰 최소 구성(java.base, java.prefs, java.desktop) |
+| 설치본 크기 — JVM 런타임 때문에 140MB 안팎 | 감수. jlink 모듈은 최소 구성(java.base, java.prefs, java.desktop) |
 | RISC-V 를 고르면 JVM 콜드 스타트 | 고른 직후 엔진을 띄우고 첫 화면 다음 단계를 보이는 동안 기다린다 |
 | 두 엔진의 동작 차이(중단점: 주소 vs 줄, 입력: 재실행 vs 이벤트, 실행 중 읽기·진행 표시) | 엔진 경계는 각자 그대로 두고 ISA 별 `app.ts` 가 흡수. 실행 중 진행 표시는 MIPS 만 |
 | 검증을 줄여 문제를 늦게 발견 | 검토 ② 에서 Windows 실물로 확인. 이전 릴리스로 되돌릴 수 있음 |

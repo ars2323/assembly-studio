@@ -1,0 +1,42 @@
+{
+  "name": "assembly-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Assembly Studio: a MIPS (SPIM) and RISC-V (RARS) simulator as an Electron app",
+  "license": "BSD-3-Clause",
+  "type": "module",
+  "scripts": {
+    "brand": "node tools/brand.ts",
+    "build": "node-gyp rebuild --directory native",
+    "build:electron": "node tools/build-electron.ts",
+    "build:ui": "node tools/build-ui.ts",
+    "typecheck": "node tools/brand.ts && tsc --noEmit",
+    "test": "node --test --import ./tests/helpers/timer-at-exit.ts \"tests/**/*.test.ts\"",
+    "gen:op-table": "node tools/gen-op-table.ts",
+    "electron": "node tools/build-ui.ts && node tools/electron.ts",
+    "shot": "node tools/build-ui.ts && node tools/shot.ts",
+    "package": "node tools/package.ts",
+    "package:dir": "node tools/package.ts --dir"
+  },
+  "dependencies": {
+    "iconv-lite": "^0.7.3",
+    "node-addon-api": "^8.0.0"
+  },
+  "devDependencies": {
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/language": "^6.12.4",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.13",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^22.20.4",
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "node-gyp": "^13.0.2",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "productName": "Assembly Studio"
+}
