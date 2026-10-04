@@ -27,7 +27,7 @@
    instead of the machine.
 
    This is the RISC-V window (src/renderer/app/app.ts is the MIPS one).  No
-   .hmx export and no Advanced settings here: those are SPIM's.  While the
+   Advanced settings here: those are SPIM's.  While the
    Editor holds the program in the machine, it
    marks the line being executed (the Text panel's line column: the core's
    own PC -> source mapping); once the code has changed it marks none (its
@@ -123,7 +123,6 @@ let errors: { message: string; line: number; col: number }[] = [];
 let saveNote = '';     // what Ctrl+S did with the file: shown until the first step
 let saveWarn = false;  // ...and whether it is a warning (not saved)
 let note = '';                          // a one-off word in the status bar (breakpoints)
-let exportNote = '';                    // the same, for an export that went well
 let crashNote = '';
 let progress: { pc: number; instructions: number } | null = null;
 let lastReason: StopReason = 'limit';
@@ -730,7 +729,6 @@ function renderStatus(): void {
     if (errors.length) parts.push(cell('err', `${plural(errors.length, 'error')} in the edited code`));
   }
   if (note) parts.push(cell('warn', note));
-  else if (exportNote) parts.push(cell('ok', exportNote));
   if (open && hints.length) parts.push(keys(...hints));
   status.replaceChildren(...parts, statusTheme);
 }
@@ -997,7 +995,6 @@ async function assemble(source: string): Promise<boolean> {
   busy = true;
   let after: Signal | null = null;
   note = '';
-  exportNote = '';
   congrats.hidden = true;
   // An assemble that takes a while says so in the Assemble panel.
   const slowAssemble = setTimeout(() => { assembling = true; renderAssemble(); }, 150);
@@ -1129,7 +1126,6 @@ async function step(): Promise<void> {
 async function go(call: () => Promise<RunReply>): Promise<RunReply | null> {
   busy = true;
   note = '';
-  exportNote = '';
   congrats.hidden = true;
   const before = lastRegs;
   let result: RunReply;
@@ -1246,7 +1242,6 @@ async function restart(): Promise<void> {
   const good = lastGood;
   busy = true;
   note = '';
-  exportNote = '';
   congrats.hidden = true;
   [saveNote, saveWarn] = ['', false]; // Reset saves nothing
   try {

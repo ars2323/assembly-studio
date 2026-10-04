@@ -1,35 +1,19 @@
 /* The MIPS engine in the main process: SPIM's core in a utility process
-   (src/sim/host.ts), and a second one for checking a program and for the
-   .hmx export.  Registers the sim:* handlers the MIPS window
-   (src/renderer/app/app.ts) calls, and the two that only it has
-   (file:exportImage, file:openHandler). */
+   (src/sim/host.ts), and a second one for checking a program.  Registers
+   the sim:* handlers the MIPS window (src/renderer/app/app.ts) calls, and
+   the one that only it has (file:openHandler). */
 
 import { app, dialog, type BrowserWindow } from 'electron';
-import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { brand } from '../brand.ts';
-import { formatHmx, hmxTime } from '../core/hmx.ts';
-import { decodeTextFile, encodeTextFile, NEW_FILE_FORMAT, type TextFileFormat } from '../node/text-file.ts';
+import { decodeTextFile } from '../node/text-file.ts';
 import { Simulator, SimulatorCrashed } from '../sim/host.ts';
-import { ImageError, readImage } from '../sim/image.ts';
 import type { CallName, Calls } from '../sim/protocol.ts';
 import { utilityTransport } from '../sim/transport.ts';
 import { answer, handlers, type Engine } from './ipc.ts';
-import { version } from './paths.ts';
 
 type AssembleOptions = Calls['assemble'][0][1];
-
-// What the window asks an export for: the program it last assembled, as it was then.
-export interface ImageJob {
-  source: string;
-  options: AssembleOptions;
-  name: string;                       // the file's name then ("untitled.s" if never saved)
-  path: string | null;                // where it was; the .hmx is offered next to it
-  format: TextFileFormat | null;      // how that file is written (null: a new file's)
-  assembled: number;                  // when, in ms since the epoch
-}
 
 export function start(win: BrowserWindow): Engine {
   const ipc = handlers();
@@ -76,36 +60,6 @@ export function start(win: BrowserWindow): Engine {
       if (e instanceof SimulatorCrashed) return { ok: false, errors: [], symbols: '', format: null, data: { start: 0, end: 0 }, crashed: e.message };
       throw e;
     }
-  }));
-  // The executable image (.hmx, ../docs/hmx-format.md) of the program last
-  // assembled -- not of the Editor's text if it changed since: the source,
-  // its options and its file as they were then.  Read in the second
-  // process; the machine on screen is not touched.  The hash is of the
-  // source as its file holds it (its encoding, BOM and line ends): for a
-  // file saved when it was assembled, the file's own SHA-256.
-  ipc.handle('file:exportImage', (_e, job: ImageJob) => answer(async () => {
-    let machine;
-    try {
-      machine = await onChecker((c) => readImage((m, ...a) => c.call(m, ...a), job.source, job.options));
-    } catch (e) {
-      if (e instanceof ImageError) return { error: e.message };
-      if (e instanceof SimulatorCrashed) return { error: 'The simulator stopped while making the executable image' };
-      throw e;
-    }
-    const encoded = encodeTextFile(job.source, job.format ?? NEW_FILE_FORMAT);
-    const bytes = encoded.ok ? encoded.bytes : new TextEncoder().encode(job.source);
-    const text = formatHmx({
-      ...machine, source: job.name, sourceSha256: createHash('sha256').update(bytes).digest('hex'),
-      producedBy: `${brand.name} ${version}`, assembled: hmxTime(new Date(job.assembled)),
-    });
-    const name = `${job.name.replace(/\.(s|asm)$/i, '')}.hmx`;
-    const r = await dialog.showSaveDialog(win, {
-      title: 'Export executable image (.hmx)', defaultPath: job.path ? path.join(path.dirname(job.path), name) : name,
-      filters: [{ name: 'Executable image', extensions: ['hmx'] }],
-    });
-    if (r.canceled || !r.filePath) return null;
-    writeFileSync(r.filePath, text);
-    return { path: r.filePath, name: path.basename(r.filePath) };
   }));
   // An exception handler for Settings > 고급: its name and text (decoded like a program).
   ipc.handle('file:openHandler', () => answer(async () => {
