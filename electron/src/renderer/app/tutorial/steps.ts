@@ -1,12 +1,12 @@
-/* The MIPS tutorial: seven chapters over src/examples/tutorial.s (and
-   tutorial-error.s in chapter 6).  The engine is tutorial/engine.ts; the
+/* The MIPS tutorial: eight chapters over src/examples/tutorial.s (and
+   tutorial-error.s in chapter 7).  The engine is tutorial/engine.ts; the
    steps both ISAs share, tutorial/common.ts. */
 
 import * as common from './common.ts';
 import { tr } from '../i18n.ts';
 import { CHAPTERS as NAMES, MIPS, STEPS } from '../messages/tutorial.ts';
 import type { Chapter, Step } from './engine.ts';
-import { $, $$, button, dataCell, groupBox, lines, scrollGroup, pcLine, reg, scrollIn, sideLine, statusChanged, trow } from './targets.ts';
+import { $, $$, button, dataCell, groupBox, ifShown, lines, scrollGroup, pcLine, reg, scrollIn, sideLine, statusChanged, trow } from './targets.ts';
 
 // The example's lines the steps are about.
 const ADD = /^\s+add\s+\$t3/;
@@ -16,8 +16,12 @@ const SW = /^\s+sw\s+\$t3, total/;
 const LW = /^\s+lw\s+\$s0, total/;
 const PRINT = /^\s+li\s+\$v0, 4\b/;
 const SYSCALL = /^\s+syscall/;          // the first: it prints msg
+const READ = /^\s+li\s+\$v0, 5\b/;
+// (For the tests: each is one line of the example, in both languages.)
+export const LINES = { ADD, SUB, BIG, SW, LW, PRINT, SYSCALL, READ };
 const T3 = { key: '$t3', name: '$t3' };
 const stackTag = () => $$('.dtags.dsec-stack').find((e) => e.textContent?.includes('$sp')) ?? null;
+const radixBoxes = () => $('.textpanel [role=radiogroup]');
 
 const twoWords: Step = {
   id: 'pseudo', kind: 'explain', file: 'tutorial.s', view: 'run', tab: 'text',
@@ -32,7 +36,7 @@ const registers: Step = {
   id: 'registers', kind: 'explain', file: 'tutorial.s', view: 'run',
   title: () => tr(MIPS.registers.title),
   body: () => tr(MIPS.registers.body),
-  targets: () => [groupBox('Temporaries')],
+  targets: () => [groupBox('Temporaries'), ...ifShown($('.regs .fold'))],
   prepare: async (t) => { if (!t.host.assembled()) await t.host.assemble(); },
   reveal: () => scrollGroup('Temporaries'),
 };
@@ -63,15 +67,6 @@ const changed: Step = {
   reveal: (t) => t.host.revealRegister('$t3'),
 };
 
-const inspector: Step = {
-  id: 'inspector', kind: 'explain', file: 'tutorial.s', view: 'run', tab: 'text', quietPc: true,
-  title: () => tr(STEPS.inspector.title),
-  body: () => tr(STEPS.inspector.body),
-  targets: () => [$('.insp .ititle'), $('.insp .bitgrid'), $('.insp .phead')],
-  prepare: async (t) => { await t.atLeast(SUB); },
-  inspect: (t) => t.addr(ADD),
-};
-
 const bits: Step = {
   id: 'bits', kind: 'explain', file: 'tutorial.s', view: 'run', tab: 'text', quietPc: true,
   title: () => tr(STEPS.bits.title),
@@ -95,7 +90,7 @@ const store: Step = {
   result: { view: 'run', tab: 'data',
     title: () => tr(STEPS.store.result.title),
     body: () => tr(STEPS.store.result.body, '$t3'),
-    targets: (t) => [dataCell(t, 'total')],
+    targets: (t) => [dataCell(t, 'total'), radixBoxes()],
     reveal: (t) => scrollIn(dataCell(t, 'total')) },
   skip: async (t) => { await t.host.runUntil(t.addr(LW)); },
 };
@@ -104,20 +99,20 @@ const stack: Step = {
   id: 'stack', kind: 'explain', file: 'tutorial.s', view: 'run', tab: 'data',
   title: () => tr(STEPS.stack.title, '$sp'),
   body: () => tr(MIPS.stack.body),
-  targets: () => [stackTag(), $('.drow.dsec-stack .dval.pointed'), reg('$sp')],
+  targets: () => [stackTag(), $('.drow.dsec-stack .dval.pointed'), reg('$sp'), $('.dsec.dsec-kernel')],
   prepare: async (t) => { await t.between(PRINT, SYSCALL); },
   reveal: (t) => { scrollIn(stackTag()); t.host.revealRegister('$sp'); },
 };
 
 export const CHAPTERS: Chapter[] = [
   { title: NAMES.screen, steps: [common.welcome('MIPS'), common.editor()] },
-  { title: NAMES.assemble, steps: [common.assemble(), common.textColumns(), twoWords, registers] },
-  { title: NAMES.step, steps: [step, changed, common.hexDecBin(T3, SUB), common.pin(T3, SUB), common.alias(T3, SUB), inspector, bits] },
+  { title: NAMES.assemble, steps: [common.assemble(), common.textColumns(true), twoWords, registers] },
+  { title: NAMES.step, steps: [step, changed, common.stepBack(T3, ADD, SUB)] },
+  { title: NAMES.registers, steps: [common.hexDecBin(T3, SUB), common.pin(T3, SUB), common.alias(T3, SUB), common.inspect(ADD, SUB), bits] },
   { title: NAMES.memory, steps: [common.dataTab(), store, stack] },
-  { title: NAMES.run, steps: [common.breakpoint(PRINT), common.run(PRINT), common.slow(), common.reset(T3)] },
-  { title: NAMES.output, steps: [
-    common.console(SYSCALL, MIPS.console.says, MIPS.console.printed),
+  { title: NAMES.run, steps: [common.breakpoint(PRINT), common.run(PRINT), common.reset(T3), common.slow(PRINT)] },
+  { title: NAMES.io, steps: [
+    common.consoleIo(PRINT, READ, MIPS.console.says), common.undoIo(PRINT, 'li $v0, 10', 'syscall'),
     common.error(), common.fixLine()] },
-  { title: NAMES.screenYours, steps: [common.separators(), common.theme(), common.end()] },
+  { title: NAMES.yours, steps: [common.tools(), common.editing(), common.settings(true), common.separators(), common.switches(), common.end()] },
 ];
-
