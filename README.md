@@ -50,8 +50,14 @@ download with a progress bar instead of the MIPS / RISC-V choice; when the downl
 installs it silently and starts the new version. With no update, no connection or no answer within a few seconds,
 the first screen goes on as usual; a failed download is shown for a moment, then the first screen goes on.
 
+From 1.4.0, an update downloads only the parts of the installer that changed, usually a few megabytes rather than
+the whole installer. For this the installed program keeps a copy of its installer (about 130 MB) in
+`%LOCALAPPDATA%\assemblystudio-updater`; uninstalling removes it. If that copy is missing, or anything goes wrong,
+the whole installer is downloaded instead. The updater writes what it did to `update.log` in that same folder.
+
 For maintainers: every release keeps its `latest.yml` and `.exe.blockmap` assets next to the installer
-(`release.yml` uploads them); installed copies read them to update. Do not delete the `engines-<hash>`
+(`release.yml` uploads them); installed copies read them to update, and a differential download needs the
+`.blockmap` of both the installed version and the new one. Do not delete the `engines-<hash>`
 pre-releases either: `release.yml` builds every installer from them.
 
 ## First run
