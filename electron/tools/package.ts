@@ -146,21 +146,21 @@ export const config: Configuration = {
     signAndEditExecutable: true,
   },
   nsis: {
-    // Two screens, in Korean: the progress, then "설치가 완료되었습니다" with
-    // "지금 실행하기" (packaging/installer.nsh).  Per user, with no choice of
+    // Two screens, in English only: the progress, then "Installation
+    // complete" with "Run Assembly Studio now" (packaging/installer.nsh).  Per user, with no choice of
     // folder or of "for all users" (either would need an administrator);
     // /S installs silently.
     oneClick: false,
     perMachine: false,
     allowElevation: false,
     allowToChangeInstallationDirectory: false,
-    installerLanguages: ['ko_KR'],
-    language: '1042',
+    installerLanguages: ['en_US'],
+    language: '1033',
     shortcutName: brand.name,
     createDesktopShortcut: false,
     createStartMenuShortcut: true,
     deleteAppDataOnUninstall: false,
-    runAfterFinish: true, // the finish page's "지금 실행하기", ticked
+    runAfterFinish: true, // the finish page's "Run … now", ticked
     installerSidebar: brandFile('installerSidebar.bmp'),
     uninstallerSidebar: brandFile('uninstallerSidebar.bmp'),
     include: path.join(root, 'build/package/installer.nsh'),

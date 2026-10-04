@@ -23,21 +23,20 @@
   Function StudioStartApp
     ${StdUtils.ExecShellAsUser} $0 "$launchLink" "open" ""
   FunctionEnd
-  !define MUI_FINISHPAGE_TITLE "설치가 완료되었습니다"
-  !define MUI_FINISHPAGE_TEXT "@NAME@ 설치를 마쳤습니다.$\r$\n$\r$\n다음부터는 시작 메뉴의 @NAME@ 항목으로 엽니다."
+  !define MUI_FINISHPAGE_TITLE "Installation complete"
+  !define MUI_FINISHPAGE_TEXT "@NAME@ has been installed.$\r$\n$\r$\nFrom now on, open it from @NAME@ in the Start menu."
   !define MUI_FINISHPAGE_RUN
-  !define MUI_FINISHPAGE_RUN_TEXT "지금 실행하기"
+  !define MUI_FINISHPAGE_RUN_TEXT "Run @NAME@ now"
   !define MUI_FINISHPAGE_RUN_FUNCTION "StudioStartApp"
   !insertmacro MUI_PAGE_FINISH
 !macroend
 
-; The progress pages' words, and the uninstaller's.  NSIS's own Korean ones
-; put a particle after the program's name ("@NAME@(을)를 설치하는 동안
-; ..."), which this program never does.  MUI_PAGE_HEADER_* apply to the next
-; page inserted: each macro below comes just before its page.
+; The progress pages' words, and the uninstaller's (the installer is in
+; English only).  MUI_PAGE_HEADER_* apply to the next page inserted: each
+; macro below comes just before its page.
 !macro customPageAfterChangeDir
-  !define MUI_PAGE_HEADER_TEXT "설치하는 중"
-  !define MUI_PAGE_HEADER_SUBTEXT "잠시 기다려 주세요. 끝나면 바로 실행할 수 있습니다."
+  !define MUI_PAGE_HEADER_TEXT "Installing"
+  !define MUI_PAGE_HEADER_SUBTEXT "Please wait. You can run it as soon as it is done."
   !define MUI_PAGE_CUSTOMFUNCTION_SHOW StudioProgressColour
   Function StudioProgressColour
     !insertmacro StudioProgressBar
@@ -60,16 +59,16 @@
 ; The uninstaller, like the installer: its progress, then its finish page --
 ; no welcome page (this macro takes its place and inserts none).
 !macro customUnWelcomePage
-  !define MUI_PAGE_HEADER_TEXT "제거하는 중"
-  !define MUI_PAGE_HEADER_SUBTEXT "잠시 기다려 주세요."
+  !define MUI_PAGE_HEADER_TEXT "Uninstalling"
+  !define MUI_PAGE_HEADER_SUBTEXT "Please wait."
   !define MUI_PAGE_CUSTOMFUNCTION_SHOW un.StudioProgressColour
   Function un.StudioProgressColour
     !insertmacro StudioProgressBar
   FunctionEnd
 !macroend
 !macro customUninstallPage
-  !define MUI_FINISHPAGE_TITLE "제거가 끝났습니다"
-  !define MUI_FINISHPAGE_TEXT "@NAME@ 제거를 마쳤습니다.$\r$\n$\r$\n직접 저장한 .s 파일은 그대로 있습니다."
+  !define MUI_FINISHPAGE_TITLE "Uninstall complete"
+  !define MUI_FINISHPAGE_TEXT "@NAME@ has been removed.$\r$\n$\r$\nThe .s files you saved are left as they are."
 !macroend
 
 ; electron-builder's installer keeps a copy of itself (the whole
