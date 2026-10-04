@@ -36,6 +36,15 @@ export function palette(style: { getPropertyValue(name: string): string }): Pale
            symbol: style.getPropertyValue('--caption-symbol').trim() };
 }
 
+// Part way (t from 0 to 1) from one theme's palette to the other's, for the
+// patch to follow the page's fade (theme.ts); the symbols turn at the middle.
+export function mixPalette(a: Palette, b: Palette, t: number): Palette {
+  const k = Math.min(1, Math.max(0, t));
+  return { surface: a.surface.map((v, i) => v + (b.surface[i] - v) * k) as Rgb,
+           scrim: a.scrim.map((v, i) => v + (b.scrim[i] - v) * k) as Rgb,
+           symbol: k < 0.5 ? a.symbol : b.symbol };
+}
+
 // The title bar's colour under what covers the page now.
 export function overlayColor(p: Palette, tutorial: boolean, dialog: boolean): string {
   const layers = [];

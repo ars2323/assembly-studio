@@ -785,6 +785,13 @@ body.first-screen .titlebar .tools { display: none; }
 .status .theme-switch .ts-knob { top: 1px; width: 20px; height: 14px; }
 .status .theme-switch[aria-checked="true"] .ts-knob { transform: translateX(18px); }
 .status .theme-switch img.icon { width: 11px; height: 11px; }
+/* Switching: every colour eases from the old theme's to the new one's
+   (theme.ts THEME_FADE_MS puts .theme-fade on <html> for as long), so the
+   page turns light or dark instead of cutting.  The switch's own knob and
+   icons keep their movement; the board's canvas fades by its own rule. */
+html.theme-fade, html.theme-fade *:not(canvas), html.theme-fade *::before, html.theme-fade *::after {
+  transition: background-color .5s ease, color .5s ease, border-color .5s ease, outline-color .5s ease, box-shadow .5s ease,
+    fill .5s ease, stroke .5s ease, caret-color .5s ease, filter .5s ease, transform .2s ease, opacity .2s ease !important; }
 /* On the card: bottom centre of the die frame, at every step and during the opening. */
 .wtheme { position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%); z-index: 1; }
 
