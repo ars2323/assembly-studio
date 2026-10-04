@@ -10,6 +10,9 @@
    32 bits.  A word the decoder does not take apart (R4, the fused
    multiply-adds) shows its head and says so -- never a wrong picture.
 
+   The head, the word, the sentence and the field table are the MIPS
+   Inspector's pieces (renderer/app/panels/inspector.ts).
+
    It follows the program: after every step it shows the instruction at PC
    (the next to run).  Choosing a row in Text pins it to that instruction
    until "Follow PC" (or Esc). */
@@ -20,6 +23,7 @@ import { hex32 } from '../../../../core/format.ts';
 import { immediateLine, meaningOf, pieceName, pieceSource } from '../../core/instruction-text.ts';
 import { code, codeText, h } from '../../../../renderer/app/dom.ts';
 import { notice } from '../../../../renderer/app/notice.ts';
+import { bitGrid, explanation, fieldTable, inspectorHead, prose, type FieldView } from '../../../../renderer/app/panels/inspector.ts';
 import type { TextRow } from '../logic/machine.ts';
 import { headButton, panelHead, type Head } from '../../../../renderer/app/ui.ts';
 
@@ -58,22 +62,20 @@ export class Inspector {
     this.body.classList.remove('is-empty');
     const d = decode(row.word);
     const format = formatName(d.format);
-    const head = h('div', { class: 'ihead' },
-      code(row.disassembly, 'dis'), h('span', { class: `badge b-${format}` }, format),
-      row.source ? h('span', { class: 'isrc' }, 'Source ', code(row.source)) : null,
-      h('span', { class: 'grow' }),
-      h('span', { class: 'where' }, code(hex32(row.word)), ' · ', code(hex32(row.addr))));
+    const head = inspectorHead(row, format);
     if (!d.fields) {
-      this.body.replaceChildren(head, h('div', { class: 'explain later' },
-        h('b', {}, `${format} 형식`), ' — ', codeText(format === 'R4'
-          ? '부동소수점 곱셈-덧셈(`fmadd.s` 등)의 R4 형식은 비트로 나누어 보여 주지 않습니다.'
-          : 'RV32 명령 형식 어디에도 맞지 않는 워드입니다.')));
+      this.body.replaceChildren(head, explanation({
+        title: `${format} format`,
+        sentence: format === 'R4'
+          ? '`fmadd.s` 같은 Fused multiply-add 명령의 R4 format은 Field로 나누어 보여 주지 않습니다.'
+          : 'RV32 명령 형식 어디에도 맞지 않는 Word입니다.',
+      }, false));
       return;
     }
     const parts = immediateParts(d.word);
     // Which piece of the immediate (1, 2 ...) a bit of the word is; 0: none.
     const pieceAt = (bit: number): number => 1 + (parts?.pieces.findIndex((p) => bit <= p.wordHigh && bit >= p.wordLow) ?? -1);
-    const fields = d.fields.map((f: InstructionField) => {
+    const fields: FieldView[] = d.fields.map((f: InstructionField) => {
       const width = f.high - f.low + 1;
       return {
         name: f.name, high: f.high, low: f.low, width, cls: fieldClass(f.name),
@@ -82,29 +84,14 @@ export class Inspector {
         meaning: meaningOf(f, d),
       };
     });
-    // The word as 32 cells, one per bit, each field a coloured group.
-    const grid = h('div', { class: 'bitgrid' }, ...fields.map((f) =>
-      h('div', { class: `fbox ${f.cls}`, style: `grid-column: span ${f.width}` },
-        h('div', { class: 'franges mono' }, h('span', {}, String(f.high)), h('span', {}, f.high !== f.low ? String(f.low) : '')),
-        h('div', { class: 'fbits mono', style: `grid-template-columns: repeat(${f.width}, 1fr)` },
-          ...[...f.bits].map((b, i) => {
-            const k = parts && f.cls === 'f-imm' ? pieceAt(f.high - i) : 0;
-            return h('span', { class: k ? `bit pk p${k}` : 'bit' }, b);
-          })),
-        h('div', { class: 'fname' }, f.name),
-        h('div', { class: 'fmean mono' }, f.meaning || f.value))));
-    const table = h('table', { class: 'ftable' },
-      h('tr', {}, ...['Field', 'Bits', 'Binary', 'Value', 'Meaning'].map((t) => h('th', {}, t))),
-      ...fields.map((f) => h('tr', {},
-        h('td', {}, h('span', { class: `sw ${f.cls}` }), f.name),
-        h('td', { class: 'mono', 'data-label': 'Bits' }, `${f.high}–${f.low}`), h('td', { class: 'mono', 'data-label': 'Binary' }, f.bits),
-        h('td', { class: 'mono' }, f.value), h('td', { class: 'mono' }, f.meaning))));
-    const e = explain(d, x, row.addr);
+    const grid = bitGrid(fields, (f, i) => {
+      const k = parts && f.cls === 'f-imm' ? pieceAt(f.high - i) : 0;
+      return k ? `pk p${k}` : '';
+    });
     const imm = immediateLine(d, parts);
     this.body.replaceChildren(head, grid, ...(parts ? [immediateRow(parts)] : []),
-      h('div', { class: 'explain' }, h('b', {}, e.title), e.sentence ? ' — ' : '', codeText(e.sentence),
-        imm ? h('div', { class: 'note' }, code(imm)) : null),
-      table);
+      explanation(explain(d, x, row.addr), d.name !== '', imm ? h('div', { class: 'note' }, prose(imm)) : null),
+      fieldTable(fields));
   }
 
   private setMode(mode: 'pc' | number | null): void {
@@ -131,17 +118,17 @@ export function immediateRow(p: ImmediateParts): HTMLElement {
   const sign = (p.value >>> (p.width - 1)) & 1;
   const extend = p.signExtended ? 32 - p.width : 0;
   if (extend > 0) {
-    cells.push(box('iext', extend, '', String(sign).repeat(extend), `부호 확장: imm[${p.width - 1}] 복사`,
-      `imm[31:${p.width}]: imm[${p.width - 1}] (부호 비트)을 그대로 복사`));
+    cells.push(box('iext', extend, '', String(sign).repeat(extend), `sign-extend: imm[${p.width - 1}]`,
+      `imm[31:${p.width}]: copies of imm[${p.width - 1}], the sign bit`));
   }
   p.pieces.forEach((piece, i) => {
     const width = piece.immHigh - piece.immLow + 1;
     cells.push(box(`ipiece p${i + 1}`, width, range(piece.wordHigh, piece.wordLow), piece.value.toString(2).padStart(width, '0'),
       range(piece.immHigh, piece.immLow), `${pieceSource(piece)} → ${pieceName(piece)}`));
   });
-  if (p.zeros > 0) cells.push(box('izero', p.zeros, '', '0'.repeat(p.zeros), range(p.zeros - 1, 0), `${pieceName({ immHigh: p.zeros - 1, immLow: 0 })}: 늘 0이라 명령에 없음`));
+  if (p.zeros > 0) cells.push(box('izero', p.zeros, '', '0'.repeat(p.zeros), range(p.zeros - 1, 0), `${pieceName({ immHigh: p.zeros - 1, immLow: 0 })}: always 0, not in the instruction`));
   return h('div', { class: 'immrow' },
-    h('div', { class: 'imm-cap' }, '즉시값 — 흩어진 조각을 제자리에 모으면 (위: 명령의 비트, 아래: 즉시값의 비트',
-      p.zeros ? ', 점선: 늘 0이라 명령에 없는 비트)' : ')'),
+    h('div', { class: 'imm-cap' }, h('span', { class: 'cap' }, 'Immediate'),
+      h('span', { class: 'key' }, 'top: bit of the word · bottom: bit of imm', p.zeros ? ' · dashed: always 0' : '')),
     h('div', { class: 'bitgrid immgrid' }, ...cells));
 }

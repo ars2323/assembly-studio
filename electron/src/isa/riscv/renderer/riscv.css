@@ -38,8 +38,12 @@
 .fbits .bit.p2, .ibox.p2 .bit { background: var(--piece2-bg); color: var(--piece2-text); }
 .fbits .bit.p3, .ibox.p3 .bit { background: var(--piece3-bg); color: var(--piece3-text); }
 .fbits .bit.p4, .ibox.p4 .bit { background: var(--piece4-bg); color: var(--piece4-text); }
-.immrow { margin: 8px 0 0; }
-.imm-cap { margin: 0 16px 2px; font-size: 11.5px; color: var(--text-2); }
+/* Under the word, the same 32 columns: a caption ("IMMEDIATE" and how to
+   read the row), then the immediate put together. */
+.immrow { margin: 10px 0 0; }
+.imm-cap { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; margin: 0 var(--ipad) 4px; }
+.imm-cap .cap { font: 600 10px var(--ui); letter-spacing: .06em; text-transform: uppercase; color: var(--f-imm-text); }
+.imm-cap .key { font-size: 11px; color: var(--muted); }
 .immgrid .ibox { display: flex; flex-direction: column; min-width: 0; border-radius: 6px; padding: 2px 0 4px; background: var(--ibox-bg); color: var(--f-imm-text); }
 .immgrid .ifrom, .immgrid .iname { font-size: 10.5px; text-align: center; line-height: 14px; min-height: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .immgrid .ifrom { opacity: .8; }
