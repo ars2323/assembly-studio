@@ -38,6 +38,9 @@
    machine stays where the next steps expect it. */
 
 import { codeText, h, icon } from '../dom.ts';
+import { onLang, tr, type Msg } from '../i18n.ts';
+import { DIALOGS } from '../messages/dialogs.ts';
+import { CARD } from '../messages/tutorial.ts';
 import { progress } from '../logic/chapters.ts';
 import { merge, place, type Rect } from '../logic/placement.ts';
 import { ask } from '../panels/ask.ts';
@@ -136,7 +139,7 @@ export interface Step extends Beat {
   leave?(t: Tutorial): Promise<void>;
 }
 
-export interface Chapter { title: string; steps: Step[] }
+export interface Chapter { title: Msg; steps: Step[] }
 
 const $ = (sel: string) => document.querySelector(sel);
 
@@ -177,6 +180,8 @@ export class Tutorial {
     this.chapters = chapters;
     this.steps = chapters.flatMap((c) => c.steps);
     host.on((s) => this.signal(s));
+    // The other language (i18n.ts): the card says the same again in it, where it stands.
+    onLang(() => { if (this.active && this.card) this.renderCard(false); });
   }
 
   get step(): Step { return this.steps[this.index]; }
@@ -239,9 +244,9 @@ export class Tutorial {
     let from = 0;
     if (this.lastStep > 0) {
       const again = await ask({
-        title: '이어서 할까요?',
-        body: `지난번에 ${this.lastStep + 1}단계에서 그만두었습니다. 프로그램을 끄면 이 기록은 없어지고 다시 1단계부터입니다.`,
-        ok: `이어서 (${this.lastStep + 1}단계부터)`, cancel: '처음부터',
+        title: tr(DIALOGS.resume.title),
+        body: tr(DIALOGS.resume.body, this.lastStep + 1),
+        ok: tr(DIALOGS.resume.ok, this.lastStep + 1), cancel: tr(DIALOGS.resume.over),
       });
       from = again ? this.lastStep : 0;
     }
@@ -256,9 +261,9 @@ export class Tutorial {
   async quit(): Promise<void> {
     if (this.busy) return;
     const sure = this.index === this.steps.length - 1 || await ask({
-      title: '튜토리얼을 그만둘까요?',
-      body: '예제는 내려가고 튜토리얼을 시작하기 전의 화면으로 돌아갑니다.',
-      ok: '그만두기', cancel: '계속하기',
+      title: tr(DIALOGS.quit.title),
+      body: tr(DIALOGS.quit.body),
+      ok: tr(DIALOGS.quit.ok), cancel: tr(DIALOGS.quit.cancel),
     });
     if (sure) await this.end();
   }
@@ -445,8 +450,9 @@ export class Tutorial {
   /* The card, top to bottom: the progress bar along its top edge (one piece
      a chapter, as long as its steps); the chapter and the step's number;
      the title; the body; for a practice step, what to do (its keys as key
-     chips), or once it is done, "완료"; the keys and the buttons. */
-  private renderCard(): void {
+     chips), or once it is done, "완료"; the keys and the buttons.
+     `fresh`: a new card, which comes in (not the same card in the other language). */
+  private renderCard(fresh = true): void {
     const card = this.card;
     if (!card) return;
     const step = this.step;
@@ -460,45 +466,45 @@ export class Tutorial {
     const end = step.kind === 'end';
     const buttons: HTMLElement[] = [];
     if (step.kind === 'practice' && !res && this.skipShown) {
-      buttons.push(button('건너뛰기', 'tut-skip', () => void this.skip(), { title: '대신 해 두고 넘어갑니다 (→)' }));
+      buttons.push(button(tr(CARD.skip), 'tut-skip', () => void this.skip(), { title: tr(CARD.skipTitle) }));
     }
-    if (p.number > 1) buttons.push(button('이전', 'tut-back', () => this.back(), { title: '이전 (←)' }));
+    if (p.number > 1) buttons.push(button(tr(CARD.back), 'tut-back', () => this.back(), { title: tr(CARD.backTitle) }));
     if (step.kind === 'explain' || res) {
-      const next = button('다음', 'primary tut-next', () => this.next(), { title: '다음 (→)' });
+      const next = button(tr(CARD.next), 'primary tut-next', () => this.next(), { title: tr(CARD.nextTitle) });
       next.append(icon('arrow-right'));
       buttons.push(next);
     }
-    if (end) buttons.push(button('끝내기', 'primary tut-finish', () => void this.end()));
-    const quit = h('button', { class: 'tut-quit', type: 'button', title: '튜토리얼 그만두기' }, h('kbd', {}, 'Esc'), h('span', {}, '그만두기'));
+    if (end) buttons.push(button(tr(CARD.finish), 'primary tut-finish', () => void this.end()));
+    const quit = h('button', { class: 'tut-quit', type: 'button', title: tr(CARD.quitTitle) }, h('kbd', {}, 'Esc'), h('span', {}, tr(CARD.quit)));
     quit.addEventListener('click', () => void this.quit());
     const hints = h('div', { class: 'tut-hints' },
-      end ? null : h('span', { class: 'tut-keys', title: '← 이전 · → 다음' }, h('kbd', {}, '←'), h('kbd', {}, '→')),
+      end ? null : h('span', { class: 'tut-keys', title: tr(CARD.keysTitle) }, h('kbd', {}, '←'), h('kbd', {}, '→')),
       end ? null : quit);
     // What a practice step waits for; once done, that it is.
     const asks = step.doing?.(this) ?? [];
     const doing = step.kind !== 'practice' ? null
-      : res ? h('div', { class: 'tut-do done' }, glyph('check'), h('span', { class: 'tut-do-label' }, '완료'))
+      : res ? h('div', { class: 'tut-do done' }, glyph('check'), h('span', { class: 'tut-do-label' }, tr(CARD.done)))
       : h('div', { class: 'tut-do' }, glyph(asks.some((d) => typeof d === 'object' && 'key' in d) ? 'keyboard' : 'pointer'),
-        h('span', { class: 'tut-do-label' }, '직접 해 보세요'),
+        h('span', { class: 'tut-do-label' }, tr(CARD.tryIt)),
         h('span', { class: 'tut-do-what' }, ...asks.map(part)));
     const chapter = this.chapters[p.chapter];
     const bar = h('div', { class: 'tut-progress', 'aria-hidden': 'true' },
       ...this.chapters.map((c, i) => h('span', { class: 'tut-seg', style: `flex-grow:${c.steps.length}` },
         h('span', { class: 'tut-fill', style: `width:${(p.fills[i] * 100).toFixed(2)}%` }))));
     const recap = end ? h('ul', { class: 'tut-recap' },
-      ...this.chapters.map((c, i) => h('li', {}, glyph('check'), h('span', {}, h('b', {}, `${i + 1}장`), ` ${c.title}`)))) : null;
+      ...this.chapters.map((c, i) => h('li', {}, glyph('check'), h('span', {}, h('b', {}, tr(CARD.recap, i + 1)), ` ${tr(c.title)}`)))) : null;
     card.className = `tut-card kind-${step.kind}${res ? ' done' : ''}`;
     card.replaceChildren(
       h('div', { class: 'tut-top' },
-        h('span', { class: 'tut-chapter' }, `${p.chapter + 1}장 · ${chapter.title}`),
-        h('span', { class: 'tut-count', 'aria-label': `${p.number}단계 / ${p.total}단계` }, `${p.number} / ${p.total}`)),
+        h('span', { class: 'tut-chapter' }, `${tr(CARD.chapter, p.chapter + 1)} · ${tr(chapter.title)}`),
+        h('span', { class: 'tut-count', 'aria-label': tr(CARD.count, p.number, p.total) }, `${p.number} / ${p.total}`)),
       bar,
       h('h3', {}, (res ?? step).title(this)),
       h('p', {}, codeText((res ?? step).body(this))),
       ...([recap, doing] as (HTMLElement | null)[]).filter((e): e is HTMLElement => e !== null),
       h('div', { class: 'tut-foot' }, hints, h('div', { class: 'tut-buttons' }, ...buttons)));
     this.lastLayout = '';
-    this.entering = true; // the next layout places it, then it comes in
+    if (fresh) this.entering = true; // the next layout places it, then it comes in
   }
 
   // Every frame: where the targets are now; the dimmed layer, the rings and
