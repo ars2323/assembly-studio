@@ -141,9 +141,8 @@ The engines (SPIM, RARS) are already proven and are used without changes, so ver
 - **1.x.0** — new features.
 
 Each version has its own branch, `release/<version>`, made from the previous version's branch; the work for that
-version goes there, and the previous branches are deleted once it is published (the
-`branch-cleanup.yml` workflow deletes branches, since the default branch can only be changed in the repository
-settings). For each release:
+version goes there. Earlier versions' branches are kept. The newest version's branch is the default branch (changed
+in the repository settings). `branch-cleanup.yml` is only for temporary branches. For each release:
 
 1. Make the branch `release/<version>` and set `version` in `electron/package.json`.
 2. Write `docs/releases/<version>.md` (it becomes the release notes).
