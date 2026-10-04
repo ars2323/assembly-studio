@@ -47,7 +47,7 @@ import type { TextFileFormat } from '../../node/text-file.ts';
 import type { RunResult } from '../../sim/protocol.ts';
 import { brand } from '../../brand.ts';
 import './api.ts';
-import { asset, character, code, codeText, h, icon, markImg, monoCh, withHex } from './dom.ts';
+import { asset, code, codeText, h, icon, markImg, monoCh, withHex } from './dom.ts';
 import { onTheme, THEME_FADE_MS, themeSwitch } from './theme.ts';
 import { captionPatch, mixPalette, palette } from './logic/overlay.ts';
 import { WINDOW_COLOURS } from '../../main/theme.ts';
@@ -479,7 +479,7 @@ function renderPlaceholder(): void {
   const go = h('button', { class: 'btn primary', type: 'button' }, icon('hammer'), h('span', {}, assembleName(false)), h('kbd', {}, 'Ctrl+S'));
   go.addEventListener('click', () => void saveAndAssemble());
   // The words first, then Haram at the far end from the Editor they are about.
-  placeholder.replaceChildren(notice({ pose: 'guide', title, body, more: [h('div', { class: 'row' }, go)] }));
+  placeholder.replaceChildren(notice({ title, body, more: [h('div', { class: 'row' }, go)] }));
   placeholder.dataset.kind = kind;
 }
 
@@ -1375,7 +1375,7 @@ function showCongrats(): void {
   congratsShown = true;
   const close = h('button', { class: 'btn small', type: 'button' }, 'Close');
   close.addEventListener('click', () => { congrats.hidden = true; });
-  congrats.replaceChildren(character('congrats', 120),
+  congrats.replaceChildren(
     h('div', { class: 'say' }, h('h3', {}, 'First run complete!'), h('p', {}, 'The program ran to the end.'), close));
   congrats.hidden = false;
 }

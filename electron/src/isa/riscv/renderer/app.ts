@@ -58,7 +58,7 @@ import type { EngineState } from '../sim/host.ts';
 import type { ErrorItem, RunReply } from '../sim/protocol.ts';
 import { api, type AboutInfo } from './api.ts';
 import { brand } from '../../../brand.ts';
-import { asset, character, code, codeText, h, icon, markImg, monoCh, withHex } from '../../../renderer/app/dom.ts';
+import { asset, code, codeText, h, icon, markImg, monoCh, withHex } from '../../../renderer/app/dom.ts';
 import { onTheme, THEME_FADE_MS, themeSwitch } from '../../../renderer/app/theme.ts';
 import { captionPatch, mixPalette, palette } from '../../../renderer/app/logic/overlay.ts';
 import { WINDOW_COLOURS } from '../../../main/theme.ts';
@@ -500,7 +500,7 @@ function renderPlaceholder(): void {
   const go = h('button', { class: 'btn primary', type: 'button' }, icon('hammer'), h('span', {}, assembleName(false)), h('kbd', {}, 'Ctrl+S'));
   go.addEventListener('click', () => void saveAndAssemble());
   // The words first, then Haram at the far end from the Editor they are about.
-  placeholder.replaceChildren(notice({ pose: 'guide', title, body, more: kind === 'dead' ? [] : [h('div', { class: 'row' }, go)] }));
+  placeholder.replaceChildren(notice({ title, body, more: kind === 'dead' ? [] : [h('div', { class: 'row' }, go)] }));
   placeholder.dataset.kind = kind;
 }
 
@@ -1419,7 +1419,7 @@ function showCongrats(): void {
   congratsShown = true;
   const close = h('button', { class: 'btn small', type: 'button' }, 'Close');
   close.addEventListener('click', () => { congrats.hidden = true; });
-  congrats.replaceChildren(character('congrats', 120),
+  congrats.replaceChildren(
     h('div', { class: 'say' }, h('h3', {}, 'First run complete!'), h('p', {}, 'The program ran to the end.'), close));
   congrats.hidden = false;
 }

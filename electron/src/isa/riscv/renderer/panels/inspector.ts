@@ -51,7 +51,7 @@ export class Inspector {
     this.setMode(null);
     this.body.classList.add('is-empty');
     this.body.replaceChildren(h('div', { class: 'notice-host' }, notice({
-      pose: 'sign', title: '명령 하나를 32비트로 나누어 보는 곳입니다',
+      title: '명령 하나를 32비트로 나누어 보는 곳입니다',
       body: codeText('`F10` 키로 한 줄 실행하거나 Text 탭에서 명령을 누르면 그 명령이 여기에 나옵니다.'),
     })));
   }
