@@ -167,16 +167,20 @@ export function startfield(options: { seed: number; from?: number; theme?: Theme
       c.width = Math.round(width * dpr);
       c.height = Math.round(height * dpr);
     }
-    /* Laid out again (the window was resized): the board comes back grown,
-       its clock going on from where it was -- not growing a second time --
-       and fades in over the dark it faded out to (resizing, below). */
+    /* Laid out again (the window was resized).  Still growing -- the window
+       is maximised just after it is shown (main.ts), which can land after
+       the first layout -- it goes on growing from the moment it was at, on
+       the new layout.  Grown, it comes back grown, its clock going on from
+       where it was -- not growing a second time -- and fades in over the
+       dark it faded out to (resizing, below). */
+    const growing = geo !== undefined && lastT < geo.grownMs;
     const again = geo !== undefined;
     geo = generate({
       seed: options.seed, width, height, dpr,
       card: { x: Math.round(box.x - host.x), y: Math.round(box.y - host.y), width: Math.round(box.width), height: Math.round(box.height) },
     });
     drawnAt = -1;
-    if (again) offset = Math.max(lastT, geo.grownMs);
+    if (again) offset = growing ? lastT : Math.max(lastT, geo.grownMs);
     if (reduce.matches) paint(geo.grownMs); else run();
     root.classList.remove('sf-resizing');
   };
@@ -209,7 +213,8 @@ export function startfield(options: { seed: number; from?: number; theme?: Theme
     const same = geo && Math.round(host.width) === geo.width && Math.round(host.height) === geo.height
       && (!el || el.offsetWidth === Math.round(geo.card.width));
     if (same) return;
-    if (shown && geo) root.classList.add('sf-resizing');
+    // Growing, the board is drawn again every frame anyway: no fade to the dark.
+    if (shown && geo && lastT >= geo.grownMs) root.classList.add('sf-resizing');
     clearTimeout(resizeTimer);
     resizeTimer = window.setTimeout(() => { if (shown) build(); }, RESIZE_SETTLE);
   });
