@@ -187,8 +187,8 @@ The response comes when execution finishes (if it waits for input, it is held un
 
 Runs until it stops. With `max`, it runs that many instructions and stops with `MAX_STEPS` (batched execution of
 the "Instant" kind). The response is like `step`'s, without `executed`. `backstep` (default true) works as in
-`step`; recording costs a run about a third more time (RARS's back-stepper; measured on a 13.8 M-instruction loop:
-9.1 s without, 12.2 s with). The app records runs too, so that Step back works after Run.
+`step`; recording costs a run more time (RARS's back-stepper; measured on a 13.8 M-instruction loop: 9.2 s
+without, 12.7 s with, +38%). The app records runs too, so that Step back works after Run.
 
 | reason | Next state | Meaning |
 |---|---|---|
@@ -246,11 +246,15 @@ With none: `nothing_to_undo`.
 - History exists only for instructions executed with `backstep:true` (step and run). A step or run with
   `backstep:false` that executes anything leaves none (`undo` 0): what was recorded before it no longer leads up to
   the machine as it is.
-- The engine counts at most the last **1000** instructions. RARS itself keeps its records as changes (a register, a
-  word of memory, PC), at most 2000 of them (its `BackstepLimit`); an instruction makes one or two, so 1000
-  instructions fit, but instructions that make many (ReadString writes one per byte) can make the history shorter.
-  `undo` then reaches 0 early. RARS undoes consecutive executions of one same instruction (a one-instruction
-  loop) together.
+- The engine keeps at most the last **1000** instructions. RARS keeps its records as changes (a register, a word of
+  memory, PC, a CSR), and its own `backStep()` undoes the changes filed under one statement. In RARS 1.6 every
+  instruction ends with three changes (the `cycle`, `instret` and `time` CSRs) filed under the instruction before
+  the new PC, so after a taken branch or a jump `backStep()` needs two calls and leaves PC on the target's
+  predecessor in between; and its ring of 2000 changes holds only about 500 instructions. The engine therefore
+  undoes the changes itself (by reflection into RARS's back-stepper, which is not modified): one instruction is the
+  CSR trio and the changes before it, down to the previous instruction's trio. It gives the back-stepper room for
+  16384 changes. An instruction that makes very many (ReadString writes one per byte) can still make the history
+  shorter; `undo` then reaches 0 early.
 - It works in `finished` too, and undoing returns to `ready`. After the Exit or Exit2 `ecall` the first `backstep`
   puts PC back on that `ecall` (RARS records nothing for it). After an `EXCEPTION`, the first `backstep` undoes what
   the faulting instruction wrote (`ucause`, `uepc`, `utval`) and puts PC back on it.
@@ -452,8 +456,10 @@ Found while writing the specification. Fixed ones are in the change log; the res
 
 ## Change log
 
-- Additions in version 2 (no version change): `undo` in the `step`, `run` and `backstep` responses; `backstep`
-  undoes exactly one instruction, also the Exit `ecall` and a faulting instruction, counting at most 1000.
+- Additions in version 2 (no version change): `undo` in the `step`, `run` and `backstep` responses. Engine fix:
+  `backstep` undoes exactly one instruction (RARS's `backStep()` took two for a taken branch or a jump, with PC
+  wrong in between), also the Exit `ecall` and a faulting instruction, for the last 1000 instructions (RARS's ring
+  held about 500).
 
 - **2**. Raised while the app did not yet use version 1 (nothing depended on it). There is no negotiation path.
   Two items left as "the app's duty" became the engine's responsibility. Both are the kind that goes silently wrong
