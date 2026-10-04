@@ -33,11 +33,11 @@ export const lead = (tone: Tone, ...children: Child[]): HTMLElement =>
 
 // A number set in the code font, with the words around it: "14 instructions",
 // "명령 14개" (`unit`: the words before and after the number, for n).
-export function count(n: number, unit: Msg<[number], [string, string]>): DocumentFragment {
+// One span: in the Assemble panel's cells (flex boxes) loose text would lose
+// the spaces at its ends.
+export function count(n: number, unit: Msg<[number], [string, string]>): HTMLElement {
   const [before, after] = tr(unit, n);
-  const f = document.createDocumentFragment();
-  f.append(before, code(n.toLocaleString('en-US'), 'num'), after);
-  return f;
+  return h('span', { class: 'count' }, before, code(n.toLocaleString('en-US'), 'num'), after);
 }
 
 // "F10 Step  F5 Run": the keys that do something now, at the far end of the

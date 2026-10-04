@@ -413,7 +413,6 @@ img.icon { filter: var(--icon-filter); }
 .asm .cells .cell.lead { font-weight: 600; }
 .asm .cells .cell.lead.idle { color: var(--text-2); }
 .asm .cells .cell.warn { color: var(--amber-text); }
-.asm .cells .num { margin-right: .3em; }
 .asm .asm-note { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--text-2); }
 /* The error list: the cells, what to do, the errors in one ruled box, the
    button; from the left, at the panel's own height. */
