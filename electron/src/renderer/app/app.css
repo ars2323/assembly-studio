@@ -344,23 +344,26 @@ img.icon { filter: var(--icon-filter); }
 /* The Editor's code is not the machine's program: one line, covering nothing. */
 .run-band { grid-row: 1; margin-bottom: 6px; padding: 3px 10px; border-radius: 6px; background: var(--amber-tint); color: var(--amber-text);
   box-shadow: inset 3px 0 0 var(--amber-text); font-size: 12px; line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.run-grid { display: grid; min-height: 0; gap: 8px;
-  grid-template-columns: clamp(var(--regs-least, 417px), 46%, var(--regs-most, 505px)) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.run-grid { display: grid; min-height: 0; gap: 0;
+  /* --regs-w: the splitter's (app.ts); otherwise what Registers needs, within its least and most. */
+  grid-template-columns: var(--regs-w, clamp(var(--regs-least, 417px), 46%, var(--regs-most, 505px))) 8px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.run-grid > .rsplit { grid-row: 1; grid-column: 2; }
 .run-grid .leftcol { grid-row: 1; grid-column: 1; display: grid; min-height: 0; gap: 0; grid-template-rows: minmax(0, 1fr) 8px auto; }
 /* The grip between Registers and the Console (app.ts): drag to share the height, double-click for the default. */
 .vgrip { display: flex; align-items: center; justify-content: center; cursor: row-resize; touch-action: none; }
 .vgrip .grip { width: 36px; height: 3px; border-radius: 2px; background: var(--border); }
 .vgrip:hover .grip { background: var(--muted); }
-.leftcol:has(> .console:not(.open)) .vgrip { cursor: default; }
-.leftcol:has(> .console:not(.open)) .vgrip .grip { visibility: hidden; }
+.leftcol:has(> .console:not(.open)) .vgrip .grip { opacity: .5; }
 .run-grid .regshost { display: grid; min-height: 0; }
-.run-grid .centre { grid-row: 1; grid-column: 2; display: grid; min-height: 0; gap: 8px; position: relative;
-  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
+.run-grid .centre { grid-row: 1; grid-column: 3; display: grid; min-height: 0; gap: 0; position: relative;
+  /* --text-h: the grip's (app.ts); otherwise half each. */
+  grid-template-rows: minmax(0, var(--text-h, 1fr)) 8px minmax(0, 1fr); }
 /* A narrow Run side: Text/Inspector on top, Registers and Console under. */
 @container run (max-width: 560px) {
-  .run-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1.2fr) minmax(0, 1fr); }
+  .run-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1.2fr) 8px minmax(0, 1fr); }
   .run-grid .centre { grid-row: 1; grid-column: 1; }
-  .run-grid .leftcol { grid-row: 2; grid-column: 1; }
+  .run-grid > .rsplit { display: none; }
+  .run-grid .leftcol { grid-row: 3; grid-column: 1; }
 }
 
 /* Text: the columns and how tight they sit are panels/text.ts's (--tcols,

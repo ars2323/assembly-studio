@@ -130,6 +130,8 @@ let narrow = false;
 let view: 'editor' | 'run' = 'editor'; // narrow windows: the side on show
 let editorWidth: number | null = null; // px, from the splitter; null: the default share
 let consoleHeight: number | null = null; // px, from the grip over the Console; null: the default
+let regsWidth: number | null = null;     // px, from the splitter right of Registers; null: the default
+let textHeight: number | null = null;    // px, from the grip between Text/Data and the Inspector; null: half each
 let asmHeight: number | null = null;     // px, from the grip over the Assemble panel; null: its words'
 let speed: 'fast' | 'slow' = 'fast';   // this session only
 let slow: { cancel(): void } | null = null; // a slow run going on
@@ -234,7 +236,10 @@ consolePanel.onToggle = () => layout();
 const congrats = h('div', { class: 'congrats', hidden: true });
 const regsHost = h('div', { class: 'regshost' });
 let registers: RegisterPanel | null = null;
-const centre = h('div', { class: 'centre' }, text.root, inspector.root, congrats);
+// Between Text/Data and the Inspector, a grip like the Console's.
+const centreGrip = h('div', { class: 'vgrip', role: 'separator', 'aria-orientation': 'horizontal', title: 'Drag to resize · double-click to reset' },
+  h('span', { class: 'grip' }));
+const centre = h('div', { class: 'centre' }, text.root, centreGrip, inspector.root, congrats);
 // Registers over the Console on the left, Text/Data over the Inspector on
 // the right: both of those get the whole height (a lab PC has ~480 px).
 // Between Registers and the Console, a grip: drag to share the height,
@@ -243,7 +248,10 @@ const centre = h('div', { class: 'centre' }, text.root, inspector.root, congrats
 const consoleGrip = h('div', { class: 'vgrip', role: 'separator', 'aria-orientation': 'horizontal', title: 'Drag to resize · double-click to reset' },
   h('span', { class: 'grip' }));
 const leftCol = h('div', { class: 'leftcol' }, regsHost, consoleGrip, consolePanel.root);
-const runGrid = h('div', { class: 'run-grid' }, leftCol, centre);
+// Between Registers (with the Console) and Text/Inspector, a splitter like the Editor's.
+const regsSplitter = h('div', { class: 'splitter rsplit', role: 'separator', 'aria-orientation': 'vertical', title: 'Drag to resize · double-click to reset' },
+  h('span', { class: 'grip' }));
+const runGrid = h('div', { class: 'run-grid' }, leftCol, regsSplitter, centre);
 const placeholder = h('div', { class: 'run-placeholder notice-host' });
 // Once the code in the Editor is not the program in the machine: one line
 // over the Run side, covering nothing.
@@ -294,7 +302,7 @@ splitter.addEventListener('pointerdown', (e) => {
 splitter.addEventListener('dblclick', () => { editorWidth = null; layout(); });
 
 consoleGrip.addEventListener('pointerdown', (e) => {
-  if (!consolePanel.expanded) return; // folded: the Expand button opens it
+  if (!consolePanel.expanded) consolePanel.setExpanded(true); // folded: a drag opens it
   consoleGrip.setPointerCapture(e.pointerId);
   const bottom = leftCol.getBoundingClientRect().bottom;
   const move = (m: PointerEvent) => {
@@ -307,6 +315,31 @@ consoleGrip.addEventListener('pointerdown', (e) => {
   consoleGrip.addEventListener('pointerup', up);
 });
 consoleGrip.addEventListener('dblclick', () => { consoleHeight = null; layout(); });
+
+// A drag on a separator: pointer capture, a value from the pointer, layout() on every move.
+function dragSeparator(el: HTMLElement, onMove: (m: PointerEvent) => void): void {
+  el.addEventListener('pointerdown', (e) => {
+    el.setPointerCapture(e.pointerId);
+    const move = (m: PointerEvent) => { onMove(m); layout(); };
+    const up = () => { el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); };
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', up);
+  });
+}
+// Registers' width: at least what its narrowest columns need, and Text keeps its least.
+dragSeparator(regsSplitter, (m) => {
+  const box = runGrid.getBoundingClientRect();
+  const least = parseFloat(runGrid.style.getPropertyValue('--regs-least')) || 300;
+  const textLeast = Math.max(text.leastWidth(fontPx()), 240);
+  regsWidth = Math.round(Math.max(least * 0.7, Math.min(box.width - 8 - textLeast, m.clientX - box.left)));
+});
+regsSplitter.addEventListener('dblclick', () => { regsWidth = null; layout(); });
+// Text/Data's height over the Inspector: each keeps a head and a few rows.
+dragSeparator(centreGrip, (m) => {
+  const box = centre.getBoundingClientRect();
+  textHeight = Math.round(Math.max(110, Math.min(box.height - 8 - 110, m.clientY - box.top)));
+});
+centreGrip.addEventListener('dblclick', () => { textHeight = null; layout(); });
 
 asmGrip.addEventListener('pointerdown', (e) => {
   asmGrip.setPointerCapture(e.pointerId);
@@ -393,6 +426,10 @@ function layout(): void {
   renderBand();
   renderAssemble();
   runGrid.classList.toggle('console-open', consolePanel.expanded);
+  if (regsWidth === null) runGrid.style.removeProperty('--regs-w');
+  else runGrid.style.setProperty('--regs-w', `${regsWidth}px`);
+  if (textHeight === null) centre.style.removeProperty('--text-h');
+  else centre.style.setProperty('--text-h', `${textHeight}px`);
   if (consoleHeight === null) leftCol.style.removeProperty('--console-h');
   else leftCol.style.setProperty('--console-h', `${consoleHeight}px`);
   const room = asmRoom();
