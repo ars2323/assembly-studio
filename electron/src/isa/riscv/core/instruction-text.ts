@@ -3,6 +3,7 @@
 
 import { immediateParts, type DecodedInstruction, type ImmediateParts, type InstructionField } from './decoder.ts';
 import { hex32 } from '../../../core/format.ts';
+import type { Lang } from '../../../core/lang.ts';
 import { bothNames } from './registers.ts';
 
 const OPCODES: Record<number, string> = {
@@ -46,13 +47,24 @@ const binary = (v: number, width: number): string => (v >>> 0).toString(2).padSt
 
 /* The immediate's value as the instruction uses it, said once, with how it
    was put together where that is not plain.  The value is code (in
-   backticks, for the view's codeText); the note after it is Korean:
+   backticks, for the view's codeText); the note after it in the language
+   asked for (core/lang.ts), in Korean:
      I  "`imm = 0xffb = -5` (12비트, Sign-extend)"
      B  "`imm = 0b1111100110000 = -208` (13비트: 맨 아래 비트는 늘 0이라 명령에 없음, Sign-extend)"
      U  "`imm = 0x12345000` (위 20비트, 아래 12비트는 0)" */
-export function immediateLine(d: DecodedInstruction, p: ImmediateParts | null = immediateParts(d.word)): string | null {
+export function immediateLine(d: DecodedInstruction, p: ImmediateParts | null = immediateParts(d.word), lang: Lang = 'ko'): string | null {
   if (!p) return null;
   const raw = binary(p.value, p.width);
+  if (lang === 'en') {
+    switch (d.format) {
+      case 'I': return `\`imm = 0x${(p.value & 0xfff).toString(16).padStart(3, '0')} = ${p.value}\` (12 bits, sign-extended)`;
+      case 'S': return `\`imm = 0b${raw} = ${p.value}\` (12 bits: the two pieces joined, sign-extended)`;
+      case 'B': return `\`imm = 0b${raw} = ${p.value}\` (13 bits: the lowest is always 0 and not in the instruction; sign-extended)`;
+      case 'J': return `\`imm = 0b${raw} = ${p.value}\` (21 bits: the lowest is always 0 and not in the instruction; sign-extended)`;
+      case 'U': return `\`imm = ${hex32(p.value)}\` (the upper 20 bits; the lower 12 bits are 0)`;
+      default: return null;
+    }
+  }
   switch (d.format) {
     case 'I': return `\`imm = 0x${(p.value & 0xfff).toString(16).padStart(3, '0')} = ${p.value}\` (12비트, Sign-extend)`;
     case 'S': return `\`imm = 0b${raw} = ${p.value}\` (12비트, 두 조각을 이어 붙여 Sign-extend)`;
