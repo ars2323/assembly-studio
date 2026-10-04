@@ -137,11 +137,14 @@ The engines (SPIM, RARS) are already proven and are used without changes, so ver
 
 1.0.0 is published. Every later change ships under a new version:
 
-- **1.0.x** — fixes only.
+- **1.x.y** — fixes only (the last number).
 - **1.x.0** — new features.
 
-For each release:
+Each version has its own branch, `release/<version>`, made from the previous version's branch; the work for that
+version goes there, and the previous branches are deleted once it is published (the
+`branch-cleanup.yml` workflow deletes branches, since the default branch can only be changed in the repository
+settings). For each release:
 
-1. Set `version` in `electron/package.json`.
+1. Make the branch `release/<version>` and set `version` in `electron/package.json`.
 2. Write `docs/releases/<version>.md` (it becomes the release notes).
 3. Push the tag `v<version>`, or run `release.yml` by hand with `release` ticked, to publish `v<version>`.

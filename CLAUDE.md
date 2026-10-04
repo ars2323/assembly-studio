@@ -39,5 +39,7 @@ If `electron/engine/{runtime,rars.jar,classes}` exists, it is used first.
 - Documentation (README, release notes, and so on) is about this project only. Do not mention other repositories or earlier products.
 - There is no automatic CI. Keep verification minimal: core unit tests, screenshots, and a human check at review points.
 - Keep commits small, one purpose each. Push at the end of each stage.
-- After 1.0.0, every change ships under a new version (fixes 1.0.x, features 1.x.0): update `electron/package.json`, write
-  `docs/releases/<version>.md`, then run release.yml by hand (with `release` ticked) to publish `v<version>`.
+- After 1.0.0, every change ships under a new version (fixes 1.x.y, features 1.x.0), on its own branch
+  `release/<version>` made from the previous version's branch: update `electron/package.json`, write
+  `docs/releases/<version>.md`, then run release.yml by hand on that branch (with `release` ticked) to publish
+  `v<version>`. Old branches are deleted with `branch-cleanup.yml` once the new version is the default branch.
