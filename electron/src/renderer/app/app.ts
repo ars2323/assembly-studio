@@ -180,7 +180,7 @@ const status = h('footer', { class: 'status' });
 
 const firstScreen = welcome({
   tutorial: () => void startTutorial(), newFile: () => void newFile(), openFile: () => void openFile(),
-  selectIsa: (isa) => api.selectIsa(isa),
+  selectIsa: (isa, then) => api.selectIsa(isa, then),
 });
 const stageWelcome = h('div', { class: 'stage-welcome' }, firstScreen.root);
 
@@ -548,7 +548,7 @@ const assembleOptions = (a: Advanced) => ({
 // ---- chrome: title bar and status bar ----------------------------------------------------
 
 function renderChrome(): void {
-  document.title = open ? `${file.name}${dirty ? ' •' : ''} — ${WINDOW_TITLE}` : WINDOW_TITLE;
+  document.title = open ? `${file.name}${dirty ? ' •' : ''} — ${WINDOW_TITLE}` : APP_NAME; // the first screen is no ISA's yet
   showFileName(FILE_MOST);
   const running = runState === 'running';
   const setBtn = (b: HTMLButtonElement, on: boolean, primary: boolean) => {
@@ -1455,3 +1455,17 @@ async function start(): Promise<void> {
   void document.fonts.ready.then(() => { text.fit(); registers?.fit(); renderChrome(); });
 }
 void start();
+
+// ---- arriving from the other ISA's first screen ------------------------------------------
+// ?then: the first screen of the other ISA chose this one and a way in; do it
+// now, the work screen fading in out of the dark the first screen faded to.
+{
+  const then = new URLSearchParams(location.search).get('then');
+  if (then) {
+    document.body.classList.add('arriving');
+    setTimeout(() => document.body.classList.remove('arriving'), 600);
+    if (then === 'tutorial') void startTutorial();
+    else if (then === 'new') void newFile();
+    else if (then === 'open') void openFile();
+  }
+}

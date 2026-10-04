@@ -11,7 +11,7 @@ export interface AppApi {
   // The ISA this window is for (the page's ?isa=), and changing it: the main
   // process ends this engine, starts the other and loads that ISA's page.
   isa(): 'mips' | 'riscv';
-  selectIsa(isa: 'mips' | 'riscv'): Promise<'mips' | 'riscv'>;
+  selectIsa(isa: 'mips' | 'riscv', then?: 'tutorial' | 'new' | 'open'): Promise<'mips' | 'riscv'>;
   // One engine command; resolves with its reply (ok or not, docs/engine-protocol.md).
   // Rejects when the engine crashed (EngineCrashed) or cannot run (EngineDead).
   call<M extends CallName>(cmd: M, params?: Calls[M][0]): Promise<Calls[M][1]>;

@@ -31,23 +31,27 @@ export const WORDMARK = brand.wordmark;
 export { SEED };
 
 export type Isa = 'mips' | 'riscv';
+export type Way = 'tutorial' | 'new' | 'open';
 export const ISA_NAME: Record<Isa, string> = { mips: 'MIPS', riscv: 'RISC-V' };
 
 export interface WelcomeEvents {
   tutorial(): void;
   newFile(): void;
   openFile(): void;
-  /** The window is for one ISA (the page's ?isa=); choosing the other
-      changes the engine and loads the page again (src/main/main.ts). */
-  selectIsa(isa: Isa): Promise<unknown>;
+  /** The window is for one ISA (the page's ?isa=).  The first screen only
+      remembers the ISA chosen; a way in (tutorial, new, open) with the other
+      one changes the engine and loads that ISA's page, which goes on to do
+      it (?then, src/main/main.ts). */
+  selectIsa(isa: Isa, then: Way): Promise<unknown>;
 }
 
-/* The page's ISA, and whether it was just chosen (?picked: the page was
-   loaded again for it, so the first screen goes on from the ISA's step and
-   the board does not grow a second time). */
+/* The page's ISA, and whether it was loaded to go on with a way in chosen
+   on the other ISA's first screen (?then: the work screen comes up at once;
+   if the user comes back, it is to that step, with the board grown). */
 const query = new URLSearchParams(location.search);
 const pageIsa: Isa = query.get('isa') === 'riscv' ? 'riscv' : 'mips';
-const picked = query.has('picked');
+const then = query.get('then');
+const picked = then !== null;
 // ?home: back from the work screen (the title bar's mark): the ISA step at once, the board grown, no opening.
 const home = query.has('home');
 
@@ -63,7 +67,11 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
   const calm = matchMedia('(prefers-reduced-motion: reduce)');
   const actions = h('div', { class: 'actions' });
   // The way back: an arrow in the die frame's top-left corner, on the steps after the first.
+  // Next to it, the ISA chosen.
+  const isaTag = h('span', { class: 'wisa' });
   const back = h('button', { class: 'wback', type: 'button', title: '뒤로', 'aria-label': '뒤로' }, icon('arrow-left'));
+  const corner = h('div', { class: 'wcorner' }, back, isaTag);
+  let chosen: Isa = pageIsa;
   let backTo = () => {};
   back.addEventListener('click', () => backTo());
 
@@ -83,25 +91,34 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
     } else if (step === 1) {
       actions.replaceChildren(
         action('바로 시작', 'play', () => show(2), true),
-        action('튜토리얼 보기', 'circle-question-mark', events.tutorial));
+        action('튜토리얼 보기', 'circle-question-mark', () => void go('tutorial')));
       backTo = () => show(0);
     } else {
       actions.replaceChildren(
-        action('새 파일', 'file-plus', events.newFile, true),
-        action('파일 열기', 'folder-open', events.openFile));
+        action('새 파일', 'file-plus', () => void go('new'), true),
+        action('파일 열기', 'folder-open', () => void go('open')));
       backTo = () => show(1);
     }
     equal = step === 0;
-    back.classList.toggle('on', step !== 0);
+    corner.classList.toggle('on', step !== 0);
+    isaTag.textContent = ISA_NAME[chosen];
     if (animate) { enter(); sparkle(); }
     if (step === 2) (actions.firstElementChild as HTMLElement).focus();
   };
-  const choose = async (isa: Isa) => {
-    if (isa === pageIsa) { show(1); return; }
+  // The ISA is only remembered here: nothing is loaded or switched yet.
+  const choose = (isa: Isa) => { chosen = isa; show(1); };
+  /* A way in.  With the page's own ISA, at once.  With the other, the first
+     screen fades to the dark the window already is, the engine is changed
+     and that ISA's page comes up doing the same (?then, app.ts), fading in. */
+  const go = async (way: Way) => {
+    if (chosen === pageIsa) {
+      if (way === 'tutorial') events.tutorial(); else if (way === 'new') events.newFile(); else events.openFile();
+      return;
+    }
     actions.querySelectorAll('button').forEach((b) => { b.disabled = true; });
-    sparkle();
-    if (!calm.matches) await wait(320);  // the light first, then the page is replaced
-    await events.selectIsa(isa);
+    document.body.classList.add('leaving');
+    if (!calm.matches) await wait(260);
+    await events.selectIsa(chosen, way);
   };
 
   // The seed is a constant: the same board every start, on every machine.
@@ -122,7 +139,7 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
       h('img', { class: 'wlogo', src: asset(brand.mark), alt: '' }),
       title,
       h('div', { class: 'wbody' }, actions)),
-    back, fx);
+    corner, fx);
   let revealed = picked || home || calm.matches;
   if (!revealed) card.classList.add('intro');
   const reveal = () => {
@@ -132,7 +149,7 @@ export function welcome(events: WelcomeEvents): { root: HTMLElement; show(on: bo
     void wait(380).then(() => { enter(); sparkle(); });
   };
   card.addEventListener('click', reveal);
-  show(picked ? 1 : 0, (picked || home) && !calm.matches);
+  show(picked ? (then === 'tutorial' ? 1 : 2) : 0, home && !calm.matches);
 
   // The buttons come in (a short rise out of a white glow), the two one after the other.
   function enter(): void {
