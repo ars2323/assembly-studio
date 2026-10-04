@@ -71,3 +71,42 @@ test('the sentences, word for word', () => {
 test('code parts', () => {
   assert.deepEqual(codeParts('a `b` c'), [{ text: 'a ', code: false }, { text: 'b', code: true }, { text: ' c', code: false }]);
 });
+
+// In English (core/lang.ts): every instruction of tt.core.s has a sentence
+// in both languages or in neither; the English one has no Hangul, names the
+// same registers as the Korean one and keeps code in backticks.  A few word for word.
+test('in English: tt.core.s, and the sentences word for word', () => {
+  const p = load('tests/programs/tt.core.s');
+  const regs = Array.from({ length: 32 }, (_, i) => (i * 0x01010101) >>> 0);
+  const named = (s: string) => new Set(codeParts(s).filter((x) => x.code && x.text.startsWith('$')).map((x) => x.text));
+  let checked = 0;
+  for (const t of p.text) {
+    const d = decode(t.word, t.addr, 'SpimNoDelaySlot');
+    const ko = explain(d, regs, t.addr, 'ko');
+    const en = explain(d, regs, t.addr, 'en');
+    assert.equal(en.title, ko.title);
+    assert.equal(en.sentence === '', ko.sentence === '', `${t.line}: ${en.sentence}`);
+    if (en.sentence === '') continue;
+    assert.ok(!/[가-힣]/.test(en.sentence), en.sentence);
+    const plain = codeParts(en.sentence).filter((x) => !x.code).map((x) => x.text).join('');
+    assert.ok(!/0x|\$/.test(plain), `code outside backticks: ${en.sentence}`);
+    assert.deepEqual(named(en.sentence), named(ko.sentence), `${t.line}\n${en.sentence}\n${ko.sentence}`);
+    checked += 1;
+  }
+  assert.ok(checked > 3000, `${checked} sentences checked`);
+
+  const r = new Array(32).fill(0);
+  r[14] = 0x80000001; r[8] = 5; r[9] = 0xfffffffe; r[29] = 0x7fffffe4; r[2] = 4;
+  const at = (word: number, pc = 0x00400054) => explain(decode(word, pc, 'SpimNoDelaySlot'), r, pc, 'en').sentence;
+  assert.equal(at(0x000e8843), // sra $s1, $t6, 1
+    'Shifts `$t6` (`0x80000001`) right by shamt (`1`) and puts the result in `$s1`. The vacated bits are filled with the sign bit.');
+  assert.equal(at(0x01095021), // addu $t2, $t0, $t1
+    'Adds `$t0` (`0x00000005`) and `$t1` (`0xfffffffe`) and puts the sum in `$t2`. Overflow is ignored.');
+  assert.equal(at(0x8fa4fffc), // lw $a0, -4($sp)
+    'Reads the word at `$sp` (`0x7fffffe4`) - offset `4` = `0x7fffffe0` and puts it in `$a0`.');
+  assert.equal(at(0x0000000c),
+    'Makes the system call that `$v0` (`0x00000004`) selects: print_string — prints the string `$a0` points to.');
+  assert.equal(at(0x0c100009, 0x00400014),
+    'Puts the return address (`0x00400018`) in `$ra` and jumps to address `0x00400024` (a function call).');
+  assert.equal(at(0x00000000), 'Does nothing.');
+});

@@ -7,8 +7,12 @@
    New in this front end; the Qt build has no such line.  Pure: it takes the
    decoded word and the register values *before* the instruction runs.
 
-   Korean sentences; the terms of art stay in English (Overflow, Exception,
-   Immediate, Offset, Word, Sign-extend ...), as the course says them.
+   In Korean (the terms of art stay in English: Overflow, Exception,
+   Immediate, Offset, Word, Sign-extend ...) or in English (core/lang.ts):
+
+     sra — Shift Right Arithmetic. Shifts `$t6` (`0x80000001`) right by
+     shamt (`1`) and puts the result in `$s1`. The vacated bits are filled
+     with the sign bit.
 
    Everything that is code -- register names, hexadecimal and other numbers
    taken from the machine -- is wrapped in backticks, and the view sets those
@@ -24,6 +28,7 @@
 import type { DecodedInstruction } from './decoder.ts';
 import { mnemonicExpansion } from './decoder.ts';
 import { hex32 } from './format.ts';
+import type { Lang } from './lang.ts';
 import { generalRegisterName } from './registers.ts';
 
 export interface Explanation {
@@ -35,7 +40,7 @@ const code = (s: string | number): string => '`' + s + '`';
 const reg = (n: number): string => code(generalRegisterName(n));
 const val = (regs: readonly number[], n: number): string => `${reg(n)} 값(${code(hex32(regs[n]))})`;
 
-// SPIM's syscalls ($v0), by the names the course uses.
+// SPIM's syscalls ($v0), by their usual names.
 const SYSCALLS: Record<number, string> = {
   1: 'print_int — `$a0` 레지스터의 정수를 출력', 2: 'print_float — `$f12` 값을 출력', 3: 'print_double — `$f12` 값을 출력',
   4: 'print_string — `$a0` 값이 가리키는 문자열을 출력', 5: 'read_int — 정수 한 줄을 읽어 `$v0` 레지스터에',
@@ -57,7 +62,8 @@ const TITLES: Record<string, string> = {
   syscall: 'System Call', break: 'Breakpoint',
 };
 
-function sentence(d: DecodedInstruction, regs: readonly number[], pc: number): string {
+function sentence(d: DecodedInstruction, regs: readonly number[], pc: number, lang: Lang): string {
+  if (lang === 'en') return sentenceEn(d, regs, pc);
   const { rs, rt, rd, shamt, simm, imm, name } = d;
   const ops: Record<string, string> = { and: 'AND', or: 'OR', xor: 'XOR', nor: 'NOR', andi: 'AND', ori: 'OR', xori: 'XOR' };
   switch (name) {
@@ -131,12 +137,105 @@ function sentence(d: DecodedInstruction, regs: readonly number[], pc: number): s
   }
 }
 
+// ---- in English -------------------------------------------------------------
+
+const valEn = (regs: readonly number[], n: number): string => `${reg(n)} (${code(hex32(regs[n]))})`;
+
+const SYSCALLS_EN: Record<number, string> = {
+  1: 'print_int — prints the integer in `$a0`', 2: 'print_float — prints `$f12`', 3: 'print_double — prints `$f12`',
+  4: 'print_string — prints the string `$a0` points to', 5: 'read_int — reads a line with an integer into `$v0`',
+  6: 'read_float — reads a line with a real number into `$f0`', 7: 'read_double — reads a line with a real number into `$f0`',
+  8: 'read_string — reads a line to where `$a0` points (at most `$a1` bytes)', 9: 'sbrk — allocates `$a0` bytes and puts their address in `$v0`',
+  10: 'exit — ends the program', 11: 'print_char — prints the character in `$a0`', 12: 'read_char — reads one character into `$v0`',
+  13: 'open', 14: 'read', 15: 'write', 16: 'close', 17: 'exit2 — ends the program with `$a0` as the exit code',
+};
+
+const overflowEn = (name: string): string => (name.endsWith('u')
+  ? ' Overflow is ignored.'
+  : ' A signed overflow raises an exception.');
+
+function sentenceEn(d: DecodedInstruction, regs: readonly number[], pc: number): string {
+  const { rs, rt, rd, shamt, simm, imm, name } = d;
+  const ops: Record<string, string> = { and: 'AND', or: 'OR', xor: 'XOR', nor: 'NOR', andi: 'AND', ori: 'OR', xori: 'XOR' };
+  const v = (n: number) => valEn(regs, n);
+  const hex16 = code('0x' + imm.toString(16).padStart(4, '0'));
+  switch (name) {
+    case 'nop':
+      return 'Does nothing.';
+    case 'add': case 'addu':
+      return `Adds ${v(rs)} and ${v(rt)} and puts the sum in ${reg(rd)}.` + overflowEn(name);
+    case 'sub': case 'subu':
+      return `Subtracts ${v(rt)} from ${v(rs)} and puts the result in ${reg(rd)}.` + overflowEn(name);
+    case 'and': case 'or': case 'xor':
+      return `Takes the bitwise ${ops[name]} of ${v(rs)} and ${v(rt)} and puts it in ${reg(rd)}.`;
+    case 'nor':
+      return `Takes the bitwise OR of ${v(rs)} and ${v(rt)}, inverts it and puts it in ${reg(rd)}.`;
+    case 'slt': case 'sltu':
+      return `Puts 1 in ${reg(rd)} if ${v(rs)} is less than ${v(rt)}, else 0 (${name === 'slt' ? 'signed' : 'unsigned'} comparison).`;
+    case 'sll': case 'srl': case 'sra':
+      return `Shifts ${v(rt)} ${name === 'sll' ? 'left' : 'right'} by shamt (${code(shamt)}) and puts the result in ${reg(rd)}. `
+        + `The vacated bits are filled with ${name === 'sra' ? 'the sign bit' : '0'}.`;
+    case 'sllv': case 'srlv': case 'srav':
+      return `Shifts ${v(rt)} ${name === 'sllv' ? 'left' : 'right'} by the low 5 bits of ${reg(rs)} (${code(regs[rs] & 31)}) and puts the result in ${reg(rd)}.`;
+    case 'mult': case 'multu':
+      return `Multiplies ${v(rs)} by ${v(rt)} and puts the upper half of the 64-bit result in HI and the lower half in LO.`;
+    case 'div': case 'divu':
+      return `Divides ${v(rs)} by ${v(rt)} and puts the quotient in LO and the remainder in HI.`;
+    case 'mul':
+      return `Multiplies ${v(rs)} by ${v(rt)} and puts the lower 32 bits of the product in ${reg(rd)}.`;
+    case 'mfhi': return `Copies HI into ${reg(rd)}.`;
+    case 'mflo': return `Copies LO into ${reg(rd)}.`;
+    case 'mthi': return `Copies ${v(rs)} into HI.`;
+    case 'mtlo': return `Copies ${v(rs)} into LO.`;
+    case 'jr':
+      return rs === 31
+        ? `Returns to the address in ${v(rs)}: the instruction after the call to this function.`
+        : `Jumps to the address in ${v(rs)}.`;
+    case 'jalr':
+      return `Puts the return address (${code(hex32(pc + 4))}) in ${reg(rd)} and jumps to the address in ${v(rs)}.`;
+    case 'syscall': {
+      const what = SYSCALLS_EN[regs[2]];
+      return `Makes the system call that ${v(2)} selects${what ? `: ${what}` : ''}.`;
+    }
+    case 'break':
+      return 'Raises a breakpoint exception.';
+    case 'addi': case 'addiu':
+      return `Adds the sign-extended immediate (${code(simm)}) to ${v(rs)} and puts the sum in ${reg(rt)}.` + overflowEn(name);
+    case 'andi': case 'ori': case 'xori':
+      return `Takes the bitwise ${ops[name]} of ${v(rs)} and the zero-extended immediate (${hex16}) and puts it in ${reg(rt)}.`;
+    case 'slti': case 'sltiu':
+      return `Puts 1 in ${reg(rt)} if ${v(rs)} is less than the immediate (${code(simm)}), else 0 (${name === 'slti' ? 'signed' : 'unsigned'} comparison).`;
+    case 'lui':
+      return `Puts the immediate (${hex16}) in the upper 16 bits of ${reg(rt)} and 0 in the lower 16 (${code(hex32(imm << 16))}).`;
+    case 'lw': case 'lh': case 'lhu': case 'lb': case 'lbu': case 'sw': case 'sh': case 'sb': {
+      const addr = (regs[rs] + simm) >>> 0;
+      const unit = { w: 'word', h: 'halfword', b: 'byte' }[name[1]]!;
+      const where = `${v(rs)} ${simm < 0 ? '-' : '+'} offset ${code(Math.abs(simm))} = ${code(hex32(addr))}`;
+      return name[0] === 'l'
+        ? `Reads the ${unit} at ${where} and puts it in ${reg(rt)}${name.endsWith('u') ? ', zero-extended' : name === 'lw' ? '' : ', sign-extended'}.`
+        : `Writes the ${name === 'sw' ? '' : 'lower '}${unit} of ${v(rt)} to ${where}.`;
+    }
+    case 'beq': case 'bne':
+      return `Branches to address ${code(hex32(d.destination))} if ${v(rs)} and ${v(rt)} are ${name === 'beq' ? 'equal' : 'not equal'}.`;
+    case 'blez': case 'bgtz': case 'bltz': case 'bgez': {
+      const cond = { blez: 'less than or equal to 0', bgtz: 'greater than 0', bltz: 'less than 0', bgez: 'greater than or equal to 0' }[name]!;
+      return `Branches to address ${code(hex32(d.destination))} if ${v(rs)} is ${cond}.`;
+    }
+    case 'j':
+      return `Jumps to address ${code(hex32(d.destination))}.`;
+    case 'jal':
+      return `Puts the return address (${code(hex32(pc + 4))}) in ${reg(31)} and jumps to address ${code(hex32(d.destination))} (a function call).`;
+    default:
+      return '';
+  }
+}
+
 // `d` should come from decode(word, pc, convention), so that branches carry
 // their destination; `regs` are the 32 general registers as they are now.
-export function explain(d: DecodedInstruction, regs: readonly number[], pc: number): Explanation {
+export function explain(d: DecodedInstruction, regs: readonly number[], pc: number, lang: Lang = 'ko'): Explanation {
   if (!d.known) return { title: 'Not an instruction this simulator implements', sentence: '' };
   const expansion = mnemonicExpansion(d.name) || TITLES[d.name];
-  return { title: expansion ? `${d.name} — ${expansion}` : d.name, sentence: sentence(d, regs, pc) };
+  return { title: expansion ? `${d.name} — ${expansion}` : d.name, sentence: sentence(d, regs, pc, lang) };
 }
 
 // Splits a sentence into plain and `code` parts, for a view to set.

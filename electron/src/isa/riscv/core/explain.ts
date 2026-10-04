@@ -5,8 +5,8 @@
    instructions the course meets, in all six formats.  Branches, jumps and auipc also
    need the instruction's own address (pc): their target is relative to it.
 
-   Korean sentences; the terms of art stay in English (Overflow, Exception,
-   Immediate, Offset, Word, Sign-extend ...), as the course says them.
+   In Korean (the terms of art stay in English: Overflow, Exception,
+   Immediate, Offset, Word, Sign-extend ...) or in English (core/lang.ts).
 
    Code -- register names, numbers taken from the machine -- is wrapped in
    backticks, which the view sets in the monospaced font.  A particle always
@@ -16,6 +16,7 @@
 
 import type { DecodedInstruction } from './decoder.ts';
 import { hex32 } from '../../../core/format.ts';
+import type { Lang } from '../../../core/lang.ts';
 import { abiName } from './registers.ts';
 
 export interface Explanation {
@@ -51,7 +52,7 @@ const BRANCH: Record<string, { says: string; holds: (a: number, b: number) => bo
   bgeu: { says: '보다 크거나 같으면', holds: (a, b) => a >>> 0 >= b >>> 0, unsigned: true },
 };
 
-// RARS's syscalls (a7), by the names the course uses.
+// RARS's syscalls (a7), by their names.
 const SYSCALLS: Record<number, string> = {
   1: 'PrintInt — `a0` 레지스터의 정수를 출력', 4: 'PrintString — `a0` 값이 가리키는 문자열을 출력',
   5: 'ReadInt — 정수 한 줄을 읽어 `a0` 레지스터에', 8: 'ReadString — 한 줄을 `a0` 값이 가리키는 곳에(최대 `a1` 값만큼)',
@@ -64,7 +65,8 @@ const target = (pc: number | null, imm: number): string => (pc === null
   ? `PC에서 Offset(${code(imm)})만큼 떨어진 곳`
   : `${code(hex32((pc + imm) >>> 0))} 주소(PC + Offset ${code(imm)})`);
 
-function sentence(d: DecodedInstruction, regs: readonly number[], pc: number | null): string {
+function sentence(d: DecodedInstruction, regs: readonly number[], pc: number | null, lang: Lang): string {
+  if (lang === 'en') return sentenceEn(d, regs, pc);
   const { rd, rs1, rs2, imm, name } = d;
   const to = `${reg(rd)} 레지스터에 넣습니다.`;
   const ops: Record<string, string> = { and: 'AND', or: 'OR', xor: 'XOR', andi: 'AND', ori: 'OR', xori: 'XOR' };
@@ -139,9 +141,104 @@ function sentence(d: DecodedInstruction, regs: readonly number[], pc: number | n
   }
 }
 
-export function explain(d: DecodedInstruction, regs: readonly number[], pc: number | null = null): Explanation {
+// ---- in English -------------------------------------------------------------
+
+// "`x5` (`t0`)", and with its value "`x5` (`t0`, `0xfffffffb`)".
+const regEn = (n: number): string => code(`x${n}`) + (n === 0 ? '' : ` (${code(abiName(n))})`);
+const valEn = (regs: readonly number[], n: number): string =>
+  `${code(`x${n}`)} (${n === 0 ? '' : `${code(abiName(n))}, `}${code(hex32(regs[n] ?? 0))})`;
+
+const BRANCH_EN: Record<string, string> = {
+  beq: 'are equal', bne: 'are not equal', blt: 'is less than', bge: 'is greater than or equal to', bltu: 'is less than', bgeu: 'is greater than or equal to',
+};
+
+const SYSCALLS_EN: Record<number, string> = {
+  1: 'PrintInt — prints the integer in `a0`', 4: 'PrintString — prints the string `a0` points to',
+  5: 'ReadInt — reads a line with an integer into `a0`', 8: 'ReadString — reads a line to where `a0` points (at most `a1` bytes)',
+  9: 'Sbrk — allocates `a0` bytes and puts their address in `a0`', 10: 'Exit — ends the program', 11: 'PrintChar — prints the character in `a0`',
+  12: 'ReadChar — reads one character into `a0`', 93: 'Exit2 — ends the program with `a0` as the exit code',
+};
+
+const targetEn = (pc: number | null, imm: number): string => (pc === null
+  ? `the address at offset ${code(imm)} from PC`
+  : `address ${code(hex32((pc + imm) >>> 0))} (PC + offset ${code(imm)})`);
+
+function sentenceEn(d: DecodedInstruction, regs: readonly number[], pc: number | null): string {
+  const { rd, rs1, rs2, imm, name } = d;
+  const v = (n: number) => valEn(regs, n);
+  const to = `in ${regEn(rd)}.`;
+  const ops: Record<string, string> = { and: 'AND', or: 'OR', xor: 'XOR', andi: 'AND', ori: 'OR', xori: 'XOR' };
+  const at = (base: number) => `${v(base)} + offset ${code(imm)} = ${code(hex32(((regs[base] ?? 0) + imm) >>> 0))}`;
+  const wraps = ' On overflow it keeps the lower 32 bits; there is no exception.';
+  switch (name) {
+    case 'add': return `Adds ${v(rs1)} and ${v(rs2)} and puts the sum ${to}${wraps}`;
+    case 'sub': return `Subtracts ${v(rs2)} from ${v(rs1)} and puts the result ${to}${wraps}`;
+    case 'and': case 'or': case 'xor': return `Takes the bitwise ${ops[name]} of ${v(rs1)} and ${v(rs2)} and puts it ${to}`;
+    case 'sll': case 'srl': case 'sra':
+      return `Shifts ${v(rs1)} ${name === 'sll' ? 'left' : 'right'} by the low 5 bits of ${v(rs2)} and puts the result ${to}`
+        + (name === 'sra' ? ' The vacated bits are filled with the sign bit.' : '');
+    case 'slt': case 'sltu':
+      return `Puts 1 ${to.slice(0, -1)} if ${v(rs1)} is less than ${v(rs2)}, else 0 (${name === 'slt' ? 'signed' : 'unsigned'} comparison).`;
+    case 'mul': return `Multiplies ${v(rs1)} by ${v(rs2)} and puts the lower 32 bits of the product ${to}`;
+    case 'div': case 'divu': case 'rem': case 'remu':
+      return `Divides ${v(rs1)} by ${v(rs2)} and puts the ${name.startsWith('div') ? 'quotient' : 'remainder'} ${to}`;
+    case 'addi':
+      if (rd === 0 && rs1 === 0 && imm === 0) return 'Does nothing (`nop`).';
+      if (rs1 === 0) return `Puts the immediate (${code(imm)}) ${to} (This is what the \`li\` instruction becomes.)`;
+      return `Adds the immediate (${code(imm)}) to ${v(rs1)} and puts the sum ${to}${wraps}`;
+    case 'andi': case 'ori': case 'xori': return `Takes the bitwise ${ops[name]} of ${v(rs1)} and the immediate (${code(imm)}) and puts it ${to}`;
+    case 'slti': case 'sltiu':
+      return `Puts 1 ${to.slice(0, -1)} if ${v(rs1)} is less than the immediate (${code(imm)}), else 0 (${name === 'slti' ? 'signed' : 'unsigned'} comparison).`;
+    case 'slli': case 'srli': case 'srai':
+      return `Shifts ${v(rs1)} ${name === 'slli' ? 'left' : 'right'} by shamt (${code(d.rs2)}) and puts the result ${to}`
+        + (name === 'srai' ? ' The vacated bits are filled with the sign bit.' : '');
+    case 'lw': case 'lh': case 'lb': case 'lhu': case 'lbu': {
+      const unit = { lw: 'word', lh: 'halfword', lb: 'byte', lhu: 'halfword', lbu: 'byte' }[name];
+      return `Reads the ${unit} at ${at(rs1)} and puts it ${to}`
+        + (name.endsWith('u') ? ' The upper bits are filled with 0 (zero-extended).' : name === 'lw' ? '' : ' The upper bits are filled with the sign bit (sign-extended).');
+    }
+    case 'jalr': {
+      const dest = (((regs[rs1] ?? 0) + imm) & ~1) >>> 0;
+      return `Jumps to ${v(rs1)} + offset ${code(imm)} = ${code(hex32(dest))}. `
+        + (rd === 0 ? 'No return address is kept (`ret`, `jr`).' : `The address of the next instruction is left in ${regEn(rd)}.`);
+    }
+    case 'ecall': {
+      const call = SYSCALLS_EN[regs[17] ?? -1];
+      return call ? `${code('a7')} is ${code(regs[17])}: ${call}.` : `Makes the system call that ${code('a7')} (${code(regs[17] ?? 0)}) selects.`;
+    }
+    case 'ebreak': return 'Raises a breakpoint exception and stops here (control passes to the debugger).';
+    case 'sw': case 'sh': case 'sb': {
+      const unit = { sw: 'word', sh: 'lower halfword', sb: 'lower byte' }[name];
+      return `Writes the ${unit} of ${v(rs2)} to ${at(rs1)}.`;
+    }
+    case 'flw': case 'fld': case 'fsw': case 'fsd': {
+      const unit = name.endsWith('w') ? 'word' : 'doubleword';
+      return name.startsWith('fl')
+        ? `Reads the ${unit} at ${at(rs1)} and puts it in ${code(`f${rd}`)}.`
+        : `Writes the ${unit} in ${code(`f${rs2}`)} to ${at(rs1)}.`;
+    }
+    case 'beq': case 'bne': case 'blt': case 'bge': case 'bltu': case 'bgeu': {
+      const b = BRANCH[name];
+      const now = b.holds(regs[rs1] ?? 0, regs[rs2] ?? 0) ? 'With the values now, it branches.'
+        : 'With the values now, it does not branch and goes on to the next instruction.';
+      const cmp = name === 'beq' || name === 'bne' ? `${v(rs1)} and ${v(rs2)} ${BRANCH_EN[name]}` : `${v(rs1)} ${BRANCH_EN[name]} ${v(rs2)}`;
+      return `Branches to ${targetEn(pc, imm)} if ${cmp}${b.unsigned ? ' (unsigned comparison)' : ''}. ${now}`;
+    }
+    case 'lui': return `Puts the immediate (${code(hex32(imm))}) ${to} The value goes in the upper 20 bits; the lower 12 bits are 0.`;
+    case 'auipc':
+      return pc === null ? `Adds the immediate (${code(hex32(imm))}) to PC (the instruction's own address) and puts the result ${to}`
+        : `Adds the immediate (${code(hex32(imm))}) to PC (${code(hex32(pc))}) and puts the result, ${code(hex32((pc + imm) >>> 0))}, ${to}`
+          + ' (The `la` instruction becomes two, `auipc` and `addi`; this is the first.)';
+    case 'jal':
+      return `Jumps to ${targetEn(pc, imm)}. ` + (rd === 0 ? 'No return address is kept (the `j` instruction).'
+        : `The address of the next instruction${pc === null ? '' : ` (${code(hex32((pc + 4) >>> 0))})`} is left in ${regEn(rd)}.`);
+    default: return '';
+  }
+}
+
+export function explain(d: DecodedInstruction, regs: readonly number[], pc: number | null = null, lang: Lang = 'ko'): Explanation {
   const t = TITLES[d.name];
-  return { title: d.name ? (t ? `${d.name} — ${t}` : d.name) : 'Unknown instruction', sentence: sentence(d, regs, pc) };
+  return { title: d.name ? (t ? `${d.name} — ${t}` : d.name) : 'Unknown instruction', sentence: sentence(d, regs, pc, lang) };
 }
 
 /* "`x5` 값(...)" -> parts, the backticked ones as code. */

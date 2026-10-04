@@ -49,3 +49,28 @@ test('the immediate, put together', () => {
   const slli = decode(0x00129293); // slli t0, t0, 1
   assert.equal(meaningOf(slli.fields!.find((f) => f.name === 'shamt')!, slli), '1 bit');
 });
+
+// In English (core/lang.ts).
+test('in English: the sentences and the immediate', () => {
+  const en = (word: number, pc = 0x00400000) => explain(decode(word), regs, pc, 'en').sentence;
+  assert.equal(en(0x006283b3), // add t2, t0, t1
+    'Adds `x5` (`t0`, `0xfffffffb`) and `x6` (`t1`, `0x00000005`) and puts the sum in `x7` (`t2`). '
+      + 'On overflow it keeps the lower 32 bits; there is no exception.');
+  assert.equal(en(0xffb00293), 'Puts the immediate (`-5`) in `x5` (`t0`). (This is what the `li` instruction becomes.)');
+  assert.equal(en(0xfe512c23), // sw t0, -8(sp)
+    'Writes the word of `x5` (`t0`, `0xfffffffb`) to `x2` (`sp`, `0x7fffeffc`) + offset `-8` = `0x7fffeff4`.');
+  assert.equal(en(0x00628663, 0x0040000c), // beq t0, t1, +12
+    'Branches to address `0x00400018` (PC + offset `12`) if `x5` (`t0`, `0xfffffffb`) and `x6` (`t1`, `0x00000005`) are equal. '
+      + 'With the values now, it does not branch and goes on to the next instruction.');
+  assert.equal(en(0x008000ef, 0x00400010), // jal ra, +8
+    'Jumps to address `0x00400018` (PC + offset `8`). The address of the next instruction (`0x00400014`) is left in `x1` (`ra`).');
+  // add, li, sw, beq, jal, lui, slli, ecall, ret
+  for (const word of [0x006283b3, 0xffb00293, 0xfe512c23, 0x00628663, 0x008000ef, 0x12345e37, 0x00129293, 0x00000073, 0x00008067]) {
+    const s = en(word);
+    assert.ok(s !== '' && !/[가-힣]/.test(s), s);
+    const plain = codeParts(s).filter((p) => !p.code).map((p) => p.text).join('');
+    assert.ok(!/0x|\bx\d/.test(plain), plain);
+  }
+  assert.equal(immediateLine(decode(0xffb00293), undefined, 'en'), '`imm = 0xffb = -5` (12 bits, sign-extended)');
+  assert.equal(immediateLine(decode(0x12345e37), undefined, 'en'), '`imm = 0x12345000` (the upper 20 bits; the lower 12 bits are 0)');
+});
