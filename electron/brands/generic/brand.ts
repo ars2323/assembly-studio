@@ -10,5 +10,4 @@ export const brand: Brand = {
   author: 'Hakhyeon Kim · AIAC Lab',
   mark: 'brand/mark.svg',
   markOnLight: 'brand/mark-black.svg',
-  characters: false,
 };

@@ -416,7 +416,6 @@ img.icon { filter: var(--icon-filter); }
    button; from the left, at the panel's own height. */
 .asm .notice-host { container-type: normal; justify-content: flex-start; align-items: flex-start; overflow: visible; flex: none; }
 .asm .notice { margin: 0; padding: 10px 14px 12px; max-width: none; width: 100%; }
-.asm .notice img.char { display: none; }
 .asm .notice .say h3.cells { margin: 0; font: 500 12.5px/1 var(--ui); color: var(--text-2); }
 .asm .notice .say > p.asm-note { margin: 8px 0 8px; }
 .asm .notice .row { margin-top: 10px; }
@@ -761,7 +760,6 @@ img.icon { filter: var(--icon-filter); }
 .cbody { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .console .notice-host { container-type: normal; } /* its words decide its height while it is empty */
 /* Its empty word is the words alone, compact (the character is the Inspector's, next to it). */
-.console .notice img.char { display: none; }
 .console .notice { padding: 10px 16px; gap: 0; }
 .clog { flex: 1; min-height: 0; margin: 0; padding: 6px 12px; overflow: auto; font-size: var(--fs); line-height: 1.5; white-space: pre-wrap; word-break: break-all; }
 .clog .typed { color: var(--accent); font-weight: 700; }
@@ -779,9 +777,8 @@ img.icon { filter: var(--icon-filter); }
 .notice .say { flex: 1; min-width: 0; }
 .notice .say h3 { margin: 0 0 6px; font-size: 16px; font-weight: 600; color: var(--strong); }
 .notice .say > p { margin: 0; color: var(--text-2); line-height: 1.5; }
-.notice img.char { flex: none; }
 /* Too short or too narrow for the character (the Console at a small window, the Inspector at 1093 px): the words alone. */
-@container (max-height: 156px) or (max-width: 380px) { .notice img.char { display: none; } .notice { padding: 8px 16px; gap: 0; } }
+@container (max-height: 156px) or (max-width: 380px) { .notice { padding: 8px 16px; gap: 0; } }
 .congrats { position: absolute; right: 16px; bottom: 16px; z-index: 6; display: flex; align-items: center; gap: 16px; padding: 12px 18px 12px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 24px rgba(var(--shadow-rgb), .14); }
 .congrats h3 { margin: 0 0 2px; font-size: 15px; color: var(--strong); }
 .congrats p { margin: 0 0 8px; color: var(--text-2); }
@@ -1038,7 +1035,6 @@ html.theme-fade, html.theme-fade *:not(canvas), html.theme-fade *::before, html.
 .modal::backdrop { background: rgba(var(--scrim-rgb), .6); } /* logic/overlay.ts DIALOG_ALPHA: the caption buttons' patch matches */
 .modal.ask { width: min(480px, calc(100vw - 32px)); }
 .askbody { display: flex; gap: 18px; align-items: center; }
-.askbody img.char { flex: none; }
 .asktext h2 { margin: 0 0 6px; font-size: 17px; }
 .asktext p { margin: 0; color: var(--text-2); line-height: 1.55; }
 .asktext p.askfile { margin-bottom: 4px; color: var(--muted); font-size: 12px; }

@@ -36,7 +36,7 @@ export class ConsolePanel {
     this.head.root.addEventListener('dblclick', () => this.setExpanded(!this.expanded));
     this.log = h('pre', { class: 'clog mono' });
     this.emptyNote = h('div', { class: 'notice-host' },
-      notice({ pose: 'talk', title: 'No output yet', body: 'What the program prints, and the input it asks for, shows up here.' }));
+      notice({ title: 'No output yet', body: 'What the program prints, and the input it asks for, shows up here.' }));
     this.input = h('input', { class: 'cinput mono', type: 'text', 'aria-label': 'Console input', spellcheck: 'false', autocomplete: 'off' });
     this.input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.isComposing) {

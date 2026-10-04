@@ -13,7 +13,7 @@
    "lab04.s 은" reads wrong whatever the name); it stands on a line of its
    own, "File: lab04.s". */
 
-import { character, code, h } from '../dom.ts';
+import { code, h } from '../dom.ts';
 
 export interface Question {
   title: string;
@@ -29,7 +29,7 @@ export function ask(q: Question): Promise<boolean> {
     const ok = h('button', { class: `btn ${q.danger ? 'danger' : 'primary'}`, type: 'button' }, q.ok);
     const cancel = h('button', { class: 'btn', type: 'button' }, q.cancel ?? '취소');
     const dialog = h('dialog', { class: 'modal ask', 'aria-label': q.title },
-      h('div', { class: 'askbody' }, character('haram', 96),
+      h('div', { class: 'askbody' },
         h('div', { class: 'asktext' }, h('h2', {}, q.title),
           q.file ? h('p', { class: 'askfile' }, 'File: ', code(q.file)) : null, h('p', {}, q.body),
           h('div', { class: 'row end' }, cancel, ok))));

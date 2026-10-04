@@ -13,5 +13,4 @@ export interface Brand {
   author: string;        // who made it: About ("Made by …"), the package's author
   mark: string;          // under src/renderer/assets/ (asset()): on the dark theme
   markOnLight: string;   // the same, on the light theme
-  characters: boolean;   // brand/characters/<pose>.png exist (tutorial, notices)
 }

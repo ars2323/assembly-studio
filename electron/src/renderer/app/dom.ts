@@ -35,13 +35,6 @@ export function codeText(text: string): DocumentFragment {
 
 export const asset = (p: string): string => `../assets/${p}`;
 export const icon = (name: string): HTMLImageElement => h('img', { class: 'icon', src: asset(`icons/lucide/${name}.svg`), alt: '' });
-// The brand's characters (brand.characters): the original PNGs, scaled by CSS
-// only, never under 76 px.  A brand without them gets nothing in their place.
-export const character = (name: string, height: number): Node =>
-  brand.characters
-    ? h('img', { class: 'char', src: asset(`brand/characters/${name}.png`), alt: '', style: `height:${Math.max(76, height)}px` })
-    : document.createComment('character');
-
 // Prose from the core (error messages): the parts that look like numbers
 // in hexadecimal go in the mono font.
 const HEXISH = /(0[xX][0-9a-fA-F]+|\b[0-9a-fA-F]{8}\b)/;
