@@ -719,7 +719,8 @@ async function exportImage(): Promise<void> {
 // asked about; a new file is asked about even when everything is saved --
 // it empties the Editor, which a student does not expect from one click.
 // The title bar's mark and name: back to the first screen, where the ISA is
-// chosen.  The page is loaded again (?isa= the same: the engine stays);
+// chosen.  The page is loaded again (?isa= the same: the engine stays;
+// ?home: the first screen without its opening);
 // unsaved changes are asked about first.
 async function goHome(): Promise<void> {
   if (open && dirty && !(await ask({
@@ -728,7 +729,7 @@ async function goHome(): Promise<void> {
     body: '처음 화면으로 가면 저장하지 않은 내용은 사라집니다.',
     ok: '버리고 계속', cancel: '돌아가기', danger: true,
   }))) return;
-  location.replace(`?isa=mips`);
+  location.replace(`?isa=mips&home=1`);
 }
 
 async function mayReplace(what: 'new' | 'open'): Promise<boolean> {
