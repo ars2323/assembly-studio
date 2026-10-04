@@ -98,6 +98,8 @@ export function startfield(options: { seed: number; from?: number }): Startfield
   let geo: Geometry | undefined;
   let raf = 0, started = 0, shown = false, frames = 0, boardDraws = 0;
   let drawnAt = -1;                      // the moment the board below holds
+  let lastT = 0;                         // the moment last painted
+  let offset = options.from ?? 0;        // where the clock starts on the next run()
   let resizeTimer = 0, lastFrame = 0;
   const deltas: number[] = [];
   const work: number[] = [];
@@ -115,6 +117,7 @@ export function startfield(options: { seed: number; from?: number }): Startfield
     const upper = pulse.getContext('2d');
     if (!lower || !upper) return;
     frames++;
+    lastT = t;
     times.push(t);
     const began = performance.now();
     if (drawnAt < geo.grownMs || t < drawnAt) {
@@ -151,12 +154,18 @@ export function startfield(options: { seed: number; from?: number }): Startfield
       c.width = Math.round(width * dpr);
       c.height = Math.round(height * dpr);
     }
+    /* Laid out again (the window was resized): the board comes back grown,
+       its clock going on from where it was -- not growing a second time --
+       and fades in over the dark it faded out to (resizing, below). */
+    const again = geo !== undefined;
     geo = generate({
       seed: options.seed, width, height, dpr,
       card: { x: Math.round(box.x - host.x), y: Math.round(box.y - host.y), width: Math.round(box.width), height: Math.round(box.height) },
     });
     drawnAt = -1;
+    if (again) offset = Math.max(lastT, geo.grownMs);
     if (reduce.matches) paint(geo.grownMs); else run();
+    root.classList.remove('sf-resizing');
   };
 
   const stop = (): void => { if (raf) cancelAnimationFrame(raf); raf = 0; };
@@ -164,7 +173,7 @@ export function startfield(options: { seed: number; from?: number }): Startfield
   const frame = (now: number): void => {
     if (!started) { started = now; deltas.push(0); } else deltas.push(now - lastFrame);
     lastFrame = now;
-    paint(now - started + (options.from ?? 0)); // delta time, never a per-frame constant
+    paint(now - started + offset);      // delta time, never a per-frame constant
     raf = requestAnimationFrame(frame); // the board below stops; this layer does not
   };
 
@@ -176,7 +185,18 @@ export function startfield(options: { seed: number; from?: number }): Startfield
     raf = requestAnimationFrame(frame);
   };
 
+  /* While the window is being resized the board drawn for the old size
+     would be stretched over the new one, its hole for the card and the
+     card's halo no longer where the card is: it fades out at once to the
+     window's dark, and back in once it has been laid out for the new size. */
   const observer = new ResizeObserver(() => {
+    // The first call (on observing) and any that changes nothing are not a resize.
+    const host = root.getBoundingClientRect();
+    const el = chip();
+    const same = geo && Math.round(host.width) === geo.width && Math.round(host.height) === geo.height
+      && (!el || el.offsetWidth === Math.round(geo.card.width));
+    if (same) return;
+    if (shown && geo) root.classList.add('sf-resizing');
     clearTimeout(resizeTimer);
     resizeTimer = window.setTimeout(() => { if (shown) build(); }, RESIZE_SETTLE);
   });
