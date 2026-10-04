@@ -4,10 +4,10 @@
 
 import type { AboutInfo } from '../api.ts';
 import { brand } from '../../../brand.ts';
-import { code, h } from '../dom.ts';
+import { code, h, markImg } from '../dom.ts';
 
 // `engine`: what the simulator is built on, in About's first tab (the ISA's engine).
-export function aboutDialog(engine: (info: AboutInfo) => (string | Node)[] = () => ['Based on SPIM 9.1.24 by James R. Larus (BSD)']):
+export function aboutDialog(engine: (info: AboutInfo) => (string | Node)[] = () => ['Simulator engine: SPIM ', code('9.1.24'), ' by James R. Larus (BSD)']):
     { root: HTMLDialogElement; open(): Promise<void> } {
   const dialog = h('dialog', { class: 'modal about', 'aria-label': 'About' });
 
@@ -19,7 +19,8 @@ export function aboutDialog(engine: (info: AboutInfo) => (string | Node)[] = () 
       [...tabs.children].forEach((t, k) => t.classList.toggle('on', k === i));
       if (i === 0) {
         body.replaceChildren(
-          h('p', {}, h('b', {}, brand.name), ' ', code(info.version)),
+          h('div', { class: 'about-id' }, markImg('about-mark'),
+            h('div', {}, h('div', { class: 'about-name' }, brand.name), h('div', { class: 'about-ver' }, 'Version ', code(info.version)), h('div', { class: 'about-by' }, 'Made by ', brand.author))),
           h('p', {}, ...engine(info)),
           h('p', { class: 'hint' }, brand.about),
           h('p', { class: 'hint' }, 'Electron ', code(info.electron), ' · Chromium ', code(info.chrome), ' · Node.js ', code(info.node)));

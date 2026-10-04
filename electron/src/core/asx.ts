@@ -1,38 +1,44 @@
-/* The executable image, .hmx: an assembled program as memory -- its words,
-   its data, where it begins, its labels -- for a program that runs MIPS code
-   without assembling it (Hallym Circuit Studio loads these).  Not an object
-   file: nothing is left to link or relocate.  The format is specified in
-   the repository's docs/hmx-format.md, which is the reference; this writes
-   version 1.
+/* The executable image, .asx: an assembled program as memory -- its words,
+   its data, where it begins, its labels -- for a program that runs MIPS or
+   RISC-V code without assembling it.  Not an object file: nothing is left
+   to link or relocate.  The format is specified in the repository's
+   docs/asx-format.md, which is the reference; this writes version 1.
 
-   Pure: the image is read from the simulator by src/sim/image.ts. */
+   Pure: the image is read from the engine by src/sim/image.ts (MIPS) and
+   src/isa/riscv/sim/image.ts (RISC-V). */
 
-export const HMX_MAGIC = 'HALLYM-EXEC';
-export const HMX_VERSION = 1;
+export const ASX_MAGIC = 'ASX';
+export const ASX_VERSION = 1;
 // A run of this many zero bytes or more is written "zero <count>" (in .text,
 // this many bytes' worth of words).
 export const ZERO_RUN = 16;
 const BYTES_PER_LINE = 16;
 const KEY_WIDTH = 14;
 
-export interface HmxSymbol { name: string; addr: number }
+export type AsxIsa = 'mips' | 'riscv';
 
-// What the machine holds once the program is assembled (src/sim/image.ts).
+export interface AsxSymbol { name: string; addr: number }
+
+// What the machine holds once the program is assembled.
 export interface MachineImage {
+  isa: AsxIsa;
   endian: 'little' | 'big';
   entry: number;
-  regs: { name: string; value: number }[];   // $sp and $gp
-  symbols: HmxSymbol[];                      // the program's own labels, by address
-  text: { addr: number; words: number[] };   // user text, the start-up code included
+  regs: { name: string; value: number }[];   // the stack and global pointers ($sp $gp, or sp gp)
+  symbols: AsxSymbol[];                      // the program's own labels, by address
+  text: { addr: number; words: number[] };   // user text (MIPS: the start-up code included)
   data: { addr: number; bytes: Uint8Array } | null;
 }
 
 export interface ExecImage extends MachineImage {
   source: string;        // the file's name
   sourceSha256: string;  // of the assembled source, as its file holds it
-  producedBy: string;    // "<brand name> <version>"
-  assembled: string;     // hmxTime()
+  producedBy: string;    // "<app name> <version>"
+  assembled: string;     // asxTime()
 }
+
+// Why there is no image; the message is for the student.
+export class ImageError extends Error {}
 
 export const hex32 = (n: number): string => '0x' + (n >>> 0).toString(16).padStart(8, '0');
 const word = (n: number): string => (n >>> 0).toString(16).padStart(8, '0');
@@ -40,7 +46,7 @@ const byte = (n: number): string => n.toString(16).padStart(2, '0');
 const field = (key: string, value: string): string => `${key.padEnd(KEY_WIDTH - 1)} ${value}`;
 
 // Local time to the minute, with its offset: 2026-09-27T13:15+09:00.
-export function hmxTime(at: Date): string {
+export function asxTime(at: Date): string {
   const p = (n: number) => String(n).padStart(2, '0');
   const off = -at.getTimezoneOffset();
   const sign = off >= 0 ? '+' : '-';
@@ -71,9 +77,10 @@ function runs<T>(items: ArrayLike<T>, isZero: (x: T) => boolean, least: number):
   return out;
 }
 
-export function formatHmx(image: ExecImage): string {
+export function formatAsx(image: ExecImage): string {
   const lines = [
-    `${HMX_MAGIC} ${HMX_VERSION}`,
+    `${ASX_MAGIC} ${ASX_VERSION}`,
+    field('isa', image.isa),
     field('source', image.source),
     field('source-sha256', image.sourceSha256),
     field('produced-by', image.producedBy),
