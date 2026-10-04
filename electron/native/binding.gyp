@@ -1,12 +1,11 @@
 # The SPIM core (../../CPU, the repository's one copy, untouched) plus a thin N-API front end.
 #
-# Mirrors the Qt build's tests/spim_core.pri (hallym-mips-simulator): the same
-# nine sources, the same bison/flex invocations and the same per-platform
-# flags.  If the core's build changes there, this has to follow.  The parser
+# The core's nine sources, compiled with SPIM's own bison/flex invocations and
+# per-platform flags (CPU/ORIGIN.md: the sources are upstream's).  The parser
 # and scanner are generated into the build directory, never into CPU/.
 #
 # Built on Linux; Windows (MSVC, win_bison/win_flex from winflexbison3) is
-# checked by ../.github/workflows/electron.yml (the repository root's).
+# built by .github/workflows/engines.yml (the repository root's).
 #
 # ONE INTERVENTION IN THE CORE'S BUILD, WINDOWS ONLY: CPU/run.cpp is compiled
 # through src/run-win.cpp, which replaces CreateWaitableTimer() (see the
