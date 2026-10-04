@@ -238,7 +238,9 @@ Full text:  In the installed program, resources\engine\runtime\legal\, one
             ADDITIONAL_LICENSE_INFO, and the notices of the third-party
             libraries each module includes (*.md). The runtime is not stored
             in this repository; engines.yml builds it from the pinned
-            Temurin release.
+            Temurin release. The GPL text with the Classpath Exception is
+            also in electron/licenses/Temurin-GPLv2-CE.txt and in About ›
+            Licenses.
 Source:     https://github.com/adoptium/jdk21u (the Temurin 21 source) and
             https://adoptium.net (release archives).
 
