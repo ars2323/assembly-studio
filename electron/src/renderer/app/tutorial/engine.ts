@@ -590,6 +590,9 @@ export class Tutorial {
     };
     const running = (document as Document & { activeViewTransition?: { finished: Promise<void> } | null }).activeViewTransition;
     void running?.finished.then(() => { if (this.shown === shown) shown.hits = hits(); });
+    // And once more a moment later, for anything else still settling (a
+    // panel that has just changed, a slow machine): the tests read it then.
+    if (shown.hits.some((hit) => !hit)) window.setTimeout(() => { if (this.shown === shown) shown.hits = hits(); }, 600);
   }
 
   // The small arrow on the card's edge toward the first target, where the
