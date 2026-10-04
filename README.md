@@ -65,8 +65,9 @@ pre-releases either: `release.yml` builds every installer from them.
 1. On the first screen, choose **MIPS** or **RISC-V**. You choose on every launch; the choice is not remembered.
 2. Choose **Start now** (바로 시작) or **Take the tutorial** (튜토리얼 보기).
    - **Start now** then offers **New file** (새 파일) and **Open file** (파일 열기).
-   - **The tutorial** walks you through the screen and the basic controls with an example program, step by step
-     (7 chapters, 26 steps, for both ISAs), in Korean or English (see **Language** below). On the work screen you can start it
+   - **The tutorial** walks you through every part of the work screen with an example program, step by step
+     (8 chapters, 31 steps, for both ISAs): you assemble, step, step back, run, type input and read the errors
+     yourself, in Korean or English (see **Language** below). On the work screen you can start it
      again at any time with the question-mark button at the right of the toolbar.
 3. To use the other ISA, start the program again and choose it on the first screen.
 

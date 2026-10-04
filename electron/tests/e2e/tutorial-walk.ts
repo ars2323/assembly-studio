@@ -1,9 +1,9 @@
 /* A walk through the whole tutorial, the way a student goes (the keys,
    the clicks), capturing every card, for looking at by eye; it also checks
    each card: something is pointed at, a click reaches every target, the
-   card covers none of them.
+   card covers none of them, nothing Korean on screen in English mode.
 
-     xvfb-run -a -s '-screen 0 2400x1400x24' node tests/e2e/tutorial-walk.ts <out-dir> [--isa mips|riscv] [--width 1280] [--theme dark|light] [--lang ko|en]
+     xvfb-run -a -s '-screen 0 2400x1400x24' node tests/e2e/tutorial-walk.ts <out-dir> [--isa mips|riscv] [--width 1920] [--height 1080] [--theme dark|light] [--lang ko|en]
 
    (node tools/build-ui.ts first.)  --lang: chosen with the first screen's KO/EN
    switch (Korean by default).  Writes <isa>-<theme>-<width>-<lang>-<nn>-<id>[-done|-phase2|...].png
@@ -18,7 +18,8 @@ import { WELCOME } from '../../src/renderer/app/messages/welcome.ts';
 const args = process.argv.slice(2);
 const opt = (name: string, def: string) => { const i = args.indexOf(`--${name}`); return i >= 0 ? args.splice(i, 2)[1] : def; };
 const isa = opt('isa', 'mips') as 'mips' | 'riscv';
-const width = Number(opt('width', '1280'));
+const width = Number(opt('width', '1920'));
+const height = Number(opt('height', '1080'));
 const theme = opt('theme', 'dark');
 const lang = opt('lang', 'ko') as 'ko' | 'en';
 const out = path.resolve(args[0] ?? 'build/tutorial');
@@ -29,7 +30,7 @@ interface State { index: number; total: number; id: string; kind: string; phase:
   shown: { targets: Rect[]; hits: boolean[]; card: Rect | null; did: string[] }; title: string }
 
 const T3 = isa === 'mips' ? '$t3' : 'x28';
-const r = await launch({ width, height: 800 }, { isa });
+const r = await launch({ width, height }, { isa });
 const page = r.page;
 const problems: string[] = [];
 
@@ -65,7 +66,7 @@ async function capture(suffix = ''): Promise<State> {
     s.shown.targets.forEach((t, i) => {
       if (intersects(card, { left: t.left - 3, top: t.top - 3, right: t.right + 3, bottom: t.bottom + 3 })) problems.push(`${where}: the card covers target ${i + 1}`);
     });
-    if (card.left < 0 || card.top < 0 || card.right > width || card.bottom > 800) problems.push(`${where}: the card is off the window`);
+    if (card.left < 0 || card.top < 0 || card.right > width || card.bottom > height) problems.push(`${where}: the card is off the window`);
   }
   // In English, nothing on the screen in Korean (the card, the Inspector, the example's comments...).
   if (lang === 'en') {
@@ -99,7 +100,7 @@ try {
   await page.waitForTimeout(700);
   await page.getByRole('button', { name: WELCOME.tutorial[lang] }).click();
   await page.waitForSelector('.tut-card');
-  await page.mouse.move(2, 790);
+  await page.mouse.move(2, height - 10);
 
   for (let guard = 0; guard < 60; guard += 1) {
     let s = await capture();
@@ -109,13 +110,13 @@ try {
       break;
     }
     if (s.kind === 'explain') {
-      if (s.id === 'inspector') {
+      if (s.id === 'bits') {
         // The other language, live: the card and the Inspector's explanation say it again in it, and back.
         await setLang(page, lang === 'en' ? 'ko' : 'en');
         await captureOther();
         await setLang(page, lang);
       }
-      if (s.id === 'theme') {
+      if (s.id === 'switches') {
         // The switch works under the tutorial: the other theme, captured, and back.
         await page.locator('.status .theme-switch').click();
         await settle(700);
@@ -131,6 +132,12 @@ try {
     switch (s.id) {
       case 'assemble': await key('Control+s'); break;
       case 'step': await key('F10'); break;
+      case 'stepback': await key('Shift+F10'); break;
+      case 'inspect': {
+        const t = s.shown.targets[0];
+        await page.mouse.click((t.left + t.right) / 2, (t.top + t.bottom) / 2);
+        break;
+      }
       case 'pin':
         await page.locator(`.rrow[data-reg="${T3}"]`).hover();
         await page.locator(`.rrow[data-reg="${T3}"] .star`).click();
@@ -163,7 +170,14 @@ try {
       case 'console':
         await key('F5');
         await settle(600);
-        if (!(await state()).result) await key('F5');
+        if ((await state()).phase === 0) await key('F5'); // stopped at the red dot: on again
+        s = await moved(s);
+        await capture('-phase2');
+        await page.locator('.console .cinput').fill('30');
+        await key('Enter');
+        break;
+      case 'undo':
+        for (let i = 0; i < 4 && !(await state()).result; i += 1) { await key('Shift+F10'); await settle(300); }
         break;
       case 'error':
         await key('Control+s');
