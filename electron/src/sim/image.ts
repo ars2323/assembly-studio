@@ -2,10 +2,11 @@
    simulator right after assembling it: every value is the core's, nothing
    is assumed.
 
-   - text     the user text segment's words, from its first to its last
-              instruction: the start-up code (__start, from the exception
-              handler's file) included; the kernel's text is not.  A word
-              with no instruction (a gap left by .text <addr>) is 0.
+   - text     the program's own words in the user text segment, from its
+              first to its last instruction: not the start-up code
+              (__start, from the exception handler's file, which comes
+              first), nor the kernel's text.  A word with no instruction (a
+              gap left by .text <addr>) is 0.
    - data     the user data segment: from where the assembler put the first
               datum to where the next would go (a trailing .space included),
               widened to any other byte that is not zero (data put below or
@@ -37,6 +38,10 @@ export async function readImage(call: Call, source: string, options: AssembleOpt
   const alone = await call('assemble', '\n', options);
   const handlerNames = new Set(parseSymbolListing(alone.symbols).map((s) => s.name));
   handlerNames.delete('main'); // declared by the loader for every program, defined by the program
+  // Where the start-up code ends: the program's own text comes after it.
+  const bounds = await call('segments');
+  const startUp = (await call('textSegment')).filter((w) => w.addr >= bounds.textBot && w.addr < bounds.textTop);
+  const ownFrom = startUp.length ? startUp[startUp.length - 1].addr + 4 : bounds.textBot;
 
   const r = await call('assemble', source, options);
   if (!r.ok) throw new ImageError('No executable image: the code has assemble errors');
@@ -50,7 +55,7 @@ export async function readImage(call: Call, source: string, options: AssembleOpt
   const little = inMemory.every((b, i) => b === le[i]), big = inMemory.every((b, i) => b === le[3 - i]);
   if (little === big) throw new Error(`the byte order cannot be told from ${inMemory}`);
 
-  const userText = (await call('textSegment')).filter((w) => w.addr >= seg.textBot && w.addr < seg.textTop);
+  const userText = (await call('textSegment')).filter((w) => w.addr >= ownFrom && w.addr < seg.textTop);
   if (userText.length === 0) throw new ImageError('No executable image: the program has no instructions');
   const textAddr = userText[0].addr;
   const words = new Array<number>((userText[userText.length - 1].addr - textAddr) / 4 + 1).fill(0);

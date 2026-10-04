@@ -96,13 +96,16 @@ Memory outside `.text` and `.data` (stack, heap, kernel) is not in the image. A 
 
 ## 6. Per ISA
 
+In both ISAs the image holds only the program's own instructions, and `entry` is the first instruction of `main`
+(since 1.3.0; earlier, MIPS images also held SPIM's startup code, and RISC-V images started at `0x00400000`).
+
 ### MIPS (SPIM)
 
 | Item | Content |
 |---|---|
-| `.text` | From the first to the last word of the user text segment. Includes the startup code at `0x00400000` (`__start`, from the exception handler file) and excludes kernel text. Gaps left by `.text <address>` are 0 |
+| `.text` | The program's own words: from its first to its last instruction in the user text segment. The startup code that SPIM puts first at `0x00400000` (`__start`, from the exception handler file) is left out, and so is kernel text. Gaps left by `.text <address>` are 0 |
 | `.data` | From where the assembler placed the first data to where the next data would go (including a trailing `.space`). If the user data segment has non-zero bytes outside that range, the range is widened to a word boundary. Kernel data is excluded |
-| `entry` | The address of `main`. For a program with its own `__start` and no exception handler, `__start` |
+| `entry` | The first instruction of `main`. For a program with its own `__start` and no exception handler, `__start` |
 | `reg` | `$sp`, `$gp` (`$sp` points to argc) |
 | `endian` | Taken from the order in which argc at `$sp` is laid out in memory (the order of the machine the core runs on, usually `little`) |
 | `symbol` | The program's own labels (global and local) in user text and data. Labels of the exception handler (`__start`, `__eoth`, kernel labels) are excluded |
@@ -113,7 +116,7 @@ Memory outside `.text` and `.data` (stack, heap, kernel) is not in the image. A 
 |---|---|
 | `.text` | The assembled instruction words, from the lower of `entry` and the first instruction to the last instruction; gaps are 0. Pseudo-instructions appear as the basic instructions they expand to. RARS does not accept data directives in `.text`, so every word is an instruction |
 | `.data` | From the `.data` base address `0x10010000` to where the next data would go (including a trailing `.space`). Widened to cover data labels (`.extern` starts at `0x10000000`) and non-zero bytes between `0x10000000` and `0x10040000` (the start of the heap) and wherever labels reach (not aligned to a word boundary) |
-| `entry` | `0x00400000`, the start of the text segment. The app's engine assembles with RARS's "start at main" setting off, so RARS also starts here. A `main` label (global or not) does not change the start address: the first instruction must come first |
+| `entry` | The first instruction of `main` (a text label, global or not). Without a `main`, `0x00400000`, the start of the text segment |
 | `reg` | `sp` (x2) = `0x7fffeffc`, `gp` (x3) = `0x10008000`. Values read from the engine |
 | `endian` | `little`. RARS memory is always little-endian; the exporter confirms it by having the engine write a known word and reading it back |
 | `symbol` | Every label in the RARS symbol table (local, global, `.extern`). RARS has no startup code, so they all belong to the program |

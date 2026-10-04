@@ -163,6 +163,8 @@ for (const isa of ['mips', 'riscv'] as const) {
       assert.ok(rows.size >= 5, `${isa}: ${rows.size} Text rows`);
       let compared = 0;
       for (const [addr, w] of rows) {
+        // MIPS: the start-up code (__start) comes first in Text, and is not the program's.
+        if (isa === 'mips' && addr < img.text.addr) continue;
         const i = (addr - img.text.addr) / 4;
         assert.ok(i >= 0 && i < img.text.words.length, `${isa}: ${addr.toString(16)} is in the image`);
         assert.equal(img.text.words[i] >>> 0, w >>> 0, `${isa}: word at ${addr.toString(16)}`);
@@ -185,7 +187,8 @@ for (const isa of ['mips', 'riscv'] as const) {
       const main = img.symbols.get('main')!;
       assert.ok(rows.has(main), `${isa}: main is a Text row`);
       const entry = Number(img.header.get('entry'));
-      assert.equal(entry, isa === 'mips' ? main : 0x00400000);
+      assert.equal(entry, main);
+      if (isa === 'mips') assert.ok(img.text.addr > 0x00400000 && !img.symbols.has('__start'), 'mips: the start-up code is not in the image');
       if (prog.name === 'lab04-ok.s') assert.equal(img.symbols.get('result'), 0x10010000);
       else {
         // To the end of buf (.space 8): allocated though zero.
@@ -196,7 +199,7 @@ for (const isa of ['mips', 'riscv'] as const) {
       // The machine on screen was not touched: it steps from the start.
       await page.keyboard.press('F10');
       await page.locator('.status', { hasText: '1 step' }).waitFor();
-      assert.match(await page.locator('.status').innerText(), new RegExp(`PC 0x${(img.text.addr + 4).toString(16).padStart(8, '0')}`));
+      assert.match(await page.locator('.status').innerText(), /PC 0x00400004/);
       console.log(`${isa} ${prog.name}: ${compared} Text words and ${dataCompared} Data words match; ` +
         `data ${d.bytes.length} bytes; symbols ${[...img.symbols.keys()].join(' ')}; entry ${img.header.get('entry')}`);
     }
