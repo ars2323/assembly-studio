@@ -27,27 +27,26 @@
 
 /* ---- Inspector: fields ---------------------------------------------------- */
 
-/* RISC-V's fields (panels/inspector.ts fieldClass): sources blue and teal,
-   destination amber, functs grey, the immediate green. */
-.f-rs1 { background: var(--blue-tint); color: var(--blue-text); }
-.f-rs2 { background: var(--teal-tint); color: var(--teal-text); }
-.f-funct3, .f-funct7 { background: var(--cp0-tint); color: var(--cp0-text); }
-.f-imm { background: var(--f-imm-bg); color: var(--f-imm-text); }
+/* RISC-V's fields (panels/inspector.ts fieldClass): greys by role, as MIPS's (app.css). */
+.f-rs1, .f-rs2 { background: var(--field-reg-bg); color: var(--field-reg-text); }
+.f-funct3, .f-funct7 { background: var(--field-op-bg); color: var(--field-op-text); }
+.f-imm { background: var(--field-imm-bg); color: var(--field-imm-text); }
 
 /* ---- Inspector: the immediate, put together ------------------------------- */
 
-/* The immediate's pieces: one colour each, in the word and in the row that puts them together. */
-.fbits .bit.p1, .ibox.p1 .bit { background: var(--piece1-bg); color: var(--piece1-text); }
-.fbits .bit.p2, .ibox.p2 .bit { background: var(--piece2-bg); color: var(--piece2-text); }
-.fbits .bit.p3, .ibox.p3 .bit { background: var(--piece3-bg); color: var(--piece3-text); }
-.fbits .bit.p4, .ibox.p4 .bit { background: var(--piece4-bg); color: var(--piece4-text); }
+/* The immediate's pieces: one grey step each, outlined, in the word and in the row that puts them together. */
+.fbits .bit:is(.p1, .p2, .p3, .p4), .ibox:is(.p1, .p2, .p3, .p4) .bit { color: var(--piece-text); box-shadow: inset 0 0 0 1px var(--piece-edge); }
+.fbits .bit.p1, .ibox.p1 .bit { background: var(--piece1-bg); }
+.fbits .bit.p2, .ibox.p2 .bit { background: var(--piece2-bg); }
+.fbits .bit.p3, .ibox.p3 .bit { background: var(--piece3-bg); }
+.fbits .bit.p4, .ibox.p4 .bit { background: var(--piece4-bg); }
 /* Under the word, the same 32 columns: a caption ("IMMEDIATE" and how to
    read the row), then the immediate put together. */
 .immrow { margin: 10px 0 0; }
 .imm-cap { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; margin: 0 var(--ipad) 4px; }
-.imm-cap .cap { font: 600 10px var(--ui); letter-spacing: .06em; text-transform: uppercase; color: var(--f-imm-text); }
+.imm-cap .cap { font: 600 10px var(--ui); letter-spacing: .06em; text-transform: uppercase; color: var(--text); }
 .imm-cap .key { font-size: 11px; color: var(--muted); }
-.immgrid .ibox { display: flex; flex-direction: column; min-width: 0; border-radius: 6px; padding: 2px 0 4px; background: var(--ibox-bg); color: var(--f-imm-text); }
+.immgrid .ibox { display: flex; flex-direction: column; min-width: 0; border-radius: 6px; padding: 2px 0 4px; background: var(--ibox-bg); color: var(--text); }
 .immgrid .ifrom, .immgrid .iname { font-size: 10.5px; text-align: center; line-height: 14px; min-height: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .immgrid .ifrom { opacity: .8; }
 .immgrid .iname { font-weight: 700; margin-top: 2px; }
