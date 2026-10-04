@@ -1,7 +1,15 @@
-/* Electron's main process: the host.  It owns the Simulator (src/sim/host.ts),
-   whose core runs in a utility process, and everything that touches the
-   disk: source files (decoded and encoded here, src/node/text-file.ts) and
-   the example programs.  The window sees only window.app (preload.cjs).
+/* Electron's main process: the host.  It owns the engine of the ISA in use
+   and everything that touches the disk: source files (decoded and encoded
+   here, src/node/text-file.ts) and the example programs.  The window sees
+   only window.app (preload.cjs).
+
+   The ISA: MIPS (SPIM's core in utility processes, engine-mips.ts) or
+   RISC-V (RARS in JVMs, engine-riscv.ts).  `--isa=mips|riscv` picks the
+   one to start with (default mips); isa:select changes it while the app
+   runs: the engine in use is ended, the other started, and the window
+   loads that ISA's page (index.html?isa=<isa>).  Only the engine in use
+   runs.  The engine modules register their own sim:* handlers; everything
+   else is here and serves both.
 
    Nothing is kept from one run to the next -- lab PCs are shared, and every
    student starts from the same screen: the window's size, the panels, the
@@ -18,21 +26,18 @@
 
 import { app, BrowserWindow, dialog, ipcMain, Menu, screen, shell } from 'electron';
 import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
 import { decodeTextFile, encodeTextFile, NEW_FILE_FORMAT, type TextFileFormat } from '../node/text-file.ts';
 import { brand } from '../brand.ts';
-import { LICENSES, paths, version } from './paths.ts';
-import { formatHmx, hmxTime } from '../core/hmx.ts';
-import { Simulator, SimulatorCrashed } from '../sim/host.ts';
-import { ImageError, readImage } from '../sim/image.ts';
-import type { CallName, Calls } from '../sim/protocol.ts';
+import * as mips from './engine-mips.ts';
+import * as riscv from './engine-riscv.ts';
+import { answer, type Engine } from './ipc.ts';
+import { LICENSES, paths, version, type Isa } from './paths.ts';
 
-type AssembleOptions = Calls['assemble'][0][1];
-import { utilityTransport } from '../sim/transport.ts';
+export type { ImageJob } from './engine-mips.ts';
 
 app.setName(brand.name);
 // The top bar's height in the window (src/renderer/app/app.css --titlebar).
@@ -84,16 +89,6 @@ function setSettings(s: Partial<Settings>): Settings {
 
 // ---- files ------------------------------------------------------------------
 
-// What the window asks an export for: the program it last assembled, as it was then.
-export interface ImageJob {
-  source: string;
-  options: AssembleOptions;
-  name: string;                       // the file's name then ("untitled.s" if never saved)
-  path: string | null;                // where it was; the .hmx is offered next to it
-  format: TextFileFormat | null;      // how that file is written (null: a new file's)
-  assembled: number;                  // when, in ms since the epoch
-}
-
 export interface OpenedFile {
   name: string;
   path: string | null;
@@ -106,36 +101,9 @@ function openBytes(bytes: Uint8Array, name: string, filePath: string | null): Op
   return { name, path: filePath, text: decoded.text, format: decoded.format };
 }
 
-type Result<T> = { ok: true; value: T } | { ok: false; error: { name: string; message: string } };
-async function answer<T>(f: () => T | Promise<T>): Promise<Result<T>> {
-  try {
-    return { ok: true, value: await f() };
-  } catch (e) {
-    const err = e instanceof Error ? e : new Error(String(e));
-    return { ok: false, error: { name: err.name, message: err.message } };
-  }
-}
-
 async function main(): Promise<void> {
   Menu.setApplicationMenu(null); // no default zoom/reload accelerators; the window has its own keys
   await app.whenReady();
-  const sim = await Simulator.start({ transport: () => utilityTransport() });
-  // A second simulator process, for assembling a program first to see whether
-  // it assembles, without touching the machine on screen: the core's own
-  // assemble starts from an empty machine, so a program with errors would
-  // otherwise take the last good one -- and where it had run to -- with it.
-  // Its crashes are its own (a .err directive ends the core): it starts
-  // again, and the call that crashed it answers SimulatorCrashed.
-  const checker = Simulator.start({ transport: () => utilityTransport() });
-  checker.catch(() => {}); // not started: the window assembles as before (app.ts assemble)
-  // One job at a time there: an export assembles twice and reads in between.
-  let checkerTurn: Promise<unknown> = Promise.resolve();
-  const onChecker = <T>(job: (c: Simulator) => Promise<T>): Promise<T> => {
-    const turn = checkerTurn.then(async () => job(await checker));
-    checkerTurn = turn.catch(() => {});
-    return turn;
-  };
-
   // The window starts at a fixed size -- or fills the screen when the screen
   // is smaller (a lab PC: 1366x768 at 125% leaves about 1093x582) -- and
   // nothing of its size or place is kept for the next start.
@@ -163,28 +131,32 @@ async function main(): Promise<void> {
     },
   });
 
-  // Calls into the simulator come back as results, never as thrown errors:
-  // a thrown error in a handler is also logged by Electron as a failure.
-  // run goes through sim.run(), which stop() needs to know about.
-  ipcMain.handle('sim:call', (_e, method: CallName, args: unknown[]) =>
-    answer(() => (method === 'run' ? sim.run() : (sim.call as (m: CallName, ...a: unknown[]) => Promise<unknown>)(method, ...args))));
-  ipcMain.handle('sim:stop', () => answer(() => sim.stop()));
-  // A crash is an answer here, not an error (an error's name does not
-  // cross into the page): { ok: false, crashed: what the core said }.
-  ipcMain.handle('sim:check', (_e, source: string, options: AssembleOptions) => answer(async () => {
-    try {
-      return await onChecker((c) => c.assemble(source, options));
-    } catch (e) {
-      if (e instanceof SimulatorCrashed) return { ok: false, errors: [], symbols: '', format: null, data: { start: 0, end: 0 }, crashed: e.message };
-      throw e;
-    }
+  // The engine of the ISA in use; isa:select ends it and starts the other.
+  // One change at a time: a second select waits for the first.
+  let isa: Isa = initialIsa();
+  const startEngine = (which: Isa): Engine => (which === 'mips' ? mips.start(win) : riscv.start(win, runDir));
+  let engine = startEngine(isa);
+  let switching: Promise<unknown> = Promise.resolve();
+  const loadPage = () => win.loadFile(paths.page, { query: { isa } });
+  ipcMain.handle('isa:select', (_e, which: unknown) => answer(() => {
+    if (which !== 'mips' && which !== 'riscv') throw new Error(`no ISA ${String(which)}`);
+    const turn = switching.then(async () => {
+      if (which === isa) return isa; // already in use: nothing ends, nothing reloads
+      await engine.dispose();
+      isa = which;
+      engine = startEngine(isa);
+      // After this answer has gone back: the page that asked is replaced.
+      setImmediate(() => { if (!win.isDestroyed()) void loadPage(); });
+      return isa;
+    });
+    switching = turn.catch(() => {});
+    return turn;
   }));
-  sim.on('console', (text) => win.webContents.send('sim:console', text));
-  sim.on('progress', (p) => win.webContents.send('sim:progress', p));
-  sim.on('crashed', (report) => win.webContents.send('sim:crashed', report.message, report.error.message));
+  app.on('will-quit', () => { void engine.dispose(); });
+  const assemblyFilter = () => ({ name: isa === 'mips' ? 'MIPS assembly' : 'RISC-V assembly', extensions: ['s', 'asm'] });
 
   ipcMain.handle('file:open', () => answer(async () => {
-    const r = await dialog.showOpenDialog(win, { filters: [{ name: 'MIPS assembly', extensions: ['s', 'asm'] }, { name: 'All files', extensions: ['*'] }] });
+    const r = await dialog.showOpenDialog(win, { filters: [assemblyFilter(), { name: 'All files', extensions: ['*'] }] });
     if (r.canceled || r.filePaths.length === 0) return null;
     const p = r.filePaths[0];
     return openBytes(readFileSync(p), path.basename(p), p);
@@ -193,7 +165,7 @@ async function main(): Promise<void> {
     answer(async () => {
       let target = file.path;
       if (target === null) {
-        const r = await dialog.showSaveDialog(win, { defaultPath: file.name, filters: [{ name: 'MIPS assembly', extensions: ['s'] }] });
+        const r = await dialog.showSaveDialog(win, { defaultPath: file.name, filters: [{ ...assemblyFilter(), extensions: ['s'] }] });
         if (r.canceled || !r.filePath) return null;
         target = r.filePath;
       }
@@ -202,49 +174,13 @@ async function main(): Promise<void> {
       writeFileSync(target, encoded.bytes);
       return { path: target, name: path.basename(target) };
     }));
-  // The executable image (.hmx, ../docs/hmx-format.md) of the program last
-  // assembled -- not of the Editor's text if it changed since: the source,
-  // its options and its file as they were then.  Read in the second
-  // process; the machine on screen is not touched.  The hash is of the
-  // source as its file holds it (its encoding, BOM and line ends): for a
-  // file saved when it was assembled, the file's own SHA-256.
-  ipcMain.handle('file:exportImage', (_e, job: ImageJob) => answer(async () => {
-    let machine;
-    try {
-      machine = await onChecker((c) => readImage((m, ...a) => c.call(m, ...a), job.source, job.options));
-    } catch (e) {
-      if (e instanceof ImageError) return { error: e.message };
-      if (e instanceof SimulatorCrashed) return { error: '실행 이미지를 만드는 중에 시뮬레이터가 멈췄습니다' };
-      throw e;
-    }
-    const encoded = encodeTextFile(job.source, job.format ?? NEW_FILE_FORMAT);
-    const bytes = encoded.ok ? encoded.bytes : new TextEncoder().encode(job.source);
-    const text = formatHmx({
-      ...machine, source: job.name, sourceSha256: createHash('sha256').update(bytes).digest('hex'),
-      producedBy: `${brand.name} ${version}`, assembled: hmxTime(new Date(job.assembled)),
-    });
-    const name = `${job.name.replace(/\.(s|asm)$/i, '')}.hmx`;
-    const r = await dialog.showSaveDialog(win, {
-      title: 'Export executable image (.hmx)', defaultPath: job.path ? path.join(path.dirname(job.path), name) : name,
-      filters: [{ name: 'Executable image', extensions: ['hmx'] }],
-    });
-    if (r.canceled || !r.filePath) return null;
-    writeFileSync(r.filePath, text);
-    return { path: r.filePath, name: path.basename(r.filePath) };
-  }));
   ipcMain.handle('example:open', (_e, name: string) => answer(() => {
     if (!/^[a-z0-9-]+\.s$/.test(name)) throw new Error(`no example ${name}`);
-    return openBytes(readFileSync(path.join(paths.examples, name)), name, null);
+    return openBytes(readFileSync(path.join(paths.examples(isa), name)), name, null);
   }));
-  // An exception handler for Settings > 고급: its name and text (decoded like a program).
-  ipcMain.handle('file:openHandler', () => answer(async () => {
-    const r = await dialog.showOpenDialog(win, { title: 'Exception handler', filters: [{ name: 'MIPS assembly', extensions: ['s', 'asm', 'a'] }, { name: 'All files', extensions: ['*'] }] });
-    if (r.canceled || r.filePaths.length === 0) return null;
-    return { name: path.basename(r.filePaths[0]), text: decodeTextFile(readFileSync(r.filePaths[0])).text };
-  }));
-  ipcMain.handle('about:info', () => ({
+  ipcMain.handle('about:info', async () => ({
     version, electron: process.versions.electron, chrome: process.versions.chrome, node: process.versions.node,
-    licenses: LICENSES.map((l) => l.title),
+    licenses: LICENSES.map((l) => l.title), ...(await engine.about()),
   }));
   ipcMain.handle('about:license', (_e, i: number) => answer(() => {
     if (i === LICENSES.length) return readFileSync(paths.electronLicense(), 'utf8');
@@ -275,7 +211,16 @@ async function main(): Promise<void> {
   // (the window's own size, 1280x800, is what un-maximising gives).
   // (maximize() shows a hidden window; show() then gives it focus.)
   win.once('ready-to-show', () => { win.maximize(); win.show(); });
-  await win.loadFile(paths.page);
+  await loadPage();
+}
+
+// --isa=mips|riscv (default mips): the ISA the app starts with.
+function initialIsa(): Isa {
+  const arg = process.argv.find((a) => a.startsWith('--isa='))?.slice('--isa='.length);
+  if (arg === undefined || arg === 'mips') return 'mips';
+  if (arg === 'riscv') return 'riscv';
+  console.error(`--isa=${arg}: not mips or riscv; starting with mips`);
+  return 'mips';
 }
 
 app.on('window-all-closed', () => app.quit());
