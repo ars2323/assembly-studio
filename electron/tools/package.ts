@@ -10,9 +10,18 @@
    1. Stages build/package/app/: the main process and the simulator process
       bundled by esbuild (STUDIO_BUNDLE defined: src/main/paths.ts,
       src/sim/transport.ts and native/index.ts then look next to the
-      bundle), the window, the addon, the default exception handler, the
-      examples, and the notices.  No node_modules: everything is bundled.
-   2. Runs electron-builder on it.
+      bundle), the window (both ISAs' scripts, app.css and riscv.css), the
+      addon, the default exception handler, both ISAs' examples, and the
+      notices.  No node_modules: everything is bundled.
+   2. The RISC-V engine, which goes into the package's resources as it is
+      (resources/engine/, outside app.asar: java reads real files):
+        runtime/   a Java runtime made by jlink (java.base, java.prefs, java.desktop)
+        rars.jar   RARS built from its pinned commit (probe/setup.sh: rars-src.jar)
+        classes/   the engine around it (probe/src/RarsProbe.java)
+      electron/engine/ when it holds all three (engines/fetch.mjs unpacks
+      them there); else staged in build/package/engine/ from the JDK this
+      runs with (its jlink), $RARS_HOME/rars-src.jar and probe/build/classes.
+   3. Runs electron-builder on it.
 
    The addon must already be built for Electron (npm run build:electron, or
    engines/fetch.mjs).
@@ -23,7 +32,9 @@
 
 import { build as electronBuild, type Configuration } from 'electron-builder';
 import * as esbuild from 'esbuild';
+import { execFileSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 import { brandId, useBrand } from './brand.ts';
@@ -33,6 +44,7 @@ const root = path.join(import.meta.dirname, '..');
 const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
 const electronVersion = JSON.parse(readFileSync(path.join(root, 'node_modules/electron/package.json'), 'utf8')).version;
 const stage = path.join(root, 'build/package/app');
+const engineStage = path.join(root, 'build/package/engine');
 const at = (...p: string[]) => path.join(stage, ...p);
 const dirOnly = process.argv.includes('--dir');
 const brandArg = process.argv.indexOf('--brand');
@@ -53,18 +65,23 @@ async function stageApp(): Promise<void> {
   writeFileSync(path.join(root, 'build/package/installer.nsh'), nsh);
   const main = await esbuild.build({ ...nodeOptions('src/main/main.ts', at('main.js')), define });
   const worker = await esbuild.build({ ...nodeOptions('src/sim/worker.ts', at('worker.js')), define });
-  const ui = await esbuild.build({ ...rendererOptions, outfile: at('renderer/app/app.js'), sourcemap: false });
+  const ui = await esbuild.build({ ...rendererOptions, outdir: at('renderer/app'), sourcemap: false });
   await writeThirdParty([ui.metafile!, main.metafile!, worker.metafile!]);
 
+  // isa.js finds the scripts and riscv.css next to the page.
   const html = readFileSync(path.join(root, 'src/renderer/app/index.html'), 'utf8');
-  const packagedHtml = html.replace('src="../../../build/renderer/app.js"', 'src="app.js"');
+  const packagedHtml = html.replace('data-bundles="../../../build/renderer/" data-riscv-css="../../isa/riscv/renderer/riscv.css"',
+    'data-bundles="" data-riscv-css="riscv.css"');
   if (packagedHtml === html) throw new Error('index.html: the script tag to rewrite was not found');
   writeFileSync(at('renderer/app/index.html'), packagedHtml);
+  cpSync(path.join(root, 'src/renderer/app/isa.js'), at('renderer/app/isa.js'));
   cpSync(path.join(root, 'src/renderer/app/app.css'), at('renderer/app/app.css'));
+  cpSync(path.join(root, 'src/isa/riscv/renderer/riscv.css'), at('renderer/app/riscv.css'));
   cpSync(path.join(root, 'src/renderer/assets'), at('renderer/assets'), { recursive: true });
   cpSync(path.join(root, 'src/main/preload.cjs'), at('preload.cjs'));
   cpSync(path.join(root, '../CPU/exceptions.s'), at('exceptions.s'));
   cpSync(path.join(root, 'src/examples'), at('examples'), { recursive: true });
+  cpSync(path.join(root, 'src/isa/riscv/examples'), at('riscv-examples'), { recursive: true });
   const addon = path.join(root, 'native/build/Release/spim.node');
   if (!existsSync(addon)) throw new Error('no native/build/Release/spim.node: npm run build:electron first');
   cpSync(addon, at('spim.node'));
@@ -79,6 +96,30 @@ async function stageApp(): Promise<void> {
   }, null, 1));
 }
 
+// The Java modules the jlink runtime carries: the ones RARS and the engine
+// need (java.desktop cannot be left out without changing RARS).
+const JAVA_MODULES = ['java.base', 'java.prefs', 'java.desktop'];
+
+// The folder that becomes resources/engine/ (see 2. above).
+function engineDir(): string {
+  const fetched = path.join(root, 'engine');
+  if (['runtime', 'rars.jar', 'classes'].every((p) => existsSync(path.join(fetched, p)))) return fetched;
+  rmSync(engineStage, { recursive: true, force: true });
+  mkdirSync(engineStage, { recursive: true });
+  const home = process.env.JAVA_HOME;
+  const jlink = home ? path.join(home, 'bin', process.platform === 'win32' ? 'jlink.exe' : 'jlink') : 'jlink';
+  execFileSync(jlink, ['--add-modules', JAVA_MODULES.join(','), '--strip-debug', '--no-man-pages', '--no-header-files',
+    '--compress=zip-9', '--output', path.join(engineStage, 'runtime')], { stdio: 'inherit' });
+  const rarsHome = process.env.RARS_HOME ?? path.join(process.env.XDG_CACHE_HOME ?? path.join(os.homedir(), '.cache'), 'assembly-studio', 'rars');
+  const jar = path.join(rarsHome, 'rars-src.jar');
+  if (!existsSync(jar)) throw new Error(`no ${jar}: run probe/setup.sh`);
+  cpSync(jar, path.join(engineStage, 'rars.jar'));
+  const classes = path.join(root, '../probe/build/classes');
+  if (!existsSync(path.join(classes, 'RarsProbe.class'))) throw new Error(`no ${classes}/RarsProbe.class: run probe/run.sh build`);
+  cpSync(classes, path.join(engineStage, 'classes'), { recursive: true });
+  return engineStage;
+}
+
 export const config: Configuration = {
   appId: brand.appId,
   productName: brand.name,
@@ -91,6 +132,9 @@ export const config: Configuration = {
   publish: null,
   asar: true,
   asarUnpack: ['spim.node'],
+  // The RISC-V engine, outside app.asar: resources/engine (src/main/paths.ts engine()).
+  // (Set by the run below: staging it may run jlink.)
+  extraResources: [],
   electronLanguages: ['ko', 'en-US'], // Chromium's UI strings: Korean, and its fallback
   npmRebuild: false,
   nodeGypRebuild: false,
@@ -128,5 +172,6 @@ export const config: Configuration = {
 
 if (import.meta.main) {
   await stageApp();
+  config.extraResources = [{ from: engineDir(), to: 'engine' }];
   await electronBuild({ config, dir: dirOnly, publish: 'never' });
 }
