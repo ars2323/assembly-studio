@@ -1,6 +1,7 @@
 /* The MIPS engine in the main process: SPIM's core in a utility process
-   (src/sim/host.ts), and a second one for checking a program.  Registers
-   the sim:* handlers the MIPS window (src/renderer/app/app.ts) calls, and
+   (src/sim/host.ts), and a second one for checking a program and for the
+   .asx export.  Registers the sim:* handlers the MIPS window
+   (src/renderer/app/app.ts) calls, file:exportImage (export-image.ts), and
    the one that only it has (file:openHandler). */
 
 import { app, dialog, type BrowserWindow } from 'electron';
@@ -9,8 +10,10 @@ import path from 'node:path';
 
 import { decodeTextFile } from '../node/text-file.ts';
 import { Simulator, SimulatorCrashed } from '../sim/host.ts';
+import { readImage } from '../sim/image.ts';
 import type { CallName, Calls } from '../sim/protocol.ts';
 import { utilityTransport } from '../sim/transport.ts';
+import { exportImage, type ImageJob } from './export-image.ts';
 import { answer, handlers, type Engine } from './ipc.ts';
 
 type AssembleOptions = Calls['assemble'][0][1];
@@ -61,6 +64,12 @@ export function start(win: BrowserWindow): Engine {
       throw e;
     }
   }));
+  // The executable image (.asx) of the program last assembled -- not of the
+  // Editor's text if it changed since: the source, its options and its file
+  // as they were then.  Read in the second process.
+  ipc.handle('file:exportImage', (_e, job: ImageJob) => answer(() => exportImage(win,
+    job, () => onChecker((c) => readImage((m, ...a) => c.call(m, ...a), job.source, job.options as AssembleOptions)),
+    SimulatorCrashed)));
   // An exception handler for Settings > 고급: its name and text (decoded like a program).
   ipc.handle('file:openHandler', () => answer(async () => {
     const r = await dialog.showOpenDialog(win, { title: 'Exception handler', filters: [{ name: 'MIPS assembly', extensions: ['s', 'asm', 'a'] }, { name: 'All files', extensions: ['*'] }] });
