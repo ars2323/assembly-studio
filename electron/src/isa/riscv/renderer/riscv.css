@@ -1,0 +1,57 @@
+/* The RISC-V window's own rules, over app.css (index.html?isa=riscv loads
+   this after it: src/renderer/app/isa.js).  Only what RISC-V has and MIPS
+   does not: its instruction formats, its immediate's pieces, the f
+   registers' rows, the longer register names.  Colours are app.css's
+   tokens; the few literals left (the immediate's pieces) are listed for
+   the theme to take over. */
+
+/* ---- Registers ---------------------------------------------------------- */
+
+/* "x10 a0", "x8 s0/fp": a wider name column than MIPS's "$t0". */
+.rhead, .rrow { grid-template-columns: var(--rcols, 8.5ch 10.5ch 10.5ch 28.5ch minmax(0, 1fr)); }
+/* f registers: 64 bits in hex across Hex and Dec, the value (float or double) under Bin. */
+.rrow.fp .hex { grid-column: 2 / span 2; }
+.rrow.fp .dec { display: none; }
+.rrow.fp .bin { font-size: .9em; letter-spacing: 0; color: var(--muted); }
+
+/* ---- Format badges (Text, Inspector) ------------------------------------ */
+
+/* RISC-V's other formats: S and B as stores and branches, U and J as the
+   wide immediates.  (R, I and J are app.css's.) */
+.b-S { background: var(--f-shamt-bg); color: var(--purple); }
+.b-B { background: var(--amber-tint); color: var(--amber-text); }
+.b-U, .b-R4 { background: var(--cp0-tint); color: var(--cp0-text); }
+
+/* ---- Inspector: fields ---------------------------------------------------- */
+
+/* RISC-V's fields (panels/inspector.ts fieldClass): sources blue and teal,
+   destination amber, functs grey, the immediate green. */
+.f-rs1 { background: var(--accent-tint); color: var(--accent); }
+.f-rs2 { background: var(--teal-tint); color: var(--teal-text); }
+.f-funct3, .f-funct7 { background: var(--cp0-tint); color: var(--cp0-text); }
+.f-imm { background: var(--f-imm-bg); color: var(--f-imm-text); }
+
+/* ---- Inspector: the immediate, put together ------------------------------- */
+
+/* The immediate's pieces: one colour each, in the word and in the row that puts them together. */
+.fbits .bit.p1, .ibox.p1 .bit { background: #bfe3dc; color: #124a44; }
+.fbits .bit.p2, .ibox.p2 .bit { background: #f5dca8; color: #6b4300; }
+.fbits .bit.p3, .ibox.p3 .bit { background: #dccff2; color: #4a2c80; }
+.fbits .bit.p4, .ibox.p4 .bit { background: #c9ddf6; color: #1b3f73; }
+.immrow { margin: 8px 0 0; }
+.imm-cap { margin: 0 16px 2px; font-size: 11.5px; color: var(--text-2); }
+.immgrid .ibox { display: flex; flex-direction: column; min-width: 0; border-radius: 6px; padding: 2px 0 4px; background: #eef4f5; color: var(--f-imm-text); }
+.immgrid .ifrom, .immgrid .iname { font-size: 10.5px; text-align: center; line-height: 14px; min-height: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.immgrid .ifrom { opacity: .8; }
+.immgrid .iname { font-weight: 700; margin-top: 2px; }
+.immgrid .iext { background: var(--bg); color: var(--muted); }
+.immgrid .iext .bit, .immgrid .izero .bit { background: transparent; color: var(--muted); font-weight: 500; }
+.immgrid .izero { background: transparent; border: 1px dashed var(--dim); color: var(--muted); }
+
+/* A narrow Inspector: smaller words under the pieces too (app.css shrinks the bits). */
+@container (max-width: 520px) {
+  .insp .immgrid .ifrom, .insp .immgrid .iname { font-size: 9px; }
+}
+@container (max-width: 400px) {
+  .insp .immgrid .ifrom, .insp .immgrid .iname { font-size: 8.5px; }
+}
