@@ -119,7 +119,7 @@ export class DataView {
     const header = h('div', { class: `dsec dsec-${s.kind}` }, toggle,
       h('b', {}, TITLES[s.kind]), ' ', code(`${hex32(s.from)} – ${hex32(s.to - 1)}`, 'range'),
       h('span', { class: 'dsize' }, size(s.to - s.from)),
-      folded ? h('span', { class: 'dhint' }, '눌러서 펼치기') : null);
+      folded ? h('span', { class: 'dhint' }, 'Click to expand') : null);
     header.addEventListener('click', () => {
       if (this.folded.has(s.kind)) this.folded.delete(s.kind); else this.folded.add(s.kind);
       if (this.last) this.show(this.last.sections, this.last.base, this.last.labels, this.last.pointers);
@@ -134,7 +134,7 @@ export class DataView {
       if (r.kind === 'ZeroRun') {
         out.push(h('div', { class: `drow dzero dsec-${s.kind}` },
           code(hex32(r.address), 'daddr'),
-          h('span', { class: 'dzerotext' }, '~ ', code(hex32(end - 1)), ` · 모두 0 · ${r.words.toLocaleString('en-US')} words`)));
+          h('span', { class: 'dzerotext' }, '~ ', code(hex32(end - 1)), ` · all zero · ${r.words.toLocaleString('en-US')} words`)));
         continue;
       }
       const base16 = r.address & ~15;

@@ -161,8 +161,8 @@ export class TextPanel {
     this.shown = this.showKernel ? this.all : this.all.filter((r) => !r.kernel);
     const kernel = this.all.filter((r) => r.kernel).length;
     // One line, the same form as Registers' CP0 line.
-    this.fold.replaceChildren(h('span', { class: 'foldtext', title: '예외를 처리하는 코드의 명령' },
-      this.showKernel ? `Kernel code 명령 ${kernel}개 보이는 중` : `Kernel code 명령 ${kernel}개 숨김`),
+    this.fold.replaceChildren(h('span', { class: 'foldtext', title: 'The exception handler\'s instructions' },
+      `${kernel} kernel instruction${kernel === 1 ? '' : 's'} ${this.showKernel ? 'shown' : 'hidden'}`),
       Object.assign(h('button', { class: 'linkbtn', type: 'button' }, this.showKernel ? 'Hide' : 'Show'),
         { onclick: () => { this.showKernel = !this.showKernel; this.refilter(); } }));
     this.fold.hidden = kernel === 0;

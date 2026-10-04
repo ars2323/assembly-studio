@@ -13,7 +13,7 @@ import { EventEmitter } from 'node:events';
 import type { CallName, Calls, RunResult, WorkerMessage } from './protocol.ts';
 import { forkTransport, type ExitInfo, type Transport, type TransportFactory } from './transport.ts';
 
-export const CRASH_MESSAGE = '시뮬레이터가 중단되었습니다';
+export const CRASH_MESSAGE = 'The simulator stopped';
 
 // The exit code of a fatal_error() in the core (native/src/addon.cc).
 export const FATAL_EXIT_CODE = 70;

@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { editDistance, nearMiss, nearMissRule, nearest } from '../../../src/isa/riscv/core/near-miss.ts';
+import { editDistance, nearMiss, nearMissRule, nearest, rarsHint } from '../../../src/isa/riscv/core/near-miss.ts';
 
 test('the distance counts an insertion, a deletion, a substitution and a swap as one each', () => {
   assert.equal(editDistance('srl', 'srll'), 1);
@@ -68,4 +68,15 @@ test('labels, strings, numbers and comments are not looked at; a bare word is a 
   assert.equal(nearMiss('msg: .asciz ".wrod srll $t0"'), null);
   assert.equal(nearMiss('    li a7, 4   # srll $t0 syscall'), null);
   assert.equal(nearMiss('    .word 0xsrl'), null);
+});
+
+test("the hint under RARS's message", () => {
+  assert.equal(rarsHint('"srll" is not a recognized operator', 'srll t1, t0, 2'), 'No instruction `srll`. Did you mean `srl`?');
+  assert.equal(rarsHint('"t7": operand is of incorrect type', 'li t7, 1'), 'No register `t7`. The `t` registers are `t0–t6`.');
+  assert.equal(rarsHint('"spp": operand is of incorrect type', 'addi spp, spp, -4'), 'No register `spp`. Did you mean `sp`?');
+  assert.equal(rarsHint('"$t0": operand is of incorrect type', 'li $t0, 1'), 'RISC-V register names have no `$`: `$t0` → `t0`.');
+  assert.equal(rarsHint('"$v0": operand is of incorrect type', 'li $v0, 4'),
+    'RISC-V register names have no `$`, and `v0` is a MIPS register. The system call number goes in `a7`.');
+  assert.equal(rarsHint('"syscall" is not a recognized operator', 'syscall'), '`syscall` is a MIPS instruction. RISC-V uses `ecall`.');
+  assert.equal(rarsHint('Too many operands', 'li a0, 1, 2'), '');
 });

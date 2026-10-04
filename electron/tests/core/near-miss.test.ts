@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { editDistance, nearMiss, nearMissRule, nearest } from '../../src/core/near-miss.ts';
+import { assemblerHint, editDistance, nearMiss, nearMissRule, nearest } from '../../src/core/near-miss.ts';
 
 test('the distance counts an insertion, a deletion, a substitution and a swap as one each', () => {
   assert.equal(editDistance('srl', 'srll'), 1);
@@ -59,4 +59,16 @@ test('labels, strings, numbers and comments are not looked at', () => {
   assert.equal(nearMiss('msg: .asciiz ".global srll t0"'), null);
   assert.equal(nearMiss('    li $v0, 4   # srll t0 .global'), null);
   assert.equal(nearMiss('    .word 0xsrl'), null);
+});
+
+test('the hint under an assembler message', () => {
+  assert.equal(assemblerHint('syntax error', '    srll $t1, $t0, 2'), 'No instruction `srll`. Did you mean `srl`?');
+  assert.equal(assemblerHint('syntax error', '    .global main'), 'No directive `.global`. Did you mean `.globl`?');
+  assert.equal(assemblerHint('syntax error', '    li $s10, 1'), 'No register `$s10`. The `$s` registers are `$s0–$s7`.');
+  assert.equal(assemblerHint('syntax error', '    add t0, $t1, $t2'), 'Register names start with `$`: `t0` → `$t0`.');
+  assert.equal(assemblerHint('syntax error', '    add $t0 $t1'), 'Check the instruction name, the register names (like `$t0`) and the commas.');
+  assert.equal(assemblerHint('Label is defined for the second time', 'main:'), 'Two labels have this name. Rename one of them.');
+  assert.equal(assemblerHint('Immediate value is too large for field', 'addi $t0, $t0, 0x12345'),
+    'The value is too big for this instruction. Put it in a register with `li` first.');
+  assert.equal(assemblerHint('Cannot open file', ''), '');
 });
