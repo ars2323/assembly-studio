@@ -13,7 +13,9 @@ import type { EditorState, TransactionSpec } from '@codemirror/state';
    commented-out block reads as a block.  And a blank line inside a selection
    is left alone: a line with nothing on it has nothing to comment, and
    marking it would leave a column of lone marks behind when the block is
-   uncommented. */
+   uncommented.  Only when every line is blank (the cursor on an empty line,
+   about to write a comment) does each get the mark, at its end -- after any
+   indentation -- with the cursor after it. */
 
 /** What a comment starts with, in MIPS and RISC-V assembly alike. */
 export const MARK = '#';
@@ -29,7 +31,7 @@ export interface Plan {
   comment: boolean;
   /** The column the mark goes in, for every line being commented. */
   column: number;
-  /** Nothing to do: every line is blank. */
+  /** Every line is blank: each gets the mark at its end. */
   nothing: boolean;
 }
 
@@ -51,8 +53,8 @@ export function take(line: string): { at: number; length: number } | null {
 }
 
 /* Ctrl+/ on an editor state: the one transaction that toggles the mark over
-   the line the cursor is on, or every line a selection touches -- or null,
-   for nothing to do.  A read-only document gets null: the tutorial opens its
+   the line the cursor is on, or every line a selection touches (all blank:
+   the mark put on each) -- or null, for nothing to do.  A read-only document gets null: the tutorial opens its
    example read-only and that file must not be written to (CodeMirror's
    readOnly is advisory -- dispatch would not refuse the change -- so this is
    the guard, and tests/renderer/comment.test.ts holds it). */
@@ -65,7 +67,11 @@ export function commentChanges(state: EditorState): TransactionSpec | null {
   }
   const lines = [...numbers].sort((a, b) => a - b).map((n) => doc.line(n));
   const { comment, column, nothing } = plan(lines.map((l) => l.text));
-  if (nothing) return null;
+  if (nothing) {
+    // A comment about to be written: the mark at each line's end, the cursor after it.
+    const set = state.changes(lines.map((l) => ({ from: l.to, insert: `${MARK} ` })));
+    return { changes: set, selection: state.selection.map(set, 1), scrollIntoView: true, userEvent: 'input.toggleComment' };
+  }
   const changes: { from: number; to?: number; insert?: string }[] = [];
   for (const line of lines) {
     if (isBlank(line.text)) continue;              // nothing on it to mark

@@ -45,7 +45,7 @@ test('a blank line in the middle counts for nothing', () => {
   assert.equal(plan(['  li $t0, 5', '   ', '  li $t1, 6']).column, 2);
 });
 
-test('nothing but blank lines: nothing to do', () => {
+test('nothing but blank lines: every one is blank', () => {
   assert.equal(plan(['', '   ', '\t']).nothing, true);
   assert.equal(plan([]).nothing, true);
   assert.equal(plan(['x']).nothing, false);
@@ -88,4 +88,15 @@ test('commentChanges: a read-only document is not written to', () => {
   assert.equal(commentChanges(state), null);
   // The same document, writable: the guard is what stops it, not the text.
   assert.notEqual(commentChanges(EditorState.create({ doc: '    li $t0, 5\n' })), null);
+});
+
+test('commentChanges: on a blank line, the mark goes in, after its indentation, and the cursor after it', () => {
+  for (const [doc, at, want] of [['', 0, '# '], ['li $t0, 1\n\nsyscall', 10, 'li $t0, 1\n# \nsyscall'], ['main:\n    ', 10, 'main:\n    # ']] as const) {
+    const state = EditorState.create({ doc, selection: EditorSelection.cursor(at) });
+    const next = state.update(commentChanges(state)!).state;
+    assert.equal(next.doc.toString(), want);
+    assert.equal(next.selection.main.head, want.indexOf('# ') + 2, `cursor after the mark in ${JSON.stringify(want)}`);
+    // And Ctrl+/ again takes it off.
+    assert.equal(next.update(commentChanges(next)!).state.doc.toString().trimEnd(), doc.trimEnd());
+  }
 });
