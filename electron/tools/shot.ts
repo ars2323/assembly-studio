@@ -1,6 +1,6 @@
 /* A few screenshots of the running app, for looking at a change by eye.
 
-     xvfb-run -a -s '-screen 0 2400x1400x24' node tools/shot.ts <out-dir> [width] [--isa mips|riscv]
+     xvfb-run -a -s '-screen 0 2400x1400x24' node tools/shot.ts <out-dir> [width] [--isa mips|riscv] [--theme light|dark]
 
    start-<w>.png   the first screen (the board settled)
    work-<w>.png    a sample assembled, a few steps, the Inspector on one instruction:
@@ -11,7 +11,9 @@
    Width 1280 by default; the window is width x 800.  --isa riscv starts the
    app with --isa=riscv (the engine: probe/setup.sh and probe/run.sh build,
    or electron/engine/).
-   --css <file>: a stylesheet laid over the page first (trying out colours). */
+   --css <file>: a stylesheet laid over the page first (trying out colours).
+   --theme light|dark: the theme (renderer/app/theme.ts), set right after launch;
+   dark by default. */
 
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -24,6 +26,9 @@ const css = cssAt >= 0 ? path.resolve(args.splice(cssAt, 2)[1]) : null;
 const isaAt = args.indexOf('--isa');
 const isa = isaAt >= 0 ? args.splice(isaAt, 2)[1] : 'mips';
 if (isa !== 'mips' && isa !== 'riscv') throw new Error(`--isa ${isa}: mips or riscv`);
+const themeAt = args.indexOf('--theme');
+const theme = themeAt >= 0 ? args.splice(themeAt, 2)[1] : 'dark';
+if (theme !== 'light' && theme !== 'dark') throw new Error(`--theme ${theme}: light or dark`);
 const out = path.resolve(args[0] ?? 'build/shots');
 const width = Number(args[1] ?? 1280);
 mkdirSync(out, { recursive: true });
@@ -35,6 +40,12 @@ const program = isa === 'mips'
 const r = await launch({ width, height: 800 }, { isa });
 try {
   await r.page.clock.setFixedTime(new Date('2026-10-04T10:00:00+09:00'));
+  if (theme === 'light') {
+    await r.page.evaluate((t) => {
+      document.documentElement.dataset.theme = t;
+      window.dispatchEvent(new CustomEvent('themechange', { detail: t }));
+    }, theme);
+  }
   if (css) await r.page.addStyleTag({ path: css });
   await r.page.waitForTimeout(12_000); // the board grows for about 8.5 s
   await r.page.screenshot({ path: path.join(out, `start-${width}.png`) });
