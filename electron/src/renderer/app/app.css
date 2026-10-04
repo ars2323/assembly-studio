@@ -440,41 +440,34 @@ img.icon { filter: var(--icon-filter); }
 .regs-list.show-cp0 .rgroup.cp0 { display: flex; }
 
 /* ---- Inspector ---------------------------------------------------------- */
-.insp { container-type: inline-size; }
-.insp .ibody { overflow: auto; }
-.insp .ibody.is-empty { display: flex; }
-/* A narrow Inspector: smaller bits, so that 32 of them fit across. */
-@container (max-width: 520px) {
-  .insp .fbits .bit { font-size: 11px; line-height: 20px; margin: 0; }
-  .insp .franges { font-size: 9px; padding: 0 2px; }
-  .insp .fname { font-size: 11px; }
-  .insp .fmean { font-size: 10px; }
-  .insp .bitgrid { gap: 0 2px; margin: 2px 10px 0; }
-}
-@container (max-width: 400px) {
-  .insp .fbits { margin: 1px 1px; }
-  .insp .fbits .bit { font-size: 9.5px; line-height: 18px; background: none; }
-  .insp .franges { font-size: 8.5px; }
-  .insp .fname { font-size: 10px; }
-  .insp .bitgrid { gap: 0 1px; margin: 2px 6px 0; }
-}
+/* panels/inspector.ts.  Top to bottom: the head (the instruction and its
+   format; its source, word and address), the word in 32 bits, the card that
+   says what it does, the field table.  Every part keeps the same side
+   margin (--ipad), so their edges line up. */
+.insp { container-type: inline-size; --ipad: 16px; }
+.insp .ibody { overflow: auto; padding-bottom: 14px; }
+.insp .ibody.is-empty { display: flex; padding-bottom: 0; }
 .insp .mode { color: var(--text-2); }
 .insp.pinned .phead { background: var(--amber-tint); }
 .insp .mode.pin { color: var(--amber-text); font-weight: 600; }
-.ihead { display: flex; align-items: center; gap: 10px; padding: 10px 14px 6px 16px; min-width: 0; }
-.ihead .dis { font-weight: 700; font-size: calc(var(--fs) + 4px); color: var(--strong); white-space: nowrap; }
-.ihead .isrc { color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.ihead .isrc .mono { color: var(--text); }
-.ihead .grow { flex: 1; }
-.ihead .where { color: var(--muted); white-space: nowrap; font-size: 12px; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
+/* The head: the instruction large, its format beside it; a line of labelled facts under them. */
+.ihead { padding: 12px var(--ipad) 10px; min-width: 0; }
+.ititle { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ititle .dis { font-weight: 700; font-size: calc(var(--fs) + 4px); color: var(--strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ititle .badge { flex: none; height: 18px; line-height: 18px; padding: 0 6px; }
+.imeta { display: flex; flex-wrap: wrap; gap: 2px 16px; margin-top: 5px; font-size: 12px; line-height: 18px; min-width: 0; }
+.iitem { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; max-width: 100%; }
+.ilabel, .ftable th { font: 600 10px var(--ui); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.iitem .mono { color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.iitem .isrc { color: var(--text); }
 /* The word: 32 cells in 32 equal columns, a field a coloured group. */
-.bitgrid { display: grid; grid-template-columns: repeat(32, minmax(0, 1fr)); gap: 0 3px; margin: 2px 16px 0; }
-.fbox { display: flex; flex-direction: column; min-width: 0; border-radius: 6px; padding: 2px 0 4px; }
-.franges { display: flex; justify-content: space-between; font-size: 10.5px; padding: 0 4px; opacity: .8; line-height: 14px; }
-.fbits { display: grid; margin: 1px 3px; }
+.bitgrid { display: grid; grid-template-columns: repeat(32, minmax(0, 1fr)); gap: 0 3px; margin: 0 var(--ipad); }
+.fbox { display: flex; flex-direction: column; min-width: 0; border-radius: 6px; padding: 3px 0 5px; }
+.franges { display: flex; justify-content: space-between; font-size: 10.5px; padding: 0 5px; opacity: .75; line-height: 14px; }
+.fbits { display: grid; margin: 2px 3px; }
 .fbits .bit { text-align: center; font-weight: 700; font-size: calc(var(--fs) + 2px); line-height: 26px; background: var(--bit-bg); border-radius: 3px; margin: 0 1px; }
-.fname { font: 700 12px var(--ui); text-align: center; margin-top: 3px; }
-.fmean { font-size: 11.5px; text-align: center; opacity: .9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 3px; }
+.fname { font: 700 12px var(--ui); text-align: center; margin-top: 4px; }
+.fmean { font-size: 11.5px; text-align: center; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 3px; }
 .f-opcode, .f-fmt { background: var(--f-opcode-bg); color: var(--blue-pale); }
 .f-rs { background: var(--blue-tint); color: var(--blue-text); }
 .f-rt, .f-ft { background: var(--teal-tint); color: var(--teal-text); }
@@ -482,34 +475,60 @@ img.icon { filter: var(--icon-filter); }
 .f-shamt, .f-fd { background: var(--f-shamt-bg); color: var(--purple); }
 .f-funct { background: var(--cp0-tint); color: var(--cp0-text); }
 .f-immediate, .f-target, .f-offset { background: var(--f-imm-bg); color: var(--f-imm-text); }
-.explain { margin: 10px 16px 0; padding: 8px 12px; border-radius: 6px; background: var(--bg); color: var(--text); line-height: 1.55; }
-.explain .mono { color: var(--strong); }
-.explain .note { color: var(--text-2); font-size: 12px; margin-top: 2px; }
-.dest { margin: 6px 16px 0; padding: 6px 12px; border-radius: 6px; background: var(--accent-tint); color: var(--strong); font-size: 12.5px; }
-.ftable { margin: 10px 16px 14px; border-collapse: collapse; font-size: var(--fs); }
-.ftable td, .ftable th { padding: 0 16px 0 0; height: 22px; text-align: left; white-space: nowrap; }
-.ftable th { font: 500 11.5px var(--ui); color: var(--muted); height: 20px; border-bottom: 1px solid var(--border); }
-.ftable .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
-/* A narrow Inspector folds instead of scrolling sideways: its head on two
-   lines (the instruction; then its source, word and address), the field
-   table one field to a block -- name, value, meaning; under them the bits
-   and their binary. */
-@container (max-width: 480px) {
-  .ihead { flex-wrap: wrap; row-gap: 2px; padding: 8px 12px 4px; }
-  .ihead .grow { display: none; }
-  .ihead .isrc, .ihead .where { flex: 0 1 auto; max-width: 100%; white-space: normal; overflow: visible; }
-  .ftable, .ftable tbody { display: block; margin: 8px 12px 12px; }
-  .ftable tr { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; column-gap: 12px; align-items: baseline;
-    padding: 3px 0; border-bottom: 1px solid var(--border); }
-  .ftable tr:first-child { display: none; }
-  .ftable td { height: auto; padding: 0; white-space: normal; }
-  .ftable td:nth-child(1) { grid-area: 1 / 1; }
-  .ftable td:nth-child(4) { grid-area: 1 / 2; text-align: right; }
-  .ftable td:nth-child(5) { grid-area: 1 / 3; }
-  .ftable td:nth-child(2) { grid-area: 2 / 1; padding-left: 16px; }
-  .ftable td:nth-child(3) { grid-area: 2 / 2 / auto / span 2; }
-  .ftable td:nth-child(2), .ftable td:nth-child(3) { color: var(--muted); font-size: 11.5px; }
-  .ftable td[data-label]::before { content: attr(data-label) ' '; font-family: var(--ui); color: var(--dim); }
+/* What it does: a card, the name and what it stands for over the sentence;
+   a note and a branch's or jump's destination at its foot. */
+.explain { margin: 12px var(--ipad) 0; padding: 10px 14px 11px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); line-height: 1.6; }
+.etitle { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; margin-bottom: 3px; }
+.etitle .mn { font-weight: 700; font-size: calc(var(--fs) + 1px); color: var(--strong); }
+.etitle .ex { font-weight: 600; font-size: 12px; color: var(--text-2); }
+.esent .mono { color: var(--strong); }
+.explain .nowrap { white-space: nowrap; }
+.explain .nowrap { white-space: nowrap; }
+.explain .note { margin-top: 6px; color: var(--text-2); font-size: 12px; line-height: 1.55; }
+.explain .note .mono { color: var(--text); }
+.dest { margin: 9px 0 0; padding: 8px 0 0; border-top: 1px solid var(--border); color: var(--strong); font-size: 12.5px; line-height: 1.5; overflow-x: auto; }
+/* The fields: one row each; a chip in the field's colour (the word's
+   above), its bit range, its bits in groups of four, its value, what it
+   means.  Hairlines between the rows.  A narrow Inspector sets the bit
+   range under the chip, in place of its own column. */
+.ftable { width: calc(100% - 2 * var(--ipad)); margin: 14px var(--ipad) 0; border-collapse: collapse; font-size: 12.5px; }
+.ftable th { text-align: left; white-space: nowrap; padding: 0 12px 6px 0; border-bottom: 1px solid var(--border); }
+.ftable td { padding: 6px 12px 6px 0; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.ftable tr:last-child td { border-bottom: 0; }
+.ftable th:last-child, .ftable td:last-child { padding-right: 0; }
+.ftable .num { text-align: right; }
+.ftable .ffield, .ftable .fbits-col { white-space: nowrap; }
+.ftable .chip { display: inline-block; padding: 0 7px; border-radius: 4px; font-weight: 700; font-size: 11.5px; line-height: 20px; }
+.ftable td.fbits-col, .ftable .frange { color: var(--muted); font-size: 11.5px; }
+.ftable th .sub, .ftable .frange { display: none; }
+.ftable .bin { display: flex; flex-wrap: wrap; column-gap: .6ch; color: var(--text-2); }
+.ftable .fval { color: var(--text); white-space: nowrap; }
+.ftable .fmeaning, .ftable .bin, .ftable .chip { overflow-wrap: normal; }
+.ftable .fmeaning { color: var(--strong); font-weight: 700; }
+@container (max-width: 380px) {
+  .ftable .fbits-col { display: none; }
+  .ftable th .sub { display: inline; color: var(--dim); }
+  .ftable .frange { display: block; margin: 2px 0 0 1px; font-size: 10.5px; line-height: 13px; }
+  .ftable .ffield { white-space: normal; } /* a long name breaks after a "|" (breakable) */
+}
+/* A narrow Inspector: smaller bits, so that 32 of them fit across; narrower margins. */
+@container (max-width: 520px) {
+  .insp .fbits .bit { font-size: 11px; line-height: 20px; margin: 0; }
+  .insp .franges { font-size: 9px; padding: 0 2px; }
+  .insp .fname { font-size: 11px; }
+  .insp .fmean { font-size: 10px; }
+  .insp .bitgrid { gap: 0 2px; }
+  .insp .ibody { --ipad: 12px; }
+  .ftable td { padding-right: 10px; }
+}
+@container (max-width: 400px) {
+  .insp .fbits { margin: 1px 1px; }
+  .insp .fbits .bit { font-size: 9.5px; line-height: 18px; background: none; }
+  .insp .franges { font-size: 8.5px; }
+  .insp .fname { font-size: 10px; }
+  .insp .bitgrid { gap: 0 1px; }
+  .insp .ibody { --ipad: 8px; }
+  .ftable { font-size: 11.5px; }
 }
 
 /* ---- Console ------------------------------------------------------------ */

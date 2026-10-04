@@ -32,7 +32,7 @@ export function meaningOf(f: InstructionField, d: DecodedInstruction): string {
     case 'funct3': return d.name ? `${d.name}` : '';
     case 'funct7': return d.funct7 === 0x20 ? '0100000 (sub / sra)' : d.funct7 === 1 ? '0000001 (M extension)' : '';
     case 'imm[11:0]': return String(d.imm);                    // sign-extended
-    case 'shamt': return `${f.value}비트`;
+    case 'shamt': return `${f.value} bit${f.value === 1 ? '' : 's'}`;
     default: {
       // A field holding pieces of a scattered immediate: which bits of it.
       const parts = immediateParts(d.word);
@@ -45,19 +45,20 @@ export function meaningOf(f: InstructionField, d: DecodedInstruction): string {
 const binary = (v: number, width: number): string => (v >>> 0).toString(2).padStart(width, '0').slice(-width);
 
 /* The immediate's value as the instruction uses it, said once, with how it
-   was put together where that is not plain:
-     I  "imm = 0xffb = -5 (12비트, 부호 확장)"
-     B  "imm = 0b1111100110000 = -208 (13비트: 맨 아래 비트는 늘 0, 부호 확장)"
-     U  "imm = 0x12345000 (위 20비트, 아래 12비트는 0)" */
+   was put together where that is not plain.  The value is code (in
+   backticks, for the view's codeText); the note after it is Korean:
+     I  "`imm = 0xffb = -5` (12비트, Sign-extend)"
+     B  "`imm = 0b1111100110000 = -208` (13비트: 맨 아래 비트는 늘 0이라 명령에 없음, Sign-extend)"
+     U  "`imm = 0x12345000` (위 20비트, 아래 12비트는 0)" */
 export function immediateLine(d: DecodedInstruction, p: ImmediateParts | null = immediateParts(d.word)): string | null {
   if (!p) return null;
   const raw = binary(p.value, p.width);
   switch (d.format) {
-    case 'I': return `imm = 0x${(p.value & 0xfff).toString(16).padStart(3, '0')} = ${p.value} (12비트, 부호 확장)`;
-    case 'S': return `imm = 0b${raw} = ${p.value} (12비트, 두 조각을 이어 붙여 부호 확장)`;
-    case 'B': return `imm = 0b${raw} = ${p.value} (13비트: 맨 아래 비트는 늘 0이라 명령에 없음, 부호 확장)`;
-    case 'J': return `imm = 0b${raw} = ${p.value} (21비트: 맨 아래 비트는 늘 0이라 명령에 없음, 부호 확장)`;
-    case 'U': return `imm = ${hex32(p.value)} (위 20비트, 아래 12비트는 0)`;
+    case 'I': return `\`imm = 0x${(p.value & 0xfff).toString(16).padStart(3, '0')} = ${p.value}\` (12비트, Sign-extend)`;
+    case 'S': return `\`imm = 0b${raw} = ${p.value}\` (12비트, 두 조각을 이어 붙여 Sign-extend)`;
+    case 'B': return `\`imm = 0b${raw} = ${p.value}\` (13비트: 맨 아래 비트는 늘 0이라 명령에 없음, Sign-extend)`;
+    case 'J': return `\`imm = 0b${raw} = ${p.value}\` (21비트: 맨 아래 비트는 늘 0이라 명령에 없음, Sign-extend)`;
+    case 'U': return `\`imm = ${hex32(p.value)}\` (위 20비트, 아래 12비트는 0)`;
     default: return null;
   }
 }
