@@ -1,6 +1,6 @@
 /* A few screenshots of the running app, for looking at a change by eye.
 
-     xvfb-run -a -s '-screen 0 2400x1400x24' node tools/shot.ts <out-dir> [width] [--isa mips|riscv] [--theme light|dark]
+     xvfb-run -a -s '-screen 0 2400x1400x24' node tools/shot.ts <out-dir> [width] [--isa mips|riscv] [--theme light|dark] [--lang ko|en]
 
    start-<w>.png   the first screen (the board settled)
    work-<w>.png    a sample assembled, a few steps, the Inspector on one instruction:
@@ -13,12 +13,14 @@
    or electron/engine/).
    --css <file>: a stylesheet laid over the page first (trying out colours).
    --theme light|dark: the theme (renderer/app/theme.ts), set right after launch;
-   dark by default. */
+   dark by default.
+   --lang ko|en: the language (renderer/app/i18n.ts), set right after launch;
+   by default the system's. */
 
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 
-import { launch, openAndAssemble, sample, settled, textRow } from '../tests/e2e/harness.ts';
+import { launch, openAndAssemble, sample, setLang, settled, textRow } from '../tests/e2e/harness.ts';
 
 const args = process.argv.slice(2);
 const cssAt = args.indexOf('--css');
@@ -29,6 +31,9 @@ if (isa !== 'mips' && isa !== 'riscv') throw new Error(`--isa ${isa}: mips or ri
 const themeAt = args.indexOf('--theme');
 const theme = themeAt >= 0 ? args.splice(themeAt, 2)[1] : 'dark';
 if (theme !== 'light' && theme !== 'dark') throw new Error(`--theme ${theme}: light or dark`);
+const langAt = args.indexOf('--lang');
+const lang = langAt >= 0 ? args.splice(langAt, 2)[1] : null;
+if (lang !== null && lang !== 'ko' && lang !== 'en') throw new Error(`--lang ${lang}: ko or en`);
 const out = path.resolve(args[0] ?? 'build/shots');
 const width = Number(args[1] ?? 1280);
 mkdirSync(out, { recursive: true });
@@ -46,6 +51,7 @@ try {
       window.dispatchEvent(new CustomEvent('themechange', { detail: t }));
     }, theme);
   }
+  if (lang) await setLang(r.page, lang);
   if (css) await r.page.addStyleTag({ path: css });
   await r.page.waitForTimeout(12_000); // the board grows for about 8.5 s
   await r.page.screenshot({ path: path.join(out, `start-${width}.png`) });
