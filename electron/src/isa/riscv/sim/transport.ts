@@ -67,6 +67,9 @@ export function engineArgs(cmd: EngineCommand): string[] {
     '-Dfile.encoding=UTF-8', '-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8',
     // This process: the engine leaves when it is gone (RarsProbe, "parent.pid").
     `-Dparent.pid=${process.pid}`,
+    // RARS's settings in the engine's own folder and nowhere else: not in the
+    // registry on Windows, not in the user's home (probe/src/StudioPrefs.java).
+    '-Djava.util.prefs.PreferencesFactory=StudioPrefs',
     ...(cmd.prefsDir ? [`-Djava.util.prefs.userRoot=${cmd.prefsDir}`] : []),
     ...(cmd.extraArgs ?? []), '-cp', cmd.classpath, 'RarsProbe'];
 }
