@@ -21,7 +21,7 @@ export const SETTINGS = {
   advanced: { ko: '— 이번 실행에만 적용되고, 다음 어셈블부터 쓰입니다', en: '— for this run only, taken up by the next assemble' },
   machine: {
     bare: {
-      ko: '늘 꺼져 있습니다. 이 교과목은 쓰지 않고, 켜면 교재의 `li` · `la` · `move` 명령이 오류가 됩니다(Qt판과 같음)',
+      ko: '늘 꺼져 있습니다. 켜면 `li` · `la` · `move` 명령이 오류가 됩니다(QtSpim 과 같음)',
       en: 'Always off: with it on, the `li` · `la` · `move` instructions are errors (as in QtSpim)',
     },
     acceptPseudo: { ko: '`li` · `la` · `move` 같은 명령. 끄면 이들이 문법 오류가 됩니다', en: 'Instructions such as `li` · `la` · `move`. Off, they are syntax errors' },
