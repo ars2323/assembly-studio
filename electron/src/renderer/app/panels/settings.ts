@@ -3,12 +3,16 @@
 
      Font size        the code font, the UI font follows (Ctrl +/- too)
      Data radix       the base the Data tab shows its words in
+     Language         KO / EN (i18n.ts), the same as the switches on the
+                      first screen and in the status line
      Advanced         QtSpim's Settings and Run Parameters: machine options,
      (folded)         the program's arguments, the exception handler --
                       taken up by the next assemble. */
 
 import type { MachineOptions } from '../../../../native/index.ts';
 import { code, codeText, h } from '../dom.ts';
+import { currentLang, onLang, setLang, tr, type Lang } from '../i18n.ts';
+import { SETTINGS } from '../messages/settings.ts';
 
 export type HandlerChoice = { kind: 'default' } | { kind: 'none' } | { kind: 'file'; name: string; text: string };
 
@@ -39,18 +43,31 @@ export interface SettingsEvents {
   about(): void;
 }
 
-const MACHINE: { key: keyof MachineOptions; label: string; note: string }[] = [
-  { key: 'acceptPseudo', label: 'Pseudo instructions', note: '`li` · `la` · `move` 같은 명령. 끄면 이들이 문법 오류가 됩니다' },
-  { key: 'delayedBranches', label: 'Delayed branches', note: '분기·점프가 한 명령 늦게 적용됩니다. 분기 오프셋이 PC+4 기준이 됩니다' },
-  { key: 'delayedLoads', label: 'Delayed loads', note: '적재한 값이 한 명령 늦게 레지스터에 들어갑니다' },
-  { key: 'mappedIo', label: 'Mapped I/O', note: '콘솔을 메모리의 장치 레지스터(`0xffff0000`~)로 씁니다. 실행 중에도 입력 칸이 열립니다' },
-  { key: 'quiet', label: 'Quiet', note: '예외가 나도 "Exception occurred" 메시지를 내지 않습니다' },
+const MACHINE: { key: keyof MachineOptions; label: string }[] = [
+  { key: 'acceptPseudo', label: 'Pseudo instructions' },
+  { key: 'delayedBranches', label: 'Delayed branches' },
+  { key: 'delayedLoads', label: 'Delayed loads' },
+  { key: 'mappedIo', label: 'Mapped I/O' },
+  { key: 'quiet', label: 'Quiet' },
 ];
+
+// The Language row's control, KO | EN, like Data radix's (both ISAs' Settings).
+export function languageControl(): HTMLElement {
+  const seg = h('span', { class: 'seg', role: 'radiogroup', 'aria-label': 'Language' }, ...(['ko', 'en'] as Lang[]).map((l) => {
+    const el = h('button', { type: 'button', role: 'radio', title: l === 'ko' ? '한국어' : 'English', 'aria-checked': String(currentLang() === l),
+      class: currentLang() === l ? 'on' : '' }, l.toUpperCase());
+    el.addEventListener('click', () => setLang(l));
+    return el;
+  }));
+  return seg;
+}
 
 export function settingsDialog(events: SettingsEvents): { root: HTMLDialogElement; open(): void } {
   const dialog = h('dialog', { class: 'modal settings', 'aria-label': 'Settings' });
+  // Its words in the other language at once (the KO/EN row is in it); Advanced stays open or shut.
+  onLang(() => { if (dialog.open) render(dialog.querySelector<HTMLDetailsElement>('details.advanced')?.open); });
 
-  const render = () => {
+  const render = (wasOpen?: boolean) => {
     const adv = events.advanced();
     const size = code(`${events.fontSize()}px`, 'value');
     const step = (d: number) => async () => {
@@ -78,10 +95,10 @@ export function settingsDialog(events: SettingsEvents): { root: HTMLDialogElemen
     };
     const machine = h('div', { class: 'opts' },
       h('label', { class: 'opt off' }, box(false, true, () => {}),
-        h('span', {}, h('b', {}, 'Bare machine'), h('small', {}, codeText('늘 꺼져 있습니다. 이 교과목은 쓰지 않고, 켜면 교재의 `li` · `la` · `move` 명령이 오류가 됩니다(Qt판과 같음)')))),
+        h('span', {}, h('b', {}, 'Bare machine'), h('small', {}, codeText(tr(SETTINGS.machine.bare))))),
       ...MACHINE.map((m) => h('label', { class: 'opt' },
         box(adv.machine[m.key], false, (v) => change((a) => { a.machine[m.key] = v; })),
-        h('span', {}, h('b', {}, m.label), h('small', {}, codeText(m.note))))));
+        h('span', {}, h('b', {}, m.label), h('small', {}, codeText(tr(SETTINGS.machine[m.key])))))));
     const args = h('input', { class: 'mono text', type: 'text', value: adv.args, spellcheck: 'false', 'aria-label': 'Program arguments' });
     args.addEventListener('change', () => change((a) => { a.args = args.value.trim(); }));
     const handlerRow = h('div', { class: 'radios' }, ...([
@@ -95,20 +112,20 @@ export function settingsDialog(events: SettingsEvents): { root: HTMLDialogElemen
           else render();
         } else change((a) => { a.handler = { kind }; });
       });
-      return h('label', { class: 'radio' }, radio, kind === 'none' ? h('span', {}, 'None — ', code('__start'), ' 라벨을 프로그램이 직접 둡니다')
+      return h('label', { class: 'radio' }, radio, kind === 'none' ? h('span', {}, codeText(tr(SETTINGS.handlerNone)))
         : kind === 'file' && adv.handler.kind === 'file' ? h('span', {}, 'File ', code(adv.handler.name)) : label);
     }));
     const reset = h('button', { class: 'btn small', type: 'button' }, 'Reset advanced');
     reset.addEventListener('click', () => { events.setAdvanced(defaultAdvanced()); render(); });
     const details = h('details', { class: 'advanced' },
-      h('summary', {}, 'Advanced ', h('small', {}, '— 이번 실행에만 적용되고, 다음 어셈블부터 쓰입니다')),
+      h('summary', {}, 'Advanced ', h('small', {}, tr(SETTINGS.advanced))),
       h('h4', {}, 'Machine'), machine,
       h('h4', {}, 'Run Parameters'),
       h('div', { class: 'row' }, h('span', { class: 'mono' }, 'program.s'), args),
-      h('small', { class: 'hint' }, codeText('`argv[0]` 값은 늘 `program.s` 입니다(모두 같은 스택을 보도록). 시작 주소는 `__start` 입니다.')),
+      h('small', { class: 'hint' }, codeText(tr(SETTINGS.argv))),
       h('h4', {}, 'Exception handler'), handlerRow,
       h('div', { class: 'row end' }, reset));
-    if (!sameAdvanced(adv, defaultAdvanced())) details.open = true;
+    if (wasOpen ?? !sameAdvanced(adv, defaultAdvanced())) details.open = true;
 
     const close = h('button', { class: 'btn primary', type: 'button' }, 'Close');
     close.addEventListener('click', () => dialog.close());
@@ -117,9 +134,11 @@ export function settingsDialog(events: SettingsEvents): { root: HTMLDialogElemen
     dialog.replaceChildren(
       h('h2', {}, 'Settings'),
       h('div', { class: 'prow' }, h('span', {}, 'Font size'), h('span', { class: 'grow' }), minus, size, plus),
-      h('small', { class: 'hint' }, '이번 실행에만 적용됩니다. Ctrl + / Ctrl − / Ctrl 0 키로도 바꿀 수 있습니다.'),
+      h('small', { class: 'hint' }, tr(SETTINGS.fontSize)),
       h('div', { class: 'prow' }, h('span', {}, 'Data radix'), h('span', { class: 'grow' }), bases),
-      h('small', { class: 'hint' }, 'Data 탭의 값을 이 진법으로 보여 줍니다. 이번 실행에만 적용됩니다.'),
+      h('small', { class: 'hint' }, tr(SETTINGS.dataRadix)),
+      h('div', { class: 'prow' }, h('span', {}, 'Language'), h('span', { class: 'grow' }), languageControl()),
+      h('small', { class: 'hint' }, tr(SETTINGS.language)),
       details,
       h('div', { class: 'row' }, aboutButton, h('span', { class: 'grow' }), close));
   };

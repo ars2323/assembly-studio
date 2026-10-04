@@ -49,6 +49,8 @@ import { brand } from '../../brand.ts';
 import './api.ts';
 import { asset, code, codeText, h, icon, markImg, monoCh, withHex } from './dom.ts';
 import { onTheme, THEME_FADE_MS, themeSwitch } from './theme.ts';
+import { currentLang, langSwitch, onLang, tr } from './i18n.ts';
+import { DIALOGS } from './messages/dialogs.ts';
 import { captionPatch, mixPalette, palette } from './logic/overlay.ts';
 import { WINDOW_COLOURS } from '../../main/theme.ts';
 import { notice } from './notice.ts';
@@ -195,8 +197,9 @@ const homeButton = titlebar.querySelector<HTMLElement>('.brand')!;
 homeButton.addEventListener('click', () => void goHome());
 homeButton.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void goHome(); } });
 const status = h('footer', { class: 'status' });
-// The light/dark switch at the status line's right end (theme.ts); kept across its re-renders.
-const statusTheme = h('span', { class: 'stheme' }, themeSwitch());
+// The KO/EN and light/dark switches at the status line's right end (i18n.ts,
+// theme.ts); kept across its re-renders.
+const statusTheme = h('span', { class: 'stheme' }, langSwitch(), themeSwitch());
 
 // ---- the first screen ------------------------------------------------------------
 
@@ -766,10 +769,10 @@ async function exportImage(): Promise<void> {
 // unsaved changes are asked about first.
 async function goHome(): Promise<void> {
   if (open && dirty && !(await ask({
-    title: '저장하지 않은 변경이 있습니다',
+    title: tr(DIALOGS.unsaved.title),
     file: file.name,
-    body: '처음 화면으로 가면 저장하지 않은 내용은 사라집니다.',
-    ok: '버리고 계속', cancel: '돌아가기', danger: true,
+    body: tr(DIALOGS.unsaved.home),
+    ok: tr(DIALOGS.unsaved.discard), cancel: tr(DIALOGS.unsaved.back), danger: true,
   }))) return;
   location.replace(`?isa=mips&home=1`);
 }
@@ -778,18 +781,18 @@ async function mayReplace(what: 'new' | 'open'): Promise<boolean> {
   if (!open) return true;
   if (dirty) {
     return ask({
-      title: '저장하지 않은 변경이 있습니다',
+      title: tr(DIALOGS.unsaved.title),
       file: file.name,
-      body: `${what === 'new' ? '새 파일을 열면' : '다른 파일을 열면'} 저장하지 않은 내용은 사라집니다.`,
-      ok: '버리고 계속', cancel: '돌아가기', danger: true,
+      body: tr(what === 'new' ? DIALOGS.unsaved.newFile : DIALOGS.unsaved.openFile),
+      ok: tr(DIALOGS.unsaved.discard), cancel: tr(DIALOGS.unsaved.back), danger: true,
     });
   }
   if (what === 'new') {
     return ask({
-      title: '새 파일을 열까요?',
+      title: tr(DIALOGS.newFile.title),
       file: file.name,
-      body: '이 파일은 저장되어 있습니다. 편집기를 비우고 새 파일을 시작합니다.',
-      ok: '새 파일', cancel: '돌아가기',
+      body: tr(DIALOGS.newFile.body),
+      ok: tr(DIALOGS.newFile.ok), cancel: tr(DIALOGS.unsaved.back),
     });
   }
   return true;
@@ -834,9 +837,9 @@ async function startTutorial(): Promise<void> {
   if (tutorial.active || busy) return;
   if (open && dirty && !file.example) {
     const go = await ask({
-      title: '저장하지 않은 변경이 있습니다', file: file.name,
-      body: '튜토리얼을 하는 동안 이 파일은 잠시 내려갑니다. 끝나면 바뀐 내용 그대로 돌아옵니다. 먼저 저장하려면 돌아가서 Ctrl+S 키를 누르세요.',
-      ok: '튜토리얼 시작', cancel: '돌아가기',
+      title: tr(DIALOGS.unsaved.title), file: file.name,
+      body: tr(DIALOGS.unsaved.tutorial),
+      ok: tr(DIALOGS.unsaved.startTutorial), cancel: tr(DIALOGS.unsaved.back),
     });
     if (!go) return;
   }
@@ -856,7 +859,8 @@ const tutorial = new Tutorial({
   narrow: () => narrow,
   view: () => view,
   showView: (v) => showView(v),
-  open: async (name) => { await load(await api.openExample(name), name); },
+  // The example's comments in the language in use when it opens (src/examples/en/).
+  open: async (name) => { await load(await api.openExample(name, currentLang()), name); },
   example: () => file.example ?? null,
   source: () => editor.text(),
   assembled: () => current(),
@@ -1352,6 +1356,8 @@ function showInspector(): void {
   else inspector.guide();
 }
 inspector.onFollow = () => { clearSelection(); renderStatus(); };
+// The other language (i18n.ts): the Inspector's explanation says it again in it.
+onLang(() => { if (open) showInspector(); });
 
 // ---- Data ------------------------------------------------------------------------------
 
