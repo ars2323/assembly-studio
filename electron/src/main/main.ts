@@ -43,6 +43,9 @@ export type { ImageJob, ImageReply } from './export-image.ts';
 app.setName(brand.name);
 // The top bar's height in the window (src/renderer/app/app.css --titlebar).
 const TITLE_BAR_HEIGHT = 36;
+// The caption buttons' patch stops one pixel short of it: the bar's bottom
+// border (app.css .titlebar) runs under the buttons instead of breaking there.
+const CAPTION_HEIGHT = TITLE_BAR_HEIGHT - 1;
 // The Start menu shortcut carries this id (tools/package.ts appId): the window groups with it.
 if (process.platform === 'win32') app.setAppUserModelId(brand.appId);
 // ---- this run's profile folder, and nothing else on disk --------------------
@@ -123,7 +126,7 @@ async function main(): Promise<void> {
     // maximise button -- keep working, as do double-click to maximise and
     // dragging to the top edge on the bar's drag region.
     titleBarStyle: 'hidden',
-    titleBarOverlay: { color: WINDOW_COLOURS.titlebar, symbolColor: WINDOW_COLOURS.symbol, height: TITLE_BAR_HEIGHT },
+    titleBarOverlay: { color: WINDOW_COLOURS.titlebar, symbolColor: WINDOW_COLOURS.symbol, height: CAPTION_HEIGHT },
     webPreferences: {
       preload: paths.preload,
       contextIsolation: true,
@@ -213,7 +216,7 @@ async function main(): Promise<void> {
   });
   ipcMain.handle('win:overlay', (_e, patch: { color: string; symbolColor: string }) => {
     Object.assign(win, { overlayColor: patch.color, overlaySymbol: patch.symbolColor });
-    try { win.setTitleBarOverlay({ color: patch.color, symbolColor: patch.symbolColor, height: TITLE_BAR_HEIGHT }); } catch { /* no title bar overlay on this platform */ }
+    try { win.setTitleBarOverlay({ color: patch.color, symbolColor: patch.symbolColor, height: CAPTION_HEIGHT }); } catch { /* no title bar overlay on this platform */ }
   });
 
   // Maximised before it is shown -- every start, whatever the screen, since
