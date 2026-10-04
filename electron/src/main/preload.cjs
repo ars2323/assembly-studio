@@ -45,4 +45,11 @@ contextBridge.exposeInMainWorld('app', {
   setSettings: (s) => ipcRenderer.invoke('settings:set', s),
   setOverlay: (patch) => ipcRenderer.invoke('win:overlay', patch),
   setTheme: (theme) => ipcRenderer.invoke('win:theme', theme),
+  // Updates (src/main/updater.ts), asked for by the first screen only.
+  checkUpdate: () => ipcRenderer.invoke('update:check'),
+  downloadUpdate: () => ipcRenderer.invoke('update:download'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+  onUpdateProgress: (listener) => ipcRenderer.on('update:progress', (_e, p) => listener(p)),
+  onUpdateReady: (listener) => ipcRenderer.on('update:ready', () => listener()),
+  onUpdateError: (listener) => ipcRenderer.on('update:error', (_e, message) => listener(message)),
 });

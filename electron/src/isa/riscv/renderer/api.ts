@@ -2,7 +2,7 @@
    window.  (The preload serves both windows; src/renderer/app/api.ts is the
    MIPS window's view and the one declared on Window.) */
 
-import type { ImageJob, ImageReply, OpenedFile, Settings } from '../../../main/main.ts';
+import type { ImageJob, ImageReply, OpenedFile, Settings, UpdateCheck, UpdateProgress } from '../../../main/main.ts';
 import type { EngineState } from '../sim/host.ts';
 import type { TextFileFormat } from '../../../node/text-file.ts';
 import type { CallName, Calls } from '../sim/protocol.ts';
@@ -38,6 +38,16 @@ export interface AppApi {
   setSettings(s: Settings): Promise<Settings>;
   setOverlay(patch: { color: string; symbolColor: string }): Promise<void>;  // the caption buttons' patch and symbols (logic/overlay.ts)
   setTheme(theme: 'dark' | 'light'): Promise<void>;  // the window's own background for the theme (theme.ts)
+  // Updates (src/main/updater.ts; the first screen, panels/welcome.ts): is there
+  // a newer release (no answer after about 6 s: no); its download, with
+  // progress, then ready or an error; installing it (the program quits, the
+  // installer runs silently and starts the new version).
+  checkUpdate(): Promise<UpdateCheck>;
+  downloadUpdate(): Promise<void>;
+  installUpdate(): Promise<void>;
+  onUpdateProgress(listener: (p: UpdateProgress) => void): void;
+  onUpdateReady(listener: () => void): void;
+  onUpdateError(listener: (message: string) => void): void;
 }
 
 export interface AboutInfo {
