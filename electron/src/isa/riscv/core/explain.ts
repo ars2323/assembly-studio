@@ -5,10 +5,14 @@
    instructions the course meets, in all six formats.  Branches, jumps and auipc also
    need the instruction's own address (pc): their target is relative to it.
 
+   Korean sentences; the terms of art stay in English (Overflow, Exception,
+   Immediate, Offset, Word, Sign-extend ...), as the course says them.
+
    Code -- register names, numbers taken from the machine -- is wrapped in
    backticks, which the view sets in the monospaced font.  A particle always
-   follows a Korean noun (값(`…`)을, `x5` 레지스터에), never a register name
-   or a number, whose reading would decide between 을/를, 이/가. */
+   follows a Korean noun or a term whose reading is settled (값(`…`)을,
+   Offset(`4`)을, `x5` 레지스터에, Overflow가), never a register name or a
+   number, whose reading would decide between 을/를, 이/가. */
 
 import type { DecodedInstruction } from './decoder.ts';
 import { hex32 } from '../../../core/format.ts';
@@ -55,74 +59,80 @@ const SYSCALLS: Record<number, string> = {
   12: 'ReadChar — 문자 하나를 읽어 `a0` 레지스터에', 93: 'Exit2 — `a0` 값을 종료 코드로 끝냄',
 };
 
+// A branch's or jal's destination: PC + Offset.
+const target = (pc: number | null, imm: number): string => (pc === null
+  ? `PC에서 Offset(${code(imm)})만큼 떨어진 곳`
+  : `${code(hex32((pc + imm) >>> 0))} 주소(PC + Offset ${code(imm)})`);
+
 function sentence(d: DecodedInstruction, regs: readonly number[], pc: number | null): string {
   const { rd, rs1, rs2, imm, name } = d;
   const to = `${reg(rd)} 레지스터에 넣습니다.`;
   const ops: Record<string, string> = { and: 'AND', or: 'OR', xor: 'XOR', andi: 'AND', ori: 'OR', xori: 'XOR' };
+  // RISC-V's add, addi and sub never trap.
+  const wraps = ' Overflow가 나도 Exception 없이 아래 32비트만 남깁니다.';
   switch (name) {
-    case 'add': return `${val(regs, rs1)}과 ${val(regs, rs2)}을 더해 ${to} 넘쳐도 예외는 나지 않습니다.`;
-    case 'sub': return `${val(regs, rs1)}에서 ${val(regs, rs2)}을 빼 ${to}`;
+    case 'add': return `${val(regs, rs1)}과 ${val(regs, rs2)}을 더해 ${to}${wraps}`;
+    case 'sub': return `${val(regs, rs1)}에서 ${val(regs, rs2)}을 빼 ${to}${wraps}`;
     case 'and': case 'or': case 'xor': return `${val(regs, rs1)}과 ${val(regs, rs2)}을 비트마다 ${ops[name]} 해 ${to}`;
     case 'sll': case 'srl': case 'sra':
       return `${val(regs, rs1)}을 ${val(regs, rs2)}의 아래 5비트만큼 ${name === 'sll' ? '왼쪽' : '오른쪽'}으로 옮겨 ${to}`
-        + (name === 'sra' ? ' 빈 자리는 부호 비트로 채웁니다.' : '');
+        + (name === 'sra' ? ' 빈 자리는 Sign bit로 채웁니다.' : '');
     case 'slt': case 'sltu':
-      return `${val(regs, rs1)}이 ${val(regs, rs2)}보다 작으면 1, 아니면 0을 ${to} (${name === 'slt' ? '부호 있는' : '부호 없는'} 비교)`;
+      return `${val(regs, rs1)}이 ${val(regs, rs2)}보다 작으면 1, 아니면 0을 ${to} (${name === 'slt' ? 'Signed' : 'Unsigned'} 비교)`;
     case 'mul': return `${val(regs, rs1)}과 ${val(regs, rs2)}을 곱한 값의 아래 32비트를 ${to}`;
     case 'div': case 'divu': case 'rem': case 'remu':
       return `${val(regs, rs1)}을 ${val(regs, rs2)}로 나눈 ${name.startsWith('div') ? '몫' : '나머지'}을 ${to}`;
     case 'addi':
       if (rd === 0 && rs1 === 0 && imm === 0) return '아무것도 하지 않습니다(`nop`).';
-      if (rs1 === 0) return `즉시값(${code(imm)})을 ${to} (\`li\` 명령이 이렇게 바뀝니다.)`;
-      return `${val(regs, rs1)}에 즉시값(${code(imm)})을 더해 ${to}`;
-    case 'andi': case 'ori': case 'xori': return `${val(regs, rs1)}과 즉시값(${code(imm)})을 비트마다 ${ops[name]} 해 ${to}`;
-    case 'slti': case 'sltiu': return `${val(regs, rs1)}이 즉시값(${code(imm)})보다 작으면 1, 아니면 0을 ${to}`;
+      if (rs1 === 0) return `Immediate 값(${code(imm)})을 ${to} (\`li\` 명령이 이렇게 바뀝니다.)`;
+      return `${val(regs, rs1)}에 Immediate 값(${code(imm)})을 더해 ${to}${wraps}`;
+    case 'andi': case 'ori': case 'xori': return `${val(regs, rs1)}과 Immediate 값(${code(imm)})을 비트마다 ${ops[name]} 해 ${to}`;
+    case 'slti': case 'sltiu':
+      return `${val(regs, rs1)}이 Immediate 값(${code(imm)})보다 작으면 1, 아니면 0을 ${to} (${name === 'slti' ? 'Signed' : 'Unsigned'} 비교)`;
     case 'slli': case 'srli': case 'srai':
       return `${val(regs, rs1)}을 shamt 값(${code(d.rs2)})만큼 ${name === 'slli' ? '왼쪽' : '오른쪽'}으로 옮겨 ${to}`
-        + (name === 'srai' ? ' 빈 자리는 부호 비트로 채웁니다.' : '');
+        + (name === 'srai' ? ' 빈 자리는 Sign bit로 채웁니다.' : '');
     case 'lw': case 'lh': case 'lb': case 'lhu': case 'lbu': {
       const addr = ((regs[rs1] ?? 0) + imm) >>> 0;
-      const size = { lw: '4바이트', lh: '2바이트', lb: '1바이트', lhu: '2바이트', lbu: '1바이트' }[name];
-      return `${val(regs, rs1)}에 오프셋(${code(imm)})을 더한 ${code(hex32(addr))} 주소에서 읽은 ${size} 값을 ${to}`
-        + (name.endsWith('u') ? ' 빈 윗자리는 0으로 채웁니다.' : name === 'lw' ? '' : ' 윗자리는 부호 비트로 채웁니다.');
+      const unit = { lw: 'Word', lh: 'Halfword', lb: 'Byte', lhu: 'Halfword', lbu: 'Byte' }[name];
+      return `${val(regs, rs1)}에 Offset(${code(imm)})을 더한 ${code(hex32(addr))} 주소의 ${unit}를 읽어 ${to}`
+        + (name.endsWith('u') ? ' 위쪽 비트는 0으로 채웁니다(Zero-extend).' : name === 'lw' ? '' : ' 위쪽 비트는 Sign bit로 채웁니다(Sign-extend).');
     }
     case 'jalr': {
       const dest = (((regs[rs1] ?? 0) + imm) & ~1) >>> 0;
-      return `${code(hex32(dest))} 주소로 뜁니다(${val(regs, rs1)} + ${code(imm)}). `
+      return `${code(hex32(dest))} 주소로 Jump합니다(${val(regs, rs1)} + Offset ${code(imm)}). `
         + (rd === 0 ? '돌아올 주소는 남기지 않습니다(`ret`, `jr`).' : `다음 명령의 주소를 ${reg(rd)} 레지스터에 남깁니다.`);
     }
     case 'ecall': {
       const call = SYSCALLS[regs[17] ?? -1];
-      return call ? `${code('a7')} 값(${code(regs[17])}): ${call}.` : `${code('a7')} 값(${code(regs[17] ?? 0)})의 시스템 호출을 부릅니다.`;
+      return call ? `${code('a7')} 값(${code(regs[17])}): ${call}.` : `${code('a7')} 값(${code(regs[17] ?? 0)})에 따라 System call을 합니다.`;
     }
-    case 'ebreak': return '여기서 멈춥니다(디버거로 제어를 넘깁니다).';
+    case 'ebreak': return 'Breakpoint Exception을 일으켜 여기서 멈춥니다(디버거로 제어를 넘깁니다).';
     case 'sw': case 'sh': case 'sb': {
       const addr = ((regs[rs1] ?? 0) + imm) >>> 0;
-      const size = { sw: '4바이트', sh: '아래 2바이트', sb: '아래 1바이트' }[name];
-      return `${val(regs, rs2)}의 ${size} 값을 ${val(regs, rs1)}에 오프셋(${code(imm)})을 더한 ${code(hex32(addr))} 주소에 씁니다.`;
+      const unit = { sw: 'Word', sh: '아래 Halfword', sb: '아래 Byte' }[name];
+      return `${val(regs, rs2)}의 ${unit}를 ${val(regs, rs1)}에 Offset(${code(imm)})을 더한 ${code(hex32(addr))} 주소에 씁니다.`;
     }
     case 'flw': case 'fld': case 'fsw': case 'fsd': {
       const addr = ((regs[rs1] ?? 0) + imm) >>> 0;
-      const size = name.endsWith('w') ? '4바이트' : '8바이트';
+      const unit = name.endsWith('w') ? 'Word' : 'Doubleword';
       return name.startsWith('fl')
-        ? `${val(regs, rs1)}에 오프셋(${code(imm)})을 더한 ${code(hex32(addr))} 주소에서 읽은 ${size} 값을 ${code(`f${rd}`)} 레지스터에 넣습니다.`
-        : `${code(`f${rs2}`)} 레지스터의 ${size} 값을 ${val(regs, rs1)}에 오프셋(${code(imm)})을 더한 ${code(hex32(addr))} 주소에 씁니다.`;
+        ? `${val(regs, rs1)}에 Offset(${code(imm)})을 더한 ${code(hex32(addr))} 주소의 ${unit}를 읽어 ${code(`f${rd}`)} 레지스터에 넣습니다.`
+        : `${code(`f${rs2}`)} 레지스터의 ${unit}를 ${val(regs, rs1)}에 Offset(${code(imm)})을 더한 ${code(hex32(addr))} 주소에 씁니다.`;
     }
     case 'beq': case 'bne': case 'blt': case 'bge': case 'bltu': case 'bgeu': {
       const b = BRANCH[name];
-      const where = pc === null ? `오프셋(${code(imm)}) 만큼 떨어진 곳` : `${code(hex32((pc + imm) >>> 0))} 주소(명령 자신의 주소 + 오프셋 ${code(imm)})`;
-      const now = b.holds(regs[rs1] ?? 0, regs[rs2] ?? 0) ? '지금 값으로는 분기합니다.' : '지금 값으로는 분기하지 않고 다음 명령으로 갑니다.';
+      const now = b.holds(regs[rs1] ?? 0, regs[rs2] ?? 0) ? '지금 값으로는 Branch합니다.' : '지금 값으로는 Branch하지 않고 다음 명령으로 갑니다.';
       const cmp = name === 'beq' || name === 'bne' ? `${val(regs, rs1)}과 ${val(regs, rs2)}이 ${b.says}` : `${val(regs, rs1)}이 ${val(regs, rs2)}${b.says}`;
-      return `${cmp} ${where}로 분기합니다${b.unsigned ? '(부호 없는 비교)' : ''}. ${now}`;
+      return `${cmp} ${target(pc, imm)}로 Branch합니다${b.unsigned ? '(Unsigned 비교)' : ''}. ${now}`;
     }
-    case 'lui': return `즉시값(${code(hex32(imm))})을 ${to} 위 20비트에 값을 두고 아래 12비트는 0으로 채웁니다.`;
+    case 'lui': return `Immediate 값(${code(hex32(imm))})을 ${to} 위 20비트에 값을 두고 아래 12비트는 0으로 채웁니다.`;
     case 'auipc':
-      return pc === null ? `명령 자신의 주소에 즉시값(${code(hex32(imm))})을 더해 ${to}`
-        : `명령 자신의 주소(${code(hex32(pc))})에 즉시값(${code(hex32(imm))})을 더한 ${code(hex32((pc + imm) >>> 0))} 값을 ${to}`
+      return pc === null ? `PC(명령 자신의 주소)에 Immediate 값(${code(hex32(imm))})을 더해 ${to}`
+        : `PC(${code(hex32(pc))})에 Immediate 값(${code(hex32(imm))})을 더한 ${code(hex32((pc + imm) >>> 0))} 값을 ${to}`
           + ' (`la` 명령은 `auipc` 명령과 `addi` 명령 둘로 바뀌는데, 그 앞의 것입니다.)';
     case 'jal': {
-      const where = pc === null ? `오프셋(${code(imm)}) 만큼 떨어진 곳` : `${code(hex32((pc + imm) >>> 0))} 주소(명령 자신의 주소 + 오프셋 ${code(imm)})`;
-      return `${where}로 뜁니다. ` + (rd === 0 ? '돌아올 주소는 남기지 않습니다(`j` 명령).'
+      return `${target(pc, imm)}로 Jump합니다. ` + (rd === 0 ? '돌아올 주소는 남기지 않습니다(`j` 명령).'
         : `다음 명령의 주소${pc === null ? '' : `(${code(hex32((pc + 4) >>> 0))})`}를 ${reg(rd)} 레지스터에 남깁니다.`);
     }
     default: return '';
@@ -131,7 +141,7 @@ function sentence(d: DecodedInstruction, regs: readonly number[], pc: number | n
 
 export function explain(d: DecodedInstruction, regs: readonly number[], pc: number | null = null): Explanation {
   const t = TITLES[d.name];
-  return { title: d.name ? (t ? `${d.name} — ${t}` : d.name) : '알 수 없는 명령', sentence: sentence(d, regs, pc) };
+  return { title: d.name ? (t ? `${d.name} — ${t}` : d.name) : 'Unknown instruction', sentence: sentence(d, regs, pc) };
 }
 
 /* "`x5` 값(...)" -> parts, the backticked ones as code. */
