@@ -62,6 +62,7 @@ To uninstall, use Windows Settings › Apps.
 |---|---|
 | Save and assemble | **Save & Assemble**, or `Ctrl+S`. Results and errors appear in the Assemble panel below the Editor |
 | Run one line | **Step**, or `F10` |
+| Undo the last instruction | **Step back**, or `Shift+F10`. Registers and memory return to what they were before it, up to the last 1000 instructions (also after Run). Console output already printed and input already read stay |
 | Run to the end or to a breakpoint | **Run**, or `F5`. While it runs, the button becomes **Stop**; `Esc` also stops it |
 | Run slowly | Set **Run speed** to **1 line/s**, then Run (**Instant** is full speed) |
 | Go back to the start | **Reset**. It restarts the last assembled program; it does not assemble again |
